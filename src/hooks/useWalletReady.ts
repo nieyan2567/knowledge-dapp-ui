@@ -11,5 +11,6 @@ export function useWalletReady() {
     address,
     isConnected,
     isCorrectChain: chainId === besuChain.id,
+    chainId,
   };
 }

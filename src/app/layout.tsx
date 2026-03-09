@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "@/components/providers";
-import { Navbar } from "@/components/navbar";
 
 export const metadata: Metadata = {
   title: "Knowledge DApp",
@@ -15,11 +14,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body>
-        <Providers>
-            <Navbar />
-            {children}
-        </Providers>
+      <body className="bg-slate-50 text-slate-900 antialiased">
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

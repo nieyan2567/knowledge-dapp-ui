@@ -6,7 +6,7 @@ import { besuChain } from "./chains";
 
 export const config = getDefaultConfig({
   appName: "Knowledge DApp",
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "demo-project-id",
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "",
   chains: [besuChain],
   transports: {
     [besuChain.id]: http(
