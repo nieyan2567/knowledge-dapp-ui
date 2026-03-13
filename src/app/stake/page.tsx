@@ -6,6 +6,9 @@ import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { Navbar } from "@/components/navbar";
 import { CONTRACTS, ABIS } from "@/contracts";
 import { SectionCard } from "@/components/section-card";
+import { PageHeader } from "@/components/page-header";
+import { Coins, Wallet, Clock3, ShieldCheck } from "lucide-react";
+import { BRANDING } from "@/lib/branding";
 
 export default function StakePage() {
   const { address } = useAccount();
@@ -93,47 +96,81 @@ export default function StakePage() {
     <div>
       <Navbar />
       <main className="mx-auto max-w-7xl px-6 py-10 space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-950">Stake & Voting Power</h1>
-          <p className="mt-2 text-slate-600">先质押原生币，再激活投票权，才能参与内容投票和 DAO 治理。</p>
-        </div>
+        <PageHeader
+          eyebrow="Staking · Voting Power"
+          title="Stake & Voting Power"
+          description="用户先质押原生币，再激活投票权，才能参与内容投票和 DAO 治理。退出质押时需要先申请，再等待冷却期结束。"
+        />
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-slate-500">投票权</div>
-            <div className="mt-2 text-2xl font-semibold">{votes ? formatEther(votes as bigint) : "0"} BESU</div>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="text-sm text-slate-500">投票权</div>
+              <ShieldCheck className="h-5 w-5 text-slate-400" />
+            </div>
+            <div className="text-2xl font-semibold text-slate-950">
+              {votes ? formatEther(votes as bigint) : "0"} {BRANDING.nativeTokenSymbol}
+            </div>
+            <div className="mt-3 text-sm text-slate-500">已激活的有效投票权</div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-slate-500">已激活质押</div>
-            <div className="mt-2 text-2xl font-semibold">{staked ? formatEther(staked as bigint) : "0"} BESU</div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="text-sm text-slate-500">已激活质押</div>
+              <Coins className="h-5 w-5 text-slate-400" />
+            </div>
+            <div className="text-2xl font-semibold text-slate-950">
+              {staked ? formatEther(staked as bigint) : "0"} {BRANDING.nativeTokenSymbol}
+            </div>
+            <div className="mt-3 text-sm text-slate-500">当前已生效的质押余额</div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-slate-500">待激活质押</div>
-            <div className="mt-2 text-2xl font-semibold">{pendingStake ? formatEther(pendingStake as bigint) : "0"} BESU</div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="text-sm text-slate-500">待激活质押</div>
+              <Clock3 className="h-5 w-5 text-slate-400" />
+            </div>
+            <div className="text-2xl font-semibold text-slate-950">
+              {pendingStake ? formatEther(pendingStake as bigint) : "0"} {BRANDING.nativeTokenSymbol}
+            </div>
+            <div className="mt-3 text-sm text-slate-500">等待区块确认后可激活</div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-slate-500">待提取金额</div>
-            <div className="mt-2 text-2xl font-semibold">{pendingWithdraw ? formatEther(pendingWithdraw as bigint) : "0"} BESU</div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="text-sm text-slate-500">待提取金额</div>
+              <Wallet className="h-5 w-5 text-slate-400" />
+            </div>
+            <div className="text-2xl font-semibold text-slate-950">
+              {pendingWithdraw ? formatEther(pendingWithdraw as bigint) : "0"} {BRANDING.nativeTokenSymbol}
+            </div>
+            <div className="mt-3 text-sm text-slate-500">冷却期后可执行提现</div>
           </div>
-        </div>
+        </section>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <SectionCard
             title="Deposit / Activate"
-            description="质押后需要等待激活区块数，再点击 Activate 才会获得投票权。"
+            description="先发起 Deposit，把原生币锁进合约；等到激活区块数达到后，再点击 Activate 获得投票权。"
           >
             <div className="space-y-4">
               <input
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(e.target.value)}
-                placeholder="输入质押数量"
+                placeholder="输入质押数量，例如 1"
               />
-              <div className="flex gap-3">
-                <button onClick={handleDeposit} className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800">
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={handleDeposit}
+                  className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800"
+                >
                   Deposit
                 </button>
-                <button onClick={handleActivate} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                <button
+                  onClick={handleActivate}
+                  className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
                   Activate
                 </button>
               </div>
@@ -141,21 +178,27 @@ export default function StakePage() {
           </SectionCard>
 
           <SectionCard
-            title="Withdraw"
-            description="先申请退出，再等待冷却期结束后完成提现。"
+            title="Request Withdraw / Withdraw"
+            description="先申请退出，系统会立即减少你的投票权；等冷却期结束后，再执行 Withdraw 提取原生币。"
           >
             <div className="space-y-4">
               <input
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
-                placeholder="输入提取数量"
+                placeholder="输入提取数量，例如 1"
               />
-              <div className="flex gap-3">
-                <button onClick={handleRequestWithdraw} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={handleRequestWithdraw}
+                  className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
                   Request Withdraw
                 </button>
-                <button onClick={handleWithdraw} className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800">
+                <button
+                  onClick={handleWithdraw}
+                  className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800"
+                >
                   Withdraw
                 </button>
               </div>

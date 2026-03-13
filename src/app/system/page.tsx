@@ -5,6 +5,9 @@ import { useReadContract } from "wagmi";
 import { Navbar } from "@/components/navbar";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { SectionCard } from "@/components/section-card";
+import { PageHeader } from "@/components/page-header";
+import { AddressBadge } from "@/components/address-badge";
+import { BRANDING } from "@/lib/branding";
 
 export default function SystemPage() {
   const { data: contentOwner } = useReadContract({
@@ -59,41 +62,84 @@ export default function SystemPage() {
     <div>
       <Navbar />
       <main className="mx-auto max-w-7xl px-6 py-10 space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-950">System Overview</h1>
-          <p className="mt-2 text-slate-600">查看链上关键合约地址、治理参数与 Treasury 状态。</p>
-        </div>
+        <PageHeader
+          eyebrow="Contracts · Roles · Treasury"
+          title="System Overview"
+          description="查看链上关键合约地址、治理参数与 Treasury 状态。"
+        />
 
         <div className="grid gap-6 lg:grid-cols-2">
           <SectionCard title="KnowledgeContent">
-            <div className="space-y-2 text-sm text-slate-600">
-              <div className="break-all">Address: {CONTRACTS.KnowledgeContent}</div>
-              <div className="break-all">Owner: {String(contentOwner ?? "-")}</div>
-              <div className="break-all">VotesContract: {String(votesContract ?? "-")}</div>
-              <div className="break-all">Treasury: {String(treasury ?? "-")}</div>
+            <div className="space-y-3 text-sm text-slate-600">
+              <div className="flex items-center justify-between gap-3">
+                <span>Address</span>
+                <AddressBadge address={CONTRACTS.KnowledgeContent} />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Owner</span>
+                <AddressBadge address={String(contentOwner ?? "")} />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>VotesContract</span>
+                <AddressBadge address={String(votesContract ?? "")} />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Treasury</span>
+                <AddressBadge address={String(treasury ?? "")} />
+              </div>
             </div>
           </SectionCard>
 
           <SectionCard title="TreasuryNative">
-            <div className="space-y-2 text-sm text-slate-600">
-              <div className="break-all">Address: {CONTRACTS.TreasuryNative}</div>
-              <div className="break-all">Owner: {String(treasuryOwner ?? "-")}</div>
-              <div>EpochBudget: {epochBudget ? formatEther(epochBudget as bigint) : "0"} BESU</div>
-              <div>EpochSpent: {epochSpent ? formatEther(epochSpent as bigint) : "0"} BESU</div>
+            <div className="space-y-3 text-sm text-slate-600">
+              <div className="flex items-center justify-between gap-3">
+                <span>Address</span>
+                <AddressBadge address={CONTRACTS.TreasuryNative} />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Owner</span>
+                <AddressBadge address={String(treasuryOwner ?? "")} />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>EpochBudget</span>
+                <span className="font-medium text-slate-900">
+                  {epochBudget ? formatEther(epochBudget as bigint) : "0"} {BRANDING.nativeTokenSymbol}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>EpochSpent</span>
+                <span className="font-medium text-slate-900">
+                  {epochSpent ? formatEther(epochSpent as bigint) : "0"} {BRANDING.nativeTokenSymbol}
+                </span>
+              </div>
             </div>
           </SectionCard>
 
           <SectionCard title="Governor">
-            <div className="space-y-2 text-sm text-slate-600">
-              <div className="break-all">Address: {CONTRACTS.KnowledgeGovernor}</div>
-              <div className="break-all">Token: {String(governorToken ?? "-")}</div>
+            <div className="space-y-3 text-sm text-slate-600">
+              <div className="flex items-center justify-between gap-3">
+                <span>Address</span>
+                <AddressBadge address={CONTRACTS.KnowledgeGovernor} />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Token</span>
+                <AddressBadge address={String(governorToken ?? "")} />
+              </div>
             </div>
           </SectionCard>
 
           <SectionCard title="Timelock">
-            <div className="space-y-2 text-sm text-slate-600">
-              <div className="break-all">Address: {CONTRACTS.TimelockController}</div>
-              <div>MinDelay: {minDelay ? String(minDelay) : "-"} 秒</div>
+            <div className="space-y-3 text-sm text-slate-600">
+              <div className="flex items-center justify-between gap-3">
+                <span>Address</span>
+                <AddressBadge address={CONTRACTS.TimelockController} />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>MinDelay</span>
+                <span className="font-medium text-slate-900">
+                  {minDelay ? String(minDelay) : "-"} 秒
+                </span>
+              </div>
             </div>
           </SectionCard>
         </div>

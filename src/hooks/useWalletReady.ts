@@ -1,7 +1,7 @@
 "use client";
 
 import { useAccount, useChainId } from "wagmi";
-import { besuChain } from "@/lib/chains";
+import { knowledgeChain } from "@/lib/chains";
 
 export function useWalletReady() {
   const { address, isConnected } = useAccount();
@@ -10,7 +10,7 @@ export function useWalletReady() {
   return {
     address,
     isConnected,
-    isCorrectChain: chainId === besuChain.id,
+    isCorrectChain: chainId === knowledgeChain.id,
     chainId,
   };
 }
