@@ -1,13 +1,16 @@
 "use client";
 
+import { Coins, ShieldCheck, Wallet } from "lucide-react";
 import { formatEther } from "viem";
+import { toast } from "sonner";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
-import { Navbar } from "@/components/navbar";
-import { CONTRACTS, ABIS } from "@/contracts";
-import { SectionCard } from "@/components/section-card";
+
+// import { Navbar } from "@/components/navbar";
 import { PageHeader } from "@/components/page-header";
-import { Coins, Wallet, ShieldCheck } from "lucide-react";
+import { SectionCard } from "@/components/section-card";
+import { ABIS, CONTRACTS } from "@/contracts";
 import { BRANDING } from "@/lib/branding";
+import { txToast } from "@/lib/tx-toast";
 
 export default function RewardsPage() {
   const { address } = useAccount();
@@ -34,64 +37,81 @@ export default function RewardsPage() {
   });
 
   async function handleClaim() {
-    if (!address) return;
+    if (!address) {
+      toast.error("请先连接钱包");
+      return;
+    }
 
-    await writeContractAsync({
-      address: CONTRACTS.TreasuryNative as `0x${string}`,
-      abi: ABIS.TreasuryNative,
-      functionName: "claim",
-      account: address,
-    });
+    await txToast(
+      writeContractAsync({
+        address: CONTRACTS.TreasuryNative as `0x${string}`,
+        abi: ABIS.TreasuryNative,
+        functionName: "claim",
+        account: address,
+      }),
+      "正在提交领取奖励交易...",
+      "领取奖励交易已提交",
+      "领取奖励失败"
+    );
   }
 
   return (
     <div>
-      <Navbar />
-      <main className="mx-auto max-w-7xl px-6 py-10 space-y-8">
+      {/* <Navbar /> */}
+      <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
         <PageHeader
           eyebrow="Treasury · Claimable Rewards"
           title="Rewards Center"
-          description="奖励由 Treasury 统一记账与发放。作者在内容达到奖励门槛并完成记账后，可在这里主动领取奖励。"
+          description="Claim rewards that have already been accrued in Treasury for the connected wallet."
         />
 
         <section className="grid gap-4 md:grid-cols-3">
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-slate-500">待领取奖励</div>
+              <div className="text-sm text-slate-500">Pending Rewards</div>
               <Wallet className="h-5 w-5 text-slate-400" />
             </div>
             <div className="text-2xl font-semibold text-slate-950">
-              {pendingRewards ? formatEther(pendingRewards as bigint) : "0"} {BRANDING.nativeTokenSymbol}
+              {pendingRewards ? formatEther(pendingRewards as bigint) : "0"}{" "}
+              {BRANDING.nativeTokenSymbol}
             </div>
-            <div className="mt-3 text-sm text-slate-500">当前账户在 Treasury 中的待领取金额</div>
+            <div className="mt-3 text-sm text-slate-500">
+              Rewards currently available to claim from Treasury.
+            </div>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-slate-500">当前 Epoch Budget</div>
+              <div className="text-sm text-slate-500">Epoch Budget</div>
               <Coins className="h-5 w-5 text-slate-400" />
             </div>
             <div className="text-2xl font-semibold text-slate-950">
-              {epochBudget ? formatEther(epochBudget as bigint) : "0"} {BRANDING.nativeTokenSymbol}
+              {epochBudget ? formatEther(epochBudget as bigint) : "0"}{" "}
+              {BRANDING.nativeTokenSymbol}
             </div>
-            <div className="mt-3 text-sm text-slate-500">当前预算周期内的总奖励上限</div>
+            <div className="mt-3 text-sm text-slate-500">
+              Total reward budget allocated to the current epoch.
+            </div>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-slate-500">当前 Epoch 已使用</div>
+              <div className="text-sm text-slate-500">Epoch Spent</div>
               <ShieldCheck className="h-5 w-5 text-slate-400" />
             </div>
             <div className="text-2xl font-semibold text-slate-950">
-              {epochSpent ? formatEther(epochSpent as bigint) : "0"} {BRANDING.nativeTokenSymbol}
+              {epochSpent ? formatEther(epochSpent as bigint) : "0"}{" "}
+              {BRANDING.nativeTokenSymbol}
             </div>
-            <div className="mt-3 text-sm text-slate-500">当前预算周期内已分配的奖励金额</div>
+            <div className="mt-3 text-sm text-slate-500">
+              Reward amount already distributed in the current epoch.
+            </div>
           </div>
         </section>
 
         <SectionCard
           title="Claim Rewards"
-          description="当你的内容奖励已经被记入 Treasury 后，点击下方按钮即可把奖励提取到当前钱包。"
+          description="Use this action after your rewards have been recorded into Treasury."
         >
           <button
             onClick={handleClaim}

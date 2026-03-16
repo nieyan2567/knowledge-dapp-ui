@@ -2,7 +2,7 @@
 
 import { formatEther } from "viem";
 import { useReadContract } from "wagmi";
-import { Navbar } from "@/components/navbar";
+// import { Navbar } from "@/components/navbar";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { SectionCard } from "@/components/section-card";
 import { PageHeader } from "@/components/page-header";
@@ -60,7 +60,7 @@ export default function SystemPage() {
 
   return (
     <div>
-      <Navbar />
+      {/* <Navbar /> */}
       <main className="mx-auto max-w-7xl px-6 py-10 space-y-8">
         <PageHeader
           eyebrow="Contracts · Roles · Treasury"

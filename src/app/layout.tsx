@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { Toaster } from "sonner";
+import { AppShell } from "@/components/app-shell";
 
 export const metadata: Metadata = {
   title: "Knowledge DApp",
@@ -13,9 +15,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
-      <body className="bg-slate-50 text-slate-900 antialiased">
-        <Providers>{children}</Providers>
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body>
+        <Providers>
+          <AppShell>
+            {children}
+          </AppShell>
+        </Providers>
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   );

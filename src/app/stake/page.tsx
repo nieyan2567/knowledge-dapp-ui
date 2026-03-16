@@ -1,14 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { Clock3, Coins, ShieldCheck, Wallet } from "lucide-react";
 import { formatEther, parseEther } from "viem";
+import { toast } from "sonner";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
-import { Navbar } from "@/components/navbar";
-import { CONTRACTS, ABIS } from "@/contracts";
-import { SectionCard } from "@/components/section-card";
+
+// import { Navbar } from "@/components/navbar";
 import { PageHeader } from "@/components/page-header";
-import { Coins, Wallet, Clock3, ShieldCheck } from "lucide-react";
+import { SectionCard } from "@/components/section-card";
+import { ABIS, CONTRACTS } from "@/contracts";
 import { BRANDING } from "@/lib/branding";
+import { txToast } from "@/lib/tx-toast";
 
 export default function StakePage() {
   const { address } = useAccount();
@@ -16,6 +19,20 @@ export default function StakePage() {
 
   const [depositAmount, setDepositAmount] = useState("1");
   const [withdrawAmount, setWithdrawAmount] = useState("1");
+
+  function parseAmount(value: string, field: string) {
+    if (!value.trim()) {
+      toast.error(`请输入${field}`);
+      return null;
+    }
+
+    try {
+      return parseEther(value.trim());
+    } catch {
+      toast.error(`请输入有效的${field}`);
+      return null;
+    }
+  }
 
   const { data: votes } = useReadContract({
     address: CONTRACTS.NativeVotes as `0x${string}`,
@@ -50,115 +67,160 @@ export default function StakePage() {
   });
 
   async function handleDeposit() {
-    if (!address) return;
-    await writeContractAsync({
-      address: CONTRACTS.NativeVotes as `0x${string}`,
-      abi: ABIS.NativeVotes,
-      functionName: "deposit",
-      value: parseEther(depositAmount),
-      account: address,
-    });
+    if (!address) {
+      toast.error("请先连接钱包");
+      return;
+    }
+
+    const amount = parseAmount(depositAmount, "质押数量");
+    if (amount === null) return;
+
+    await txToast(
+      writeContractAsync({
+        address: CONTRACTS.NativeVotes as `0x${string}`,
+        abi: ABIS.NativeVotes,
+        functionName: "deposit",
+        value: amount,
+        account: address,
+      }),
+      "正在提交质押交易...",
+      "质押交易已提交",
+      "质押失败"
+    );
   }
 
   async function handleActivate() {
-    if (!address) return;
-    await writeContractAsync({
-      address: CONTRACTS.NativeVotes as `0x${string}`,
-      abi: ABIS.NativeVotes,
-      functionName: "activate",
-      account: address,
-    });
+    if (!address) {
+      toast.error("请先连接钱包");
+      return;
+    }
+
+    await txToast(
+      writeContractAsync({
+        address: CONTRACTS.NativeVotes as `0x${string}`,
+        abi: ABIS.NativeVotes,
+        functionName: "activate",
+        account: address,
+      }),
+      "正在提交激活交易...",
+      "激活交易已提交",
+      "激活失败"
+    );
   }
 
   async function handleRequestWithdraw() {
-    if (!address) return;
-    await writeContractAsync({
-      address: CONTRACTS.NativeVotes as `0x${string}`,
-      abi: ABIS.NativeVotes,
-      functionName: "requestWithdraw",
-      args: [parseEther(withdrawAmount)],
-      account: address,
-    });
+    if (!address) {
+      toast.error("请先连接钱包");
+      return;
+    }
+
+    const amount = parseAmount(withdrawAmount, "提取数量");
+    if (amount === null) return;
+
+    await txToast(
+      writeContractAsync({
+        address: CONTRACTS.NativeVotes as `0x${string}`,
+        abi: ABIS.NativeVotes,
+        functionName: "requestWithdraw",
+        args: [amount],
+        account: address,
+      }),
+      "正在提交退出申请...",
+      "退出申请已提交",
+      "退出申请失败"
+    );
   }
 
   async function handleWithdraw() {
-    if (!address) return;
-    await writeContractAsync({
-      address: CONTRACTS.NativeVotes as `0x${string}`,
-      abi: ABIS.NativeVotes,
-      functionName: "withdraw",
-      args: [parseEther(withdrawAmount)],
-      account: address,
-    });
+    if (!address) {
+      toast.error("请先连接钱包");
+      return;
+    }
+
+    const amount = parseAmount(withdrawAmount, "提取数量");
+    if (amount === null) return;
+
+    await txToast(
+      writeContractAsync({
+        address: CONTRACTS.NativeVotes as `0x${string}`,
+        abi: ABIS.NativeVotes,
+        functionName: "withdraw",
+        args: [amount],
+        account: address,
+      }),
+      "正在提交提取交易...",
+      "提取交易已提交",
+      "提取失败"
+    );
   }
 
   return (
     <div>
-      <Navbar />
-      <main className="mx-auto max-w-7xl px-6 py-10 space-y-8">
+      {/* <Navbar /> */}
+      <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
         <PageHeader
           eyebrow="Staking · Voting Power"
           title="Stake & Voting Power"
-          description="用户先质押原生币，再激活投票权，才能参与内容投票和 DAO 治理。退出质押时需要先申请，再等待冷却期结束。"
+          description="Stake native tokens, activate voting power, and request withdrawals from the staking contract."
         />
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-slate-500">投票权</div>
+              <div className="text-sm text-slate-500">Voting Power</div>
               <ShieldCheck className="h-5 w-5 text-slate-400" />
             </div>
             <div className="text-2xl font-semibold text-slate-950">
               {votes ? formatEther(votes as bigint) : "0"} {BRANDING.nativeTokenSymbol}
             </div>
-            <div className="mt-3 text-sm text-slate-500">已激活的有效投票权</div>
+            <div className="mt-3 text-sm text-slate-500">Activated voting power.</div>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-slate-500">已激活质押</div>
+              <div className="text-sm text-slate-500">Active Stake</div>
               <Coins className="h-5 w-5 text-slate-400" />
             </div>
             <div className="text-2xl font-semibold text-slate-950">
               {staked ? formatEther(staked as bigint) : "0"} {BRANDING.nativeTokenSymbol}
             </div>
-            <div className="mt-3 text-sm text-slate-500">当前已生效的质押余额</div>
+            <div className="mt-3 text-sm text-slate-500">Stake already active on-chain.</div>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-slate-500">待激活质押</div>
+              <div className="text-sm text-slate-500">Pending Stake</div>
               <Clock3 className="h-5 w-5 text-slate-400" />
             </div>
             <div className="text-2xl font-semibold text-slate-950">
               {pendingStake ? formatEther(pendingStake as bigint) : "0"} {BRANDING.nativeTokenSymbol}
             </div>
-            <div className="mt-3 text-sm text-slate-500">等待区块确认后可激活</div>
+            <div className="mt-3 text-sm text-slate-500">Waiting to be activated.</div>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-slate-500">待提取金额</div>
+              <div className="text-sm text-slate-500">Pending Withdraw</div>
               <Wallet className="h-5 w-5 text-slate-400" />
             </div>
             <div className="text-2xl font-semibold text-slate-950">
               {pendingWithdraw ? formatEther(pendingWithdraw as bigint) : "0"} {BRANDING.nativeTokenSymbol}
             </div>
-            <div className="mt-3 text-sm text-slate-500">冷却期后可执行提现</div>
+            <div className="mt-3 text-sm text-slate-500">Amount available after cooldown.</div>
           </div>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <SectionCard
             title="Deposit / Activate"
-            description="先发起 Deposit，把原生币锁进合约；等到激活区块数达到后，再点击 Activate 获得投票权。"
+            description="Deposit native tokens first, then activate them to gain voting power."
           >
             <div className="space-y-4">
               <input
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
                 value={depositAmount}
-                onChange={(e) => setDepositAmount(e.target.value)}
-                placeholder="输入质押数量，例如 1"
+                onChange={(event) => setDepositAmount(event.target.value)}
+                placeholder="Enter deposit amount, e.g. 1"
               />
               <div className="flex flex-wrap gap-3">
                 <button
@@ -179,14 +241,14 @@ export default function StakePage() {
 
           <SectionCard
             title="Request Withdraw / Withdraw"
-            description="先申请退出，系统会立即减少你的投票权；等冷却期结束后，再执行 Withdraw 提取原生币。"
+            description="Request a withdraw first. After cooldown, complete the actual withdraw transaction."
           >
             <div className="space-y-4">
               <input
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
                 value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
-                placeholder="输入提取数量，例如 1"
+                onChange={(event) => setWithdrawAmount(event.target.value)}
+                placeholder="Enter withdraw amount, e.g. 1"
               />
               <div className="flex flex-wrap gap-3">
                 <button

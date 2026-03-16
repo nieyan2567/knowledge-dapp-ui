@@ -22,7 +22,7 @@ export function StatCard({
         ) : null}
       </div>
 
-      <div className="min-h-[40px] text-2xl font-semibold tracking-tight text-slate-950">
+      <div className="min-h-10 text-2xl font-semibold tracking-tight text-slate-950">
         {value}
       </div>
 

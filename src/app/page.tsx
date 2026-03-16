@@ -1,7 +1,7 @@
 "use client";
 
 import { useReadContract } from "wagmi";
-import { Navbar } from "@/components/navbar";
+// import { Navbar } from "@/components/navbar";
 import { useWalletReady } from "@/hooks/useWalletReady";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { formatEther } from "viem";
@@ -44,7 +44,7 @@ export default function HomePage() {
 
   return (
     <div>
-      <Navbar />
+      {/* <Navbar /> */}
       <main className="mx-auto max-w-7xl px-6 py-10 space-y-8">
         <div className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
           <PageHeader
