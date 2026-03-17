@@ -5,56 +5,56 @@ import { createClient } from "redis";
 type KnowledgeRedisClient = ReturnType<typeof createClient>;
 
 declare global {
-    var __knowledgeRedisClient: KnowledgeRedisClient | undefined;
-    var __knowledgeRedisConnectPromise:
-        | Promise<KnowledgeRedisClient>
-        | undefined;
+  var __knowledgeRedisClient: KnowledgeRedisClient | undefined;
+  var __knowledgeRedisConnectPromise:
+    | Promise<KnowledgeRedisClient>
+    | undefined;
 }
 
 function createRedisClient(): KnowledgeRedisClient | null {
-    const url = process.env.REDIS_URL;
+  const url = process.env.REDIS_URL;
 
-    if (!url) {
-        return null;
-    }
+  if (!url) {
+    return null;
+  }
 
-    const client = createClient({ url });
-    client.on("error", (error) => {
-        console.error("Redis client error:", error);
-    });
+  const client = createClient({ url });
+  client.on("error", (error) => {
+    console.error("Redis client error:", error);
+  });
 
-    return client;
+  return client;
 }
 
 export async function getRedis(): Promise<KnowledgeRedisClient | null> {
-    if (!process.env.REDIS_URL) {
-        return null;
-    }
+  if (!process.env.REDIS_URL) {
+    return null;
+  }
 
-    const client =
-        globalThis.__knowledgeRedisClient ?? createRedisClient();
+  const client =
+    globalThis.__knowledgeRedisClient ?? createRedisClient();
 
-    if (!client) {
-        return null;
-    }
+  if (!client) {
+    return null;
+  }
 
-    if (!globalThis.__knowledgeRedisClient) {
-        globalThis.__knowledgeRedisClient = client;
-    }
+  if (!globalThis.__knowledgeRedisClient) {
+    globalThis.__knowledgeRedisClient = client;
+  }
 
-    if (client.isOpen) {
-        return client;
-    }
+  if (client.isOpen) {
+    return client;
+  }
 
-    const connectPromise =
-        globalThis.__knowledgeRedisConnectPromise ??
-        client.connect().then(() => client);
+  const connectPromise =
+    globalThis.__knowledgeRedisConnectPromise ??
+    client.connect().then(() => client);
 
-    if (!globalThis.__knowledgeRedisConnectPromise) {
-        globalThis.__knowledgeRedisConnectPromise = connectPromise.finally(() => {
-            globalThis.__knowledgeRedisConnectPromise = undefined;
-        });
-    }
+  if (!globalThis.__knowledgeRedisConnectPromise) {
+    globalThis.__knowledgeRedisConnectPromise = connectPromise.finally(() => {
+      globalThis.__knowledgeRedisConnectPromise = undefined;
+    });
+  }
 
-    return globalThis.__knowledgeRedisConnectPromise;
+  return globalThis.__knowledgeRedisConnectPromise;
 }
