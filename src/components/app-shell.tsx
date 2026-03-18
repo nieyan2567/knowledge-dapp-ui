@@ -46,13 +46,12 @@ function getPageTitle(pathname: string) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+		if (typeof window === "undefined") return false;
+		const saved = localStorage.getItem("knowledge-sidebar-collapsed");
+		return saved === "true";
+	});
   const pageTitle = useMemo(() => getPageTitle(pathname), [pathname]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("knowledge-sidebar-collapsed");
-    if (saved === "true") setCollapsed(true);
-  }, []);
 
   useEffect(() => {
     localStorage.setItem("knowledge-sidebar-collapsed", String(collapsed));
