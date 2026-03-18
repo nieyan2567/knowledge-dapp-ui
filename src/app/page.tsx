@@ -9,6 +9,7 @@ import { BookOpen, Coins, ShieldCheck, Wallet } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { AddressBadge } from "@/components/address-badge";
 import { BRANDING } from "@/lib/branding";
+import { asBigInt } from "@/lib/web3-types";
 
 export default function HomePage() {
   const { address, isConnected, isCorrectChain } = useWalletReady();
@@ -40,6 +41,11 @@ export default function HomePage() {
     args: address ? [address] : undefined,
     query: { enabled: !!address },
   });
+	
+	const epochBudgetValue = asBigInt(epochBudget);
+  const contentCountValue = asBigInt(contentCount);
+  const myVotesValue = asBigInt(myVotes);
+  const myPendingRewardsValue = asBigInt(myPendingRewards);
 
   return (
     <div>
@@ -67,13 +73,13 @@ export default function HomePage() {
           />
           <StatCard
             title="我的投票权"
-            value={`${myVotes ? formatEther(myVotes as bigint) : "0"} ${BRANDING.nativeTokenSymbol}`}
+            value={`${myVotesValue ? formatEther(myVotesValue) : "0"} ${BRANDING.nativeTokenSymbol}`}
             description="已激活的质押投票权"
             icon={<Coins className="h-5 w-5" />}
           />
           <StatCard
             title="我的待领取奖励"
-            value={`${myPendingRewards ? formatEther(myPendingRewards as bigint) : "0"} ${BRANDING.nativeTokenSymbol}`}
+            value={`${myPendingRewardsValue ? formatEther(myPendingRewardsValue) : "0"} ${BRANDING.nativeTokenSymbol}`}
             description="来自 Treasury 的待领取金额"
             icon={<Coins className="h-5 w-5" />}
           />
@@ -82,13 +88,13 @@ export default function HomePage() {
         <section className="grid gap-4 md:grid-cols-3">
           <StatCard
             title="内容总数"
-            value={contentCount ? String(contentCount) : "0"}
+            value={contentCountValue ? String(contentCountValue) : "0"}
             description="当前链上已注册的知识内容数量"
             icon={<BookOpen className="h-5 w-5" />}
           />
           <StatCard
             title="当前 Treasury Budget"
-            value={`${epochBudget ? formatEther(epochBudget as bigint) : "0"} ${BRANDING.nativeTokenSymbol}`}
+            value={`${epochBudgetValue ? formatEther(epochBudgetValue) : "0"} ${BRANDING.nativeTokenSymbol}`}
             description="当前预算周期可分配奖励上限"
             icon={<Coins className="h-5 w-5" />}
           />

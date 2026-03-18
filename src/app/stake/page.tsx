@@ -10,281 +10,281 @@ import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { BRANDING } from "@/lib/branding";
 import { txToast } from "@/lib/tx-toast";
+import { asBigInt } from "@/lib/web3-types";
 
 export default function StakePage() {
-  const { address } = useAccount();
-  const { writeContractAsync } = useWriteContract();
+	const { address } = useAccount();
+	const { writeContractAsync } = useWriteContract();
 
-  const [depositAmount, setDepositAmount] = useState("1");
-  const [withdrawAmount, setWithdrawAmount] = useState("1");
+	const [depositAmount, setDepositAmount] = useState("1");
+	const [withdrawAmount, setWithdrawAmount] = useState("1");
 
-  function parseAmount(value: string, field: string) {
-    if (!value.trim()) {
-      toast.error(`请输入${field}`);
-      return null;
-    }
+	function parseAmount(value: string, field: string) {
+		if (!value.trim()) {
+			toast.error(`请输入${field}`);
+			return null;
+		}
 
-    try {
-      return parseEther(value.trim());
-    } catch {
-      toast.error(`请输入有效的${field}`);
-      return null;
-    }
-  }
+		try {
+			return parseEther(value.trim());
+		} catch {
+			toast.error(`请输入有效的${field}`);
+			return null;
+		}
+	}
 
-  const { data: votes } = useReadContract({
-    address: CONTRACTS.NativeVotes as `0x${string}`,
-    abi: ABIS.NativeVotes,
-    functionName: "getVotes",
-    args: address ? [address] : undefined,
-    query: { enabled: !!address },
-  });
+	const { data: votes } = useReadContract({
+		address: CONTRACTS.NativeVotes as `0x${string}`,
+		abi: ABIS.NativeVotes,
+		functionName: "getVotes",
+		args: address ? [address] : undefined,
+		query: { enabled: !!address },
+	});
 
-  const { data: staked } = useReadContract({
-    address: CONTRACTS.NativeVotes as `0x${string}`,
-    abi: ABIS.NativeVotes,
-    functionName: "staked",
-    args: address ? [address] : undefined,
-    query: { enabled: !!address },
-  });
+	const { data: staked } = useReadContract({
+		address: CONTRACTS.NativeVotes as `0x${string}`,
+		abi: ABIS.NativeVotes,
+		functionName: "staked",
+		args: address ? [address] : undefined,
+		query: { enabled: !!address },
+	});
 
-  const { data: pendingStake } = useReadContract({
-    address: CONTRACTS.NativeVotes as `0x${string}`,
-    abi: ABIS.NativeVotes,
-    functionName: "pendingStake",
-    args: address ? [address] : undefined,
-    query: { enabled: !!address },
-  });
+	const { data: pendingStake } = useReadContract({
+		address: CONTRACTS.NativeVotes as `0x${string}`,
+		abi: ABIS.NativeVotes,
+		functionName: "pendingStake",
+		args: address ? [address] : undefined,
+		query: { enabled: !!address },
+	});
 
-  const { data: pendingWithdraw } = useReadContract({
-    address: CONTRACTS.NativeVotes as `0x${string}`,
-    abi: ABIS.NativeVotes,
-    functionName: "pendingWithdraw",
-    args: address ? [address] : undefined,
-    query: { enabled: !!address },
-  });
+	const { data: pendingWithdraw } = useReadContract({
+		address: CONTRACTS.NativeVotes as `0x${string}`,
+		abi: ABIS.NativeVotes,
+		functionName: "pendingWithdraw",
+		args: address ? [address] : undefined,
+		query: { enabled: !!address },
+	});
 
-  async function handleDeposit() {
-    if (!address) {
-      toast.error("请先连接钱包");
-      return;
-    }
+	const votesValue = asBigInt(votes);
+	const stakedValue = asBigInt(staked);
+	const pendingStakeValue = asBigInt(pendingStake);
+	const pendingWithdrawValue = asBigInt(pendingWithdraw);
 
-    const amount = parseAmount(depositAmount, "质押数量");
-    if (amount === null) return;
+	async function handleDeposit() {
+		if (!address) {
+			toast.error("请先连接钱包");
+			return;
+		}
 
-    await txToast(
-      writeContractAsync({
-        address: CONTRACTS.NativeVotes as `0x${string}`,
-        abi: ABIS.NativeVotes,
-        functionName: "deposit",
-        value: amount,
-        account: address,
-      }),
-      "正在提交质押交易...",
-      "质押交易已提交",
-      "质押失败"
-    );
-  }
+		const amount = parseAmount(depositAmount, "质押数量");
+		if (amount === null) return;
 
-  async function handleActivate() {
-    if (!address) {
-      toast.error("请先连接钱包");
-      return;
-    }
+		await txToast(
+			writeContractAsync({
+				address: CONTRACTS.NativeVotes as `0x${string}`,
+				abi: ABIS.NativeVotes,
+				functionName: "deposit",
+				value: amount,
+				account: address,
+			}),
+			"正在提交质押交易...",
+			"质押交易已提交",
+			"质押失败"
+		);
+	}
 
-    await txToast(
-      writeContractAsync({
-        address: CONTRACTS.NativeVotes as `0x${string}`,
-        abi: ABIS.NativeVotes,
-        functionName: "activate",
-        account: address,
-      }),
-      "正在提交激活交易...",
-      "激活交易已提交",
-      "激活失败"
-    );
-  }
+	async function handleActivate() {
+		if (!address) {
+			toast.error("请先连接钱包");
+			return;
+		}
 
-  async function handleRequestWithdraw() {
-    if (!address) {
-      toast.error("请先连接钱包");
-      return;
-    }
+		await txToast(
+			writeContractAsync({
+				address: CONTRACTS.NativeVotes as `0x${string}`,
+				abi: ABIS.NativeVotes,
+				functionName: "activate",
+				account: address,
+			}),
+			"正在提交激活交易...",
+			"激活交易已提交",
+			"激活失败"
+		);
+	}
 
-    const amount = parseAmount(withdrawAmount, "提取数量");
-    if (amount === null) return;
+	async function handleRequestWithdraw() {
+		if (!address) {
+			toast.error("请先连接钱包");
+			return;
+		}
 
-    await txToast(
-      writeContractAsync({
-        address: CONTRACTS.NativeVotes as `0x${string}`,
-        abi: ABIS.NativeVotes,
-        functionName: "requestWithdraw",
-        args: [amount],
-        account: address,
-      }),
-      "正在提交退出申请...",
-      "退出申请已提交",
-      "退出申请失败"
-    );
-  }
+		const amount = parseAmount(withdrawAmount, "提取数量");
+		if (amount === null) return;
 
-  async function handleWithdraw() {
-    if (!address) {
-      toast.error("请先连接钱包");
-      return;
-    }
+		await txToast(
+			writeContractAsync({
+				address: CONTRACTS.NativeVotes as `0x${string}`,
+				abi: ABIS.NativeVotes,
+				functionName: "requestWithdraw",
+				args: [amount],
+				account: address,
+			}),
+			"正在提交退出申请...",
+			"退出申请已提交",
+			"退出申请失败"
+		);
+	}
 
-    const amount = parseAmount(withdrawAmount, "提取数量");
-    if (amount === null) return;
+	async function handleWithdraw() {
+		if (!address) {
+			toast.error("请先连接钱包");
+			return;
+		}
 
-    await txToast(
-      writeContractAsync({
-        address: CONTRACTS.NativeVotes as `0x${string}`,
-        abi: ABIS.NativeVotes,
-        functionName: "withdraw",
-        args: [amount],
-        account: address,
-      }),
-      "正在提交提取交易...",
-      "提取交易已提交",
-      "提取失败"
-    );
-  }
+		const amount = parseAmount(withdrawAmount, "提取数量");
+		if (amount === null) return;
 
-  return (
-    <div>
-      <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
-        <PageHeader
-          eyebrow="Staking · Voting Power"
-          title="Stake & Voting Power"
-          description="用户先质押原生币，再激活投票权，才能参与内容投票和 DAO 治理。退出质押时需要先申请，再等待冷却期结束。"
-        />
+		await txToast(
+			writeContractAsync({
+				address: CONTRACTS.NativeVotes as `0x${string}`,
+				abi: ABIS.NativeVotes,
+				functionName: "withdraw",
+				args: [amount],
+				account: address,
+			}),
+			"正在提交提取交易...",
+			"提取交易已提交",
+			"提取失败"
+		);
+	}
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-slate-500 dark:text-slate-400">
-                Voting Power
-              </div>
-              <ShieldCheck className="h-5 w-5 text-slate-400 dark:text-slate-500" />
-            </div>
-            <div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
-              {votes ? formatEther(votes as bigint) : "0"}{" "}
-              {BRANDING.nativeTokenSymbol}
-            </div>
-            <div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-              Activated voting power.
-            </div>
-          </div>
+	return (
+		<main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
+			<PageHeader
+				eyebrow="Staking · Voting Power"
+				title="Stake & Voting Power"
+				description="用户先质押原生币，再激活投票权，才能参与内容投票和 DAO 治理。退出质押时需要先申请，再等待冷却期结束。"
+			/>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-slate-500 dark:text-slate-400">
-                Active Stake
-              </div>
-              <Coins className="h-5 w-5 text-slate-400 dark:text-slate-500" />
-            </div>
-            <div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
-              {staked ? formatEther(staked as bigint) : "0"}{" "}
-              {BRANDING.nativeTokenSymbol}
-            </div>
-            <div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-              Stake already active on-chain.
-            </div>
-          </div>
+			<section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+					<div className="mb-4 flex items-center justify-between">
+						<div className="text-sm text-slate-500 dark:text-slate-400">
+							投票权
+						</div>
+						<ShieldCheck className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+					</div>
+					<div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
+						{votesValue ? formatEther(votesValue) : "0"} {BRANDING.nativeTokenSymbol}
+					</div>
+					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+						已激活的有效投票权
+					</div>
+				</div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-slate-500 dark:text-slate-400">
-                Pending Stake
-              </div>
-              <Clock3 className="h-5 w-5 text-slate-400 dark:text-slate-500" />
-            </div>
-            <div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
-              {pendingStake ? formatEther(pendingStake as bigint) : "0"}{" "}
-              {BRANDING.nativeTokenSymbol}
-            </div>
-            <div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-              Waiting to be activated.
-            </div>
-          </div>
+				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+					<div className="mb-4 flex items-center justify-between">
+						<div className="text-sm text-slate-500 dark:text-slate-400">
+							已激活质押
+						</div>
+						<Coins className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+					</div>
+					<div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
+						{stakedValue ? formatEther(stakedValue) : "0"} {BRANDING.nativeTokenSymbol}
+					</div>
+					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+						当前已生效的质押余额
+					</div>
+				</div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-slate-500 dark:text-slate-400">
-                Pending Withdraw
-              </div>
-              <Wallet className="h-5 w-5 text-slate-400 dark:text-slate-500" />
-            </div>
-            <div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
-              {pendingWithdraw ? formatEther(pendingWithdraw as bigint) : "0"}{" "}
-              {BRANDING.nativeTokenSymbol}
-            </div>
-            <div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-              Amount available after cooldown.
-            </div>
-          </div>
-        </section>
+				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+					<div className="mb-4 flex items-center justify-between">
+						<div className="text-sm text-slate-500 dark:text-slate-400">
+							待激活质押
+						</div>
+						<Clock3 className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+					</div>
+					<div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
+						{pendingStakeValue ? formatEther(pendingStakeValue) : "0"} {BRANDING.nativeTokenSymbol}
+					</div>
+					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+						等待区块确认后可激活
+					</div>
+				</div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <SectionCard
-            title="Deposit / Activate"
-            description="Deposit native tokens first, then activate them to gain voting power."
-          >
-            <div className="space-y-4">
-              <input
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
-                value={depositAmount}
-                onChange={(event) => setDepositAmount(event.target.value)}
-                placeholder="Enter deposit amount, e.g. 1"
-              />
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={handleDeposit}
-                  className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-                >
-                  Deposit
-                </button>
-                <button
-                  onClick={handleActivate}
-                  className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                >
-                  Activate
-                </button>
-              </div>
-            </div>
-          </SectionCard>
+				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+					<div className="mb-4 flex items-center justify-between">
+						<div className="text-sm text-slate-500 dark:text-slate-400">
+							待提取金额
+						</div>
+						<Wallet className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+					</div>
+					<div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
+						{pendingWithdrawValue ? formatEther(pendingWithdrawValue) : "0"} {BRANDING.nativeTokenSymbol}
+					</div>
+					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+						冷却期结束后可执行提现
+					</div>
+				</div>
+			</section>
 
-          <SectionCard
-            title="Request Withdraw / Withdraw"
-            description="Request a withdraw first. After cooldown, complete the actual withdraw transaction."
-          >
-            <div className="space-y-4">
-              <input
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
-                value={withdrawAmount}
-                onChange={(event) => setWithdrawAmount(event.target.value)}
-                placeholder="Enter withdraw amount, e.g. 1"
-              />
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={handleRequestWithdraw}
-                  className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                >
-                  Request Withdraw
-                </button>
-                <button
-                  onClick={handleWithdraw}
-                  className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-                >
-                  Withdraw
-                </button>
-              </div>
-            </div>
-          </SectionCard>
-        </div>
-      </main>
-    </div>
-  );
+			<div className="grid gap-6 lg:grid-cols-2">
+				<SectionCard
+					title="Deposit / Activate"
+					description="先发起 Deposit，把原生币锁进合约；等到激活区块数达到后，再点击 Activate 获得投票权。"
+				>
+					<div className="space-y-4">
+						<input
+							className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
+							value={depositAmount}
+							onChange={(event) => setDepositAmount(event.target.value)}
+							placeholder="输入质押数量，例如 1"
+						/>
+						<div className="flex flex-wrap gap-3">
+							<button
+								onClick={handleDeposit}
+								className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+							>
+								Deposit
+							</button>
+							<button
+								onClick={handleActivate}
+								className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+							>
+								Activate
+							</button>
+						</div>
+					</div>
+				</SectionCard>
+
+				<SectionCard
+					title="Request Withdraw / Withdraw"
+					description="先申请退出，系统会立即减少你的投票权；等冷却期结束后，再执行 Withdraw 提取原生币。"
+				>
+					<div className="space-y-4">
+						<input
+							className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
+							value={withdrawAmount}
+							onChange={(event) => setWithdrawAmount(event.target.value)}
+							placeholder="输入提取数量，例如 1"
+						/>
+						<div className="flex flex-wrap gap-3">
+							<button
+								onClick={handleRequestWithdraw}
+								className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+							>
+								Request Withdraw
+							</button>
+							<button
+								onClick={handleWithdraw}
+								className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+							>
+								Withdraw
+							</button>
+						</div>
+					</div>
+				</SectionCard>
+			</div>
+		</main>
+	);
 }

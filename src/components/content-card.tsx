@@ -1,26 +1,15 @@
 "use client";
 
+import Link from "next/link";
+import { useAccount, useWriteContract } from "wagmi";
+import { ABIS, CONTRACTS } from "@/contracts";
 import { BookOpen, Coins, ExternalLink, Heart } from "lucide-react";
 import { toast } from "sonner";
-import { useAccount, useWriteContract } from "wagmi";
-
-import { ABIS, CONTRACTS } from "@/contracts";
 import { txToast } from "@/lib/tx-toast";
-import Link from "next/link";
+import type { ContentCardData } from "@/types/content";
 
 const gatewayBase =
 	process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || "http://127.0.0.1:8080/ipfs";
-
-export type ContentCardData = {
-	id: bigint;
-	author: `0x${string}`;
-	ipfsHash: string;
-	title: string;
-	description: string;
-	voteCount: bigint;
-	timestamp: bigint;
-	rewardAccrued: boolean;
-};
 
 function shortenAddress(address: string) {
 	return `${address.slice(0, 6)}...${address.slice(-4)}`;

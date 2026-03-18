@@ -8,11 +8,9 @@ import {
 	parseEther,
 	stringToBytes,
 	toHex,
-	type Hex,
 } from "viem";
 import {
 	useAccount,
-	useCall,
 	usePublicClient,
 	useReadContract,
 	useWriteContract,
@@ -33,25 +31,9 @@ import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { BRANDING } from "@/lib/branding";
 import { txToast } from "@/lib/tx-toast";
-
-type ProposalItem = {
-	proposalId: bigint;
-	proposer: `0x${string}`;
-	description: string;
-	descriptionHash: Hex;
-	blockNumber: bigint;
-	voteStart: bigint;
-	voteEnd: bigint;
-	targets: readonly `0x${string}`[];
-	values: readonly bigint[];
-	calldatas: readonly Hex[];
-};
-
-type ProposalVotes = {
-	againstVotes: bigint;
-	forVotes: bigint;
-	abstainVotes: bigint;
-};
+import { asBigInt, asProposalVotes } from "@/lib/web3-types";
+import type { ProposalItem, ProposalVotes } from "@/types/governance";
+import type { HexString } from "@/types/contracts";
 
 const proposalCreatedEvent = parseAbiItem(
 	"event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)"
@@ -175,7 +157,7 @@ export default function GovernancePage() {
 						proposer: `0x${string}`;
 						targets: readonly `0x${string}`[];
 						values: readonly bigint[];
-						calldatas: readonly Hex[];
+						calldatas: readonly HexString[];
 						voteStart: bigint;
 						voteEnd: bigint;
 						description: string;
@@ -419,30 +401,19 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 		args: [proposal.proposalId],
 	});
 
-	const voteData = useMemo(() => {
-		if (!votes) {
-			return {
-				againstVotes: 0n,
-				forVotes: 0n,
-				abstainVotes: 0n,
-			} satisfies ProposalVotes;
-		}
+	const proposalState = asBigInt(state);
+	const currentStateLabel = stateLabel(proposalState);
 
-		const [againstVotes, forVotes, abstainVotes] = votes as readonly [
-			bigint,
-			bigint,
-			bigint
-		];
+	const voteData: ProposalVotes =
+		asProposalVotes(votes) ?? {
+			againstVotes: 0n,
+			forVotes: 0n,
+			abstainVotes: 0n,
+		};
 
-		return { againstVotes, forVotes, abstainVotes };
-	}, [votes]);
-
-	const currentState = state as bigint | undefined;
-	const currentStateLabel = stateLabel(currentState);
-
-	const canVote = Number(currentState ?? -1) === 1;
-	const canQueue = Number(currentState ?? -1) === 4;
-	const canExecute = Number(currentState ?? -1) === 5;
+	const canVote = Number(proposalState ?? -1) === 1;
+	const canQueue = Number(proposalState ?? -1) === 4;
+	const canExecute = Number(proposalState ?? -1) === 5;
 
 	async function handleVote(support: 0 | 1 | 2) {
 		if (!address) {
@@ -524,7 +495,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 						</span>
 						<span
 							className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${stateBadgeClass(
-								currentState
+								proposalState
 							)}`}
 						>
 							{currentStateLabel}

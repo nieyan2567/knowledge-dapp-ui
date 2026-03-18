@@ -9,7 +9,7 @@ import {
 } from "wagmi";
 import { toast } from "sonner";
 
-import { ContentCard, type ContentCardData } from "@/components/content-card";
+import { ContentCard } from "@/components/content-card";
 import { CopyField } from "@/components/copy-field";
 import { FileDrop } from "@/components/file-drop";
 import { PageHeader } from "@/components/page-header";
@@ -17,41 +17,13 @@ import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useUploadAuth } from "@/hooks/useUploadAuth";
 import { txToast } from "@/lib/tx-toast";
+import type { ContentCardData } from "@/types/content";
+import { asContentData } from "@/lib/web3-types";
 
 function parseContentResults(results: readonly unknown[]): ContentCardData[] {
   return results
-    .map((item) => {
-      const [
-        id,
-        author,
-        ipfsHash,
-        title,
-        description,
-        voteCount,
-        timestamp,
-        rewardAccrued,
-      ] = item as readonly [
-        bigint,
-        `0x${string}`,
-        string,
-        string,
-        string,
-        bigint,
-        bigint,
-        boolean,
-      ];
-
-      return {
-        id,
-        author,
-        ipfsHash,
-        title,
-        description,
-        voteCount,
-        timestamp,
-        rewardAccrued,
-      };
-    })
+    .map((item) => asContentData(item))
+		.filter((item): item is ContentCardData => !!item)
     .reverse();
 }
 
@@ -260,7 +232,6 @@ export default function ContentPage() {
   }
 
   return (
-    <div>
       <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
         <PageHeader
           eyebrow="Content Registry · Local IPFS"
@@ -354,6 +325,5 @@ export default function ContentPage() {
           </div>
         </div>
       </main>
-    </div>
   );
 }
