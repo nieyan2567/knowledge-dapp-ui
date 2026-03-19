@@ -39,6 +39,13 @@ const externalNavItems = [
   },
 ];
 
+const topbarButtonClass =
+  "inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-sm font-medium shadow-sm transition";
+const neutralButtonClass =
+  "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800";
+const dangerButtonClass =
+  "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-950/60";
+
 function getPageTitle(pathname: string) {
   const item = internalNavItems.find((i) => i.href === pathname);
   return item?.label || "Knowledge DApp";
@@ -213,7 +220,70 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <ConnectButton />
+
+            <ConnectButton.Custom>
+              {({
+                account,
+                chain,
+                mounted,
+                openAccountModal,
+                openChainModal,
+                openConnectModal,
+              }) => {
+                const ready = mounted;
+                const connected = ready && !!account && !!chain;
+
+                if (!ready) {
+                  return (
+                    <button
+                      className={clsx(topbarButtonClass, neutralButtonClass, "pointer-events-none opacity-0")}
+                      aria-hidden="true"
+                      tabIndex={-1}
+                    >
+                      <Wallet className="h-4 w-4" />
+                      连接钱包
+                    </button>
+                  );
+                }
+
+                if (!connected) {
+                  return (
+                    <button
+                      onClick={openConnectModal}
+                      className={clsx(topbarButtonClass, neutralButtonClass)}
+                      type="button"
+                    >
+                      <Wallet className="h-4 w-4" />
+                      连接钱包
+                    </button>
+                  );
+                }
+
+                if (chain.unsupported) {
+                  return (
+                    <button
+                      onClick={openChainModal}
+                      className={clsx(topbarButtonClass, dangerButtonClass)}
+                      type="button"
+                    >
+                      <Shield className="h-4 w-4" />
+                      Wrong Network
+                    </button>
+                  );
+                }
+
+                return (
+                  <button
+                    onClick={openAccountModal}
+                    className={clsx(topbarButtonClass, neutralButtonClass)}
+                    type="button"
+                  >
+                    <Wallet className="h-4 w-4" />
+                    {account.displayName}
+                  </button>
+                );
+              }}
+            </ConnectButton.Custom>
           </div>
         </div>
       </header>
