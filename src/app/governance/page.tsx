@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	encodeFunctionData,
+	formatEther,
 	keccak256,
 	parseAbiItem,
 	parseEther,
@@ -258,7 +259,7 @@ export default function GovernancePage() {
 						<Gavel className="h-5 w-5 text-slate-400 dark:text-slate-500" />
 					</div>
 					<div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
-						{proposalThreshold ? String(proposalThreshold) : "-"}
+						{proposalThreshold ? `${formatEther(proposalThreshold as bigint)} ${BRANDING.nativeTokenSymbol}` : "-"}
 					</div>
 					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
 						创建提案所需的最低投票权。
@@ -313,7 +314,7 @@ export default function GovernancePage() {
 							className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
 							value={rewardPerVote}
 							onChange={(e) => setRewardPerVote(e.target.value)}
-							placeholder="单票奖励 (ETH)"
+							placeholder="单票奖励 (KC)"
 						/>
 
 						<textarea

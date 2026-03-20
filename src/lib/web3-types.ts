@@ -3,7 +3,15 @@ import type { ContentData } from "@/types/content";
 import type { ProposalVotes } from "@/types/governance";
 
 export function asBigInt(value: unknown): bigint | undefined {
-  return typeof value === "bigint" ? value : undefined;
+  if (typeof value === "bigint") {
+    return value;
+  }
+
+  if (typeof value === "number" && Number.isSafeInteger(value)) {
+    return BigInt(value);
+  }
+
+  return undefined;
 }
 
 export function asAddress(value: unknown): Address | undefined {

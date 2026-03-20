@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useMemo } from "react";
-import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import { useEffect, useMemo, useState } from "react";
+import { keccak256, parseAbiItem, stringToBytes, toHex } from "viem";
+import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -11,6 +12,7 @@ import {
   ExternalLink,
   Gavel,
   Vote as VoteIcon,
+  RefreshCw,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/page-header";
@@ -19,14 +21,19 @@ import { AddressBadge } from "@/components/address-badge";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { txToast } from "@/lib/tx-toast";
 import { BRANDING } from "@/lib/branding";
+import type { ProposalItem, ProposalVotes } from "@/types/governance";
+import type { HexString } from "@/types/contracts";
 import { asBigInt, asProposalVotes } from "@/lib/web3-types";
-import type { ProposalVotes } from "@/types/governance";
+
+// 解析 ProposalCreated 事件的 ABI
+const proposalCreatedEvent = parseAbiItem(
+  "event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)"
+);
 
 function explorerProposalUrl(id: bigint) {
   return `${BRANDING.explorerUrl}/tx/${id.toString()}`;
 }
 
-// --- [新增] 状态标签文本 ---
 function stateLabel(state?: bigint) {
   switch (Number(state ?? -1)) {
     case 0: return "Pending";
@@ -41,7 +48,6 @@ function stateLabel(state?: bigint) {
   }
 }
 
-// --- [新增] 状态徽章样式类 ---
 function stateBadgeClass(state?: bigint) {
   switch (Number(state ?? -1)) {
     case 0: return "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300";
@@ -56,17 +62,29 @@ function stateBadgeClass(state?: bigint) {
   }
 }
 
+function shortenAddress(address: string) {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
 export default function ProposalDetailPage() {
   const params = useParams();
+  const publicClient = usePublicClient();
   const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
 
+  // [融合] 恢复 proposalDetail 状态以存储详细事件数据
+  const [proposalDetail, setProposalDetail] = useState<ProposalItem | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
   const proposalId = useMemo(() => {
     if (!params?.id) return null;
-    return BigInt(params.id as string);
+    const raw = params.id as string;
+    if (!/^\d+$/.test(raw)) return null;
+    return BigInt(raw);
   }, [params]);
 
-  const { data: state } = useReadContract({
+  // 基础链上数据
+  const { data: state, refetch: refetchState } = useReadContract({
     address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
     abi: ABIS.KnowledgeGovernor,
     functionName: "state",
@@ -74,7 +92,7 @@ export default function ProposalDetailPage() {
     query: { enabled: !!proposalId },
   });
 
-  const { data: votes } = useReadContract({
+  const { data: votes, refetch: refetchVotes } = useReadContract({
     address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
     abi: ABIS.KnowledgeGovernor,
     functionName: "proposalVotes",
@@ -91,7 +109,6 @@ export default function ProposalDetailPage() {
       abstainVotes: 0n,
     };
 
-  // --- [新增] 计算总票数和百分比 ---
   const totalVotes =
     voteData.forVotes + voteData.againstVotes + voteData.abstainVotes;
 
@@ -102,10 +119,75 @@ export default function ProposalDetailPage() {
   const abstainPercent =
     totalVotes > 0n ? Number((voteData.abstainVotes * 100n) / totalVotes) : 0;
 
-  // --- [新增] 核心权限判断逻辑 ---
   const canVote = Number(proposalState ?? -1) === 1;
   const canQueue = Number(proposalState ?? -1) === 4;
   const canExecute = Number(proposalState ?? -1) === 5;
+
+  // [融合] 恢复轻量级事件监听，仅获取当前提案详情
+  useEffect(() => {
+    async function loadProposalDetail() {
+      if (!publicClient || proposalId === null) {
+        setProposalDetail(null);
+        return;
+      }
+
+      setLoadingDetail(true);
+      try {
+        // 优化：实际生产中建议限制 fromBlock 为合约部署块，这里为了演示保持动态获取最新块
+        const latestBlock = await publicClient.getBlockNumber();
+        
+        // 注意：如果提案 ID 非常大且链很长，全量扫描可能会慢。
+        // 优化策略：可以根据业务需求限制扫描范围，或使用索引器。
+        const logs = await publicClient.getLogs({
+          address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
+          event: proposalCreatedEvent,
+          fromBlock: 0n, 
+          toBlock: latestBlock,
+        });
+
+        const matched = logs.find((log) => {
+          const args = log.args as { proposalId: bigint };
+          return args.proposalId === proposalId;
+        });
+
+        if (!matched) {
+          setProposalDetail(null);
+          return;
+        }
+
+        const args = matched.args as {
+          proposalId: bigint;
+          proposer: `0x${string}`;
+          targets: readonly `0x${string}`[];
+          values: readonly bigint[];
+          calldatas: readonly HexString[];
+          voteStart: bigint;
+          voteEnd: bigint;
+          description: string;
+        };
+
+        setProposalDetail({
+          proposalId: args.proposalId,
+          proposer: args.proposer,
+          targets: args.targets,
+          values: args.values,
+          calldatas: args.calldatas,
+          voteStart: args.voteStart,
+          voteEnd: args.voteEnd,
+          description: args.description,
+          descriptionHash: keccak256(toHex(stringToBytes(args.description))),
+          blockNumber: matched.blockNumber ?? 0n,
+        });
+      } catch (error) {
+        console.error(error);
+        // 非致命错误，不阻断页面，只是详情不显示
+      } finally {
+        setLoadingDetail(false);
+      }
+    }
+
+    loadProposalDetail();
+  }, [publicClient, proposalId]);
 
   async function vote(support: 0 | 1 | 2) {
     if (!address || !proposalId) {
@@ -128,91 +210,151 @@ export default function ProposalDetailPage() {
   }
 
   async function queueProposal() {
-    if (!address || !proposalId) {
-      toast.error("请先连接钱包");
+    if (!proposalDetail || !address) {
+      toast.error("提案详情数据未加载，无法执行 Queue");
       return;
     }
-    // 注意：实际 Queue 通常需要 targets, values, calldatas，这些在详情页可能拿不到
-    // 这里暂时保留提示，或者你需要从事件日志中获取这些数据
-    toast.info("Queue 操作通常在提案列表页执行（需要原始 calldata），或需补充数据源。");
+
+    await txToast(
+      writeContractAsync({
+        address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
+        abi: ABIS.KnowledgeGovernor,
+        functionName: "queue",
+        args: [
+          proposalDetail.targets,
+          proposalDetail.values,
+          proposalDetail.calldatas,
+          proposalDetail.descriptionHash,
+        ],
+        account: address,
+      }),
+      "正在提交 Queue 交易...",
+      "Queue 交易已提交",
+      "Queue 失败"
+    );
   }
 
   async function executeProposal() {
-    if (!address || !proposalId) {
-      toast.error("请先连接钱包");
+    if (!proposalDetail || !address) {
+      toast.error("提案详情数据未加载，无法执行 Execute");
       return;
     }
-     // 注意：实际 Execute 同样需要原始参数
-    toast.info("Execute 操作通常在提案列表页执行，或需补充数据源。");
+
+    await txToast(
+      writeContractAsync({
+        address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
+        abi: ABIS.KnowledgeGovernor,
+        functionName: "execute",
+        args: [
+          proposalDetail.targets,
+          proposalDetail.values,
+          proposalDetail.calldatas,
+          proposalDetail.descriptionHash,
+        ],
+        account: address,
+      }),
+      "正在提交 Execute 交易...",
+      "Execute 交易已提交",
+      "Execute 失败"
+    );
   }
+
+  const handleRefresh = () => {
+    refetchState();
+    refetchVotes();
+    // 触发 effect 重新运行通常不需要手动操作，因为依赖项没变
+    // 但如果想强制重跑 effect，可以加一个 key 或者手动调用 loadProposalDetail
+    // 这里简单起见，重新挂载组件或提示用户
+    window.location.reload(); 
+  };
 
   if (!proposalId) return null;
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-10 space-y-8">
-      {/* 返回导航 */}
-      <Link
-        href="/governance"
-        className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        返回提案列表
-      </Link>
+      {/* [融合] 顶部导航与刷新按钮 */}
+      <div className="flex items-center justify-between gap-4">
+        <Link
+          href="/governance"
+          className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          返回提案列表
+        </Link>
+
+        <button
+          onClick={handleRefresh}
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Refresh
+        </button>
+      </div>
 
       <PageHeader
         eyebrow={`Proposal #${proposalId.toString()}`}
-        title="Governance Proposal"
-        description="查看提案状态、投票分布，并参与 DAO 治理。"
+        title={proposalDetail?.description || "Governance Proposal"}
+        description="查看提案状态、投票分布，并在详情页直接完成 Queue / Execute。"
       />
 
-      {/* --- [修改] 布局优化：左右结构 (左侧信息+图表，右侧操作) --- */}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        
-        {/* 左侧：详细信息与投票图表 */}
+        {/* 左侧：详细信息 */}
         <div className="space-y-6">
+          
+          {/* [融合] 基础信息卡片 */}
           <SectionCard
             title="Proposal Info"
             description="当前提案的核心链上信息。"
           >
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Proposal ID
-                </div>
-                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                  {proposalId.toString()}
-                </div>
+            {loadingDetail ? (
+              <div className="text-sm text-slate-500 dark:text-slate-400 animate-pulse">
+                正在加载提案详情...
               </div>
+            ) : !proposalDetail ? (
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                未找到该提案的 ProposalCreated 事件记录。可能是一个过期的测试提案。
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                <InfoCard label="Proposal ID" value={proposalId.toString()} />
+                <InfoBadgeCard
+                  label="Status"
+                  value={stateLabel(proposalState)}
+                  className={stateBadgeClass(proposalState)}
+                />
+                <InfoCard label="Created Block" value={proposalDetail.blockNumber.toString()} />
+                <InfoCard label="Vote Start" value={proposalDetail.voteStart.toString()} />
+                <InfoCard label="Vote End" value={proposalDetail.voteEnd.toString()} />
+                
+                {/* [融合] 提案人信息 */}
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50 md:col-span-2">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Proposer
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-slate-900 dark:text-slate-100">
+                    <AddressBadge address={proposalDetail.proposer} />
+                    <span className="text-slate-500 dark:text-slate-400">
+                      {shortenAddress(proposalDetail.proposer)}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Status
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50 md:col-span-2">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Governor Contract
+                  </div>
+                  <AddressBadge address={CONTRACTS.KnowledgeGovernor} />
                 </div>
-                {/* --- [新增] 带颜色的状态徽章 --- */}
-                <span
-                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${stateBadgeClass(
-                    proposalState
-                  )}`}
-                >
-                  {stateLabel(proposalState)}
-                </span>
               </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50 md:col-span-2">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Governor Contract
-                </div>
-                <AddressBadge address={CONTRACTS.KnowledgeGovernor} />
-              </div>
-            </div>
+            )}
           </SectionCard>
 
+          {/* [融合] 投票分布图表 */}
           <SectionCard
             title="Voting Distribution"
             description="For / Against / Abstain 的当前投票分布。"
           >
             <div className="space-y-4">
-              {/* --- [新增] 使用带进度条的 VoteBar 组件 --- */}
               <VoteBar
                 label="For"
                 value={voteData.forVotes}
@@ -233,6 +375,53 @@ export default function ProposalDetailPage() {
               />
             </div>
           </SectionCard>
+
+          {/* [融合] 执行动作列表 (只有加载出详情才显示) */}
+          <SectionCard
+            title="Proposal Actions"
+            description="ProposalCreated 事件中记录的原始执行动作。"
+          >
+            {loadingDetail ? (
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                正在加载执行动作...
+              </div>
+            ) : !proposalDetail ? (
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                暂无动作数据。
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {proposalDetail.targets.length === 0 ? (
+                   <div className="text-sm text-slate-500 italic">此提案不包含任何链上执行动作。</div>
+                ) : (
+                  proposalDetail.targets.map((target, index) => (
+                    <div
+                      key={`${target}-${index}`}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50"
+                    >
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Action #{index + 1}
+                      </div>
+                      <div className="space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                        <div>
+                          <span className="text-slate-500 dark:text-slate-400">Target: </span>
+                          <AddressBadge address={target} />
+                        </div>
+                        <div>
+                          <span className="text-slate-500 dark:text-slate-400">Value: </span>
+                          {proposalDetail.values[index]?.toString() ?? "0"} ETH
+                        </div>
+                        <div className="break-all font-mono text-xs bg-slate-200 dark:bg-slate-900 p-2 rounded">
+                          <span className="text-slate-500 dark:text-slate-400 block mb-1">Calldata: </span>
+                          {proposalDetail.calldatas[index]}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </SectionCard>
         </div>
 
         {/* 右侧：操作面板 */}
@@ -242,7 +431,6 @@ export default function ProposalDetailPage() {
             description="根据提案状态参与投票或执行治理动作。"
           >
             <div className="space-y-3">
-              {/* --- [修复] 添加 disabled 逻辑和图标 --- */}
               <button
                 onClick={() => vote(1)}
                 disabled={!canVote}
@@ -268,21 +456,23 @@ export default function ProposalDetailPage() {
                 Abstain
               </button>
 
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-700 my-2"></div>
+
               <button
                 onClick={queueProposal}
-                disabled={!canQueue}
+                disabled={!canQueue || !proposalDetail}
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                Queue
+                Queue Proposal
               </button>
 
               <button
                 onClick={executeProposal}
-                disabled={!canExecute}
+                disabled={!canExecute || !proposalDetail}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 px-4 py-3 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
               >
                 <CheckCircle2 className="h-4 w-4" />
-                Execute
+                Execute Proposal
               </button>
             </div>
           </SectionCard>
@@ -302,21 +492,36 @@ export default function ProposalDetailPage() {
             </a>
           </SectionCard>
 
-          {/* --- [新增] 状态摘要提示 --- */}
           <SectionCard
             title="Summary"
-            description="提案状态的简要说明。"
+            description="提案当前状态和可用操作的摘要。"
           >
             <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
               <div className="flex items-center gap-2">
                 <Gavel className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                <span>Current State: <strong>{stateLabel(proposalState)}</strong></span>
+                <span>
+                  Current State: <strong>{stateLabel(proposalState)}</strong>
+                </span>
               </div>
-              <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50">
-                {canVote && "✅ 当前提案处于 Active 状态，您可以进行投票。"}
-                {canQueue && "✅ 当前提案已通过投票，可以进行 Queue 操作。"}
-                {canExecute && "✅ 当前提案已 Queue，可以进行 Execute 操作。"}
-                {!canVote && !canQueue && !canExecute && "⚠️ 当前提案暂时不可操作，请等待状态变更。"}
+              <div className="rounded-lg bg-slate-50 p-3 text-xs leading-relaxed dark:bg-slate-800/50">
+                {canVote && (
+                  <>
+                    当前提案处于 <strong>Active</strong> 状态，您可以进行投票。
+                  </>
+                )}
+                {canQueue && (
+                  <>
+                    当前提案已 <strong>Succeeded</strong>，可以进行 Queue 操作将其加入执行队列。
+                  </>
+                )}
+                {canExecute && (
+                  <>
+                    当前提案已 <strong>Queued</strong> 且等待期结束，可以进行 Execute 操作正式执行。
+                  </>
+                )}
+                {!canVote && !canQueue && !canExecute && (
+                  <>当前提案暂时不可操作。请检查是否已结束、被取消或尚未开始。</>
+                )}
               </div>
             </div>
           </SectionCard>
@@ -326,7 +531,42 @@ export default function ProposalDetailPage() {
   );
 }
 
-// --- [新增] 带进度条的投票统计组件 ---
+// --- 内部 UI 组件 (从第一版迁移过来，保持样式一致) ---
+
+function InfoCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {label}
+      </div>
+      <div className="text-sm font-medium text-slate-900 dark:text-slate-100 break-all">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function InfoBadgeCard({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {label}
+      </div>
+      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${className}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
 function VoteBar({
   label,
   value,
@@ -344,14 +584,12 @@ function VoteBar({
         <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
           {label}
         </div>
-        <div className="text-sm text-slate-500 dark:text-slate-400">
+        <div className="text-sm text-slate-500 dark:text-slate-400 font-mono">
           {value.toString()} <span className="mx-1">·</span> {percent}%
         </div>
       </div>
 
-      {/* 进度条背景 */}
       <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-        {/* 进度条前景 */}
         <div
           className={`h-full ${color} transition-all duration-500 ease-out`}
           style={{ width: `${percent}%` }}
