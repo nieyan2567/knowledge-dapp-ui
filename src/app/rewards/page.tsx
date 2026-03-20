@@ -84,7 +84,7 @@ export default function RewardsPage() {
 			<PageHeader
 				eyebrow="Treasury · Claimable Rewards"
 				title="Rewards Center"
-				description="Claim rewards that have already been accrued in Treasury for the connected wallet."
+				description="领取已在金库中为当前连接钱包累积的奖励。"
 			/>
 
 			{/* ================= Stats ================= */}
@@ -94,7 +94,7 @@ export default function RewardsPage() {
 				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
 					<div className="mb-4 flex items-center justify-between">
 						<div className="text-sm text-slate-500 dark:text-slate-400">
-							Pending Rewards
+							待领取奖励
 						</div>
 						<Wallet className="h-5 w-5 text-slate-400 dark:text-slate-500" />
 					</div>
@@ -104,7 +104,7 @@ export default function RewardsPage() {
 					</div>
 
 					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-						Rewards currently available to claim.
+						当前可领取的奖励。
 					</div>
 				</div>
 
@@ -112,7 +112,7 @@ export default function RewardsPage() {
 				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
 					<div className="mb-4 flex items-center justify-between">
 						<div className="text-sm text-slate-500 dark:text-slate-400">
-							Epoch Budget
+							周期预算
 						</div>
 						<Coins className="h-5 w-5 text-slate-400 dark:text-slate-500" />
 					</div>
@@ -122,14 +122,14 @@ export default function RewardsPage() {
 					</div>
 
 					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-						Total reward budget for this epoch.
+						当前周期的奖励总预算。
 					</div>
 				</div>
 
 				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
 					<div className="mb-4 flex items-center justify-between">
 						<div className="text-sm text-slate-500 dark:text-slate-400">
-							Epoch Spent
+							周期已发放
 						</div>
 						<ShieldCheck className="h-5 w-5 text-slate-400 dark:text-slate-500" />
 					</div>
@@ -139,7 +139,7 @@ export default function RewardsPage() {
 					</div>
 
 					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-						Reward already distributed this epoch.
+						当前周期已分配的奖励。
 					</div>
 				</div>
 
@@ -149,8 +149,8 @@ export default function RewardsPage() {
 			{/* ================= Budget Progress ================= */}
 
 			<SectionCard
-				title="Epoch Budget Usage"
-				description="How much reward budget has been used in the current epoch."
+				title="周期预算使用"
+				description="当前周期已使用的奖励预算比例。"
 			>
 
 				<div className="space-y-4">
@@ -163,7 +163,7 @@ export default function RewardsPage() {
 					</div>
 
 					<div className="text-sm text-slate-500 dark:text-slate-400">
-						{spent} / {budget} {BRANDING.nativeTokenSymbol} used
+						已使用 {spent} / {budget} {BRANDING.nativeTokenSymbol}
 					</div>
 
 				</div>
@@ -174,15 +174,15 @@ export default function RewardsPage() {
 			{/* ================= Claim ================= */}
 
 			<SectionCard
-				title="Claim Rewards"
-				description="Use this action after rewards have been recorded into Treasury."
+				title="领取奖励"
+				description="在奖励记录入库后，使用此操作进行领取。"
 			>
 
 				<div className="flex items-center justify-between">
 
 					<div>
 						<div className="text-sm text-slate-500 dark:text-slate-400">
-							Claimable
+							可领取
 						</div>
 
 						<div className="text-xl font-semibold text-slate-950 dark:text-slate-100">
@@ -195,7 +195,7 @@ export default function RewardsPage() {
 						disabled={loading || !pending}
 						className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
 					>
-						{loading ? "Claiming..." : "Claim Reward"}
+						{loading ? "领取中..." : "领取奖励"}
 					</button>
 
 				</div>

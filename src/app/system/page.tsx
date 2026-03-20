@@ -79,7 +79,7 @@ export default function SystemPage() {
 						rel="noreferrer"
 						className="inline-flex items-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 					>
-						Open {BRANDING.explorerName}
+						打开 {BRANDING.explorerName}
 					</a>
 				}
 			/>
@@ -88,19 +88,19 @@ export default function SystemPage() {
 				<SectionCard title="KnowledgeContent">
 					<div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
 						<div className="flex items-center justify-between gap-3">
-							<span>Address</span>
+							<span>合约地址</span>
 							<AddressBadge address={CONTRACTS.KnowledgeContent} />
 						</div>
 						<div className="flex items-center justify-between gap-3">
-							<span>Owner</span>
+							<span>所有者 (Owner)</span>
 							<AddressBadge address={String(contentOwner ?? "")} />
 						</div>
 						<div className="flex items-center justify-between gap-3">
-							<span>VotesContract</span>
+							<span>投票合约 (Votes)</span>
 							<AddressBadge address={String(votesContract ?? "")} />
 						</div>
 						<div className="flex items-center justify-between gap-3">
-							<span>Treasury</span>
+							<span>金库 (Treasury)</span>
 							<AddressBadge address={String(treasury ?? "")} />
 						</div>
 
@@ -111,7 +111,7 @@ export default function SystemPage() {
 								rel="noreferrer"
 								className="inline-flex items-center rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 							>
-								View in {BRANDING.explorerName}
+								在 {BRANDING.explorerName} 中查看
 							</a>
 						</div>
 					</div>
@@ -120,22 +120,22 @@ export default function SystemPage() {
 				<SectionCard title="TreasuryNative">
 					<div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
 						<div className="flex items-center justify-between gap-3">
-							<span>Address</span>
+							<span>合约地址</span>
 							<AddressBadge address={CONTRACTS.TreasuryNative} />
 						</div>
 						<div className="flex items-center justify-between gap-3">
-							<span>Owner</span>
+							<span>所有者 (Owner)</span>
 							<AddressBadge address={String(treasuryOwner ?? "")} />
 						</div>
 						<div className="flex items-center justify-between gap-3">
-							<span>EpochBudget</span>
+							<span>周期预算 (Epoch Budget)</span>
 							<span className="font-medium text-slate-900 dark:text-slate-100">
 								{epochBudgetValue ? formatEther(epochBudgetValue) : "0"}{" "}
 								{BRANDING.nativeTokenSymbol}
 							</span>
 						</div>
 						<div className="flex items-center justify-between gap-3">
-							<span>EpochSpent</span>
+							<span>周期已用 (Epoch Spent)</span>
 							<span className="font-medium text-slate-900 dark:text-slate-100">
 								{epochSpentValue ? formatEther(epochSpentValue) : "0"}{" "}
 								{BRANDING.nativeTokenSymbol}
@@ -149,7 +149,7 @@ export default function SystemPage() {
 								rel="noreferrer"
 								className="inline-flex items-center rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 							>
-								View in {BRANDING.explorerName}
+								在 {BRANDING.explorerName} 中查看
 							</a>
 						</div>
 					</div>
@@ -158,11 +158,11 @@ export default function SystemPage() {
 				<SectionCard title="Governor">
 					<div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
 						<div className="flex items-center justify-between gap-3">
-							<span>Address</span>
+							<span>合约地址</span>
 							<AddressBadge address={CONTRACTS.KnowledgeGovernor} />
 						</div>
 						<div className="flex items-center justify-between gap-3">
-							<span>Token</span>
+							<span>治理代币 (Token)</span>
 							<AddressBadge address={String(governorToken ?? "")} />
 						</div>
 
@@ -173,7 +173,7 @@ export default function SystemPage() {
 								rel="noreferrer"
 								className="inline-flex items-center rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 							>
-								View in {BRANDING.explorerName}
+								在 {BRANDING.explorerName} 中查看
 							</a>
 						</div>
 					</div>
@@ -182,11 +182,11 @@ export default function SystemPage() {
 				<SectionCard title="Timelock">
 					<div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
 						<div className="flex items-center justify-between gap-3">
-							<span>Address</span>
+							<span>合约地址</span>
 							<AddressBadge address={CONTRACTS.TimelockController} />
 						</div>
 						<div className="flex items-center justify-between gap-3">
-							<span>MinDelay</span>
+							<span>最小延迟 (Min Delay)</span>
 							<span className="font-medium text-slate-900 dark:text-slate-100">
 								{minDelayValue ? String(minDelayValue) : "-"} 秒
 							</span>
@@ -199,7 +199,7 @@ export default function SystemPage() {
 								rel="noreferrer"
 								className="inline-flex items-center rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 							>
-								View in {BRANDING.explorerName}
+								在 {BRANDING.explorerName} 中查看
 							</a>
 						</div>
 					</div>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	encodeFunctionData,
@@ -21,7 +22,6 @@ import {
 	Clock3,
 	ExternalLink,
 	Gavel,
-	Link,
 	RefreshCw,
 	Vote,
 } from "lucide-react";
@@ -46,23 +46,23 @@ function shortenAddress(address: string) {
 function stateLabel(state?: bigint) {
 	switch (Number(state ?? -1)) {
 		case 0:
-			return "Pending";
+			return "待开始";
 		case 1:
-			return "Active";
+			return "投票中";
 		case 2:
-			return "Canceled";
+			return "已取消";
 		case 3:
-			return "Defeated";
+			return "未通过";
 		case 4:
-			return "Succeeded";
+			return "已通过";
 		case 5:
-			return "Queued";
+			return "已排队";
 		case 6:
-			return "Expired";
+			return "已过期";
 		case 7:
-			return "Executed";
+			return "已执行";
 		default:
-			return "Unknown";
+			return "未知状态";
 	}
 }
 
@@ -104,7 +104,7 @@ export default function GovernancePage() {
 	const [minVotes, setMinVotes] = useState("10");
 	const [rewardPerVote, setRewardPerVote] = useState("0.001");
 	const [description, setDescription] = useState(
-		"Proposal: update reward rules"
+		"提案：更新奖励规则"
 	);
 
 	const [loadingProposals, setLoadingProposals] = useState(false);
@@ -224,8 +224,8 @@ export default function GovernancePage() {
 		<main className="mx-auto max-w-7xl px-6 py-10 space-y-8">
 			<PageHeader
 				eyebrow="Governor · Timelock · DAO"
-				title="Governance"
-				description="Create proposals, browse proposal states, cast votes, and execute governance actions in one place."
+				title="Governance Center"
+				description="在此创建提案、浏览提案状态、进行投票以及执行治理操作。"
 				right={
 					<div className="flex items-center gap-3">
 						<button
@@ -233,7 +233,7 @@ export default function GovernancePage() {
 							className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 						>
 							<RefreshCw className="h-4 w-4" />
-							Refresh
+							刷新
 						</button>
 
 						<a
@@ -242,7 +242,7 @@ export default function GovernancePage() {
 							rel="noreferrer"
 							className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 						>
-							View Governor
+							查看合约
 							<ExternalLink className="h-4 w-4" />
 						</a>
 					</div>
@@ -253,7 +253,7 @@ export default function GovernancePage() {
 				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
 					<div className="mb-4 flex items-center justify-between">
 						<div className="text-sm text-slate-500 dark:text-slate-400">
-							Proposal Threshold
+							提案门槛
 						</div>
 						<Gavel className="h-5 w-5 text-slate-400 dark:text-slate-500" />
 					</div>
@@ -261,14 +261,14 @@ export default function GovernancePage() {
 						{proposalThreshold ? String(proposalThreshold) : "-"}
 					</div>
 					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-						Minimum voting power required to create a proposal.
+						创建提案所需的最低投票权。
 					</div>
 				</div>
 
 				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
 					<div className="mb-4 flex items-center justify-between">
 						<div className="text-sm text-slate-500 dark:text-slate-400">
-							Voting Delay
+							投票延迟
 						</div>
 						<Clock3 className="h-5 w-5 text-slate-400 dark:text-slate-500" />
 					</div>
@@ -276,14 +276,14 @@ export default function GovernancePage() {
 						{votingDelay ? String(votingDelay) : "-"}
 					</div>
 					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-						Delay between proposal creation and the start of voting.
+						提案创建后到投票开始前的延迟时间（区块数）。
 					</div>
 				</div>
 
 				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
 					<div className="mb-4 flex items-center justify-between">
 						<div className="text-sm text-slate-500 dark:text-slate-400">
-							Voting Period
+							投票周期
 						</div>
 						<Vote className="h-5 w-5 text-slate-400 dark:text-slate-500" />
 					</div>
@@ -291,29 +291,29 @@ export default function GovernancePage() {
 						{votingPeriod ? String(votingPeriod) : "-"}
 					</div>
 					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-						Duration of the active voting window.
+						活跃投票窗口的持续时间（区块数）。
 					</div>
 				</div>
 			</section>
 
 			<div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
 				<SectionCard
-					title="Create Proposal"
-					description="Current MVP supports proposing a reward rule update on KnowledgeContent."
+					title="创建提案"
+					description="当前 MVP 版本支持针对 KnowledgeContent 合约提出奖励规则更新的提案。"
 				>
 					<div className="space-y-4">
 						<input
 							className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
 							value={minVotes}
 							onChange={(e) => setMinVotes(e.target.value)}
-							placeholder="minVotesToReward"
+							placeholder="最小获奖票数 (minVotesToReward)"
 						/>
 
 						<input
 							className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
 							value={rewardPerVote}
 							onChange={(e) => setRewardPerVote(e.target.value)}
-							placeholder="rewardPerVote (ETH)"
+							placeholder="单票奖励 (ETH)"
 						/>
 
 						<textarea
@@ -321,11 +321,11 @@ export default function GovernancePage() {
 							rows={4}
 							value={description}
 							onChange={(e) => setDescription(e.target.value)}
-							placeholder="proposal description"
+							placeholder="提案描述"
 						/>
 
 						<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
-							This proposal will call:
+							本提案将调用：
 							<div className="mt-2 break-all rounded-xl bg-white p-3 font-mono text-xs text-slate-700 dark:bg-slate-950 dark:text-slate-300">
 								setRewardRules({minVotes}, {rewardPerVote})
 							</div>
@@ -335,14 +335,14 @@ export default function GovernancePage() {
 							onClick={handlePropose}
 							className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
 						>
-							Create Proposal
+							创建提案
 						</button>
 					</div>
 				</SectionCard>
 
 				<SectionCard
-					title="Proposal List"
-					description="Browse proposals, inspect their current state, and act on them directly."
+					title="提案列表"
+					description="浏览提案、检查当前状态并直接进行操作。"
 				>
 					<ProposalList proposals={proposals} loading={loadingProposals} />
 				</SectionCard>
@@ -411,6 +411,12 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 			abstainVotes: 0n,
 		};
 
+	const totalVotes = voteData.forVotes + voteData.againstVotes + voteData.abstainVotes;
+
+	const forPercent = totalVotes > 0n ? Number((voteData.forVotes * 100n) / totalVotes) : 0;
+	const againstPercent = totalVotes > 0n ? Number((voteData.againstVotes * 100n) / totalVotes) : 0;
+	const abstainPercent = totalVotes > 0n ? Number((voteData.abstainVotes * 100n) / totalVotes) : 0;
+
 	const canVote = Number(proposalState ?? -1) === 1;
 	const canQueue = Number(proposalState ?? -1) === 4;
 	const canExecute = Number(proposalState ?? -1) === 5;
@@ -421,6 +427,10 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 			return;
 		}
 
+		let actionText = "赞成";
+		if (support === 0) actionText = "反对";
+		if (support === 2) actionText = "弃权";
+
 		await txToast(
 			writeContractAsync({
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
@@ -429,7 +439,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 				args: [proposal.proposalId, support],
 				account: address,
 			}),
-			"正在提交投票...",
+			`正在提交${actionText}投票...`,
 			"投票交易已提交",
 			"投票失败"
 		);
@@ -454,9 +464,9 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 				],
 				account: address,
 			}),
-			"正在提交 queue 交易...",
-			"Queue 交易已提交",
-			"Queue 失败"
+			"正在提交排队交易...",
+			"排队交易已提交",
+			"排队失败"
 		);
 	}
 
@@ -479,9 +489,9 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 				],
 				account: address,
 			}),
-			"正在提交 execute 交易...",
-			"Execute 交易已提交",
-			"Execute 失败"
+			"正在提交执行交易...",
+			"执行交易已提交",
+			"执行失败"
 		);
 	}
 
@@ -491,7 +501,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 				<div className="min-w-0 flex-1">
 					<div className="mb-2 flex flex-wrap items-center gap-2">
 						<span className="text-sm font-medium text-slate-500 dark:text-slate-400">
-							Proposal #{proposal.proposalId.toString()}
+							提案 #{proposal.proposalId.toString()}
 						</span>
 						<span
 							className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${stateBadgeClass(
@@ -503,23 +513,23 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 					</div>
 
 					<Link
-						href={`/governance/${proposal.proposalId}`}
+						href={`/governance/${proposal.proposalId.toString()}`}
 						className="text-lg font-semibold text-slate-950 dark:text-slate-100">
-						{proposal.description || "No description"}
+						{proposal.description || "无描述"}
 					</Link>
 
 					<div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
-						<span>proposer: {shortenAddress(proposal.proposer)}</span>
-						<span>created block: {proposal.blockNumber.toString()}</span>
+						<span>发起人：{shortenAddress(proposal.proposer)}</span>
+						<span>创建区块：{proposal.blockNumber.toString()}</span>
 						<span>
-							voting blocks: {formatBlockRange(proposal.voteStart, proposal.voteEnd)}
+							投票区间：{formatBlockRange(proposal.voteStart, proposal.voteEnd)}
 						</span>
 					</div>
 
-					<div className="mt-4 grid gap-3 md:grid-cols-3">
-						<VoteStat label="For" value={voteData.forVotes} />
-						<VoteStat label="Against" value={voteData.againstVotes} />
-						<VoteStat label="Abstain" value={voteData.abstainVotes} />
+					<div className="mt-4 space-y-3">
+						<VoteStat label="赞成" value={voteData.forVotes} percent={forPercent} color="bg-emerald-500" />
+						<VoteStat label="反对" value={voteData.againstVotes} percent={againstPercent} color="bg-rose-500" />
+						<VoteStat label="弃权" value={voteData.abstainVotes} percent={abstainPercent} color="bg-slate-500" />
 					</div>
 				</div>
 
@@ -529,7 +539,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 						disabled={!canVote}
 						className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
 					>
-						Vote For
+						投赞成票
 					</button>
 
 					<button
@@ -537,7 +547,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 						disabled={!canVote}
 						className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 					>
-						Vote Against
+						投反对票
 					</button>
 
 					<button
@@ -545,7 +555,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 						disabled={!canVote}
 						className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 					>
-						Abstain
+						弃权
 					</button>
 
 					<button
@@ -553,7 +563,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 						disabled={!canQueue}
 						className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 					>
-						Queue
+						加入队列
 					</button>
 
 					<button
@@ -562,7 +572,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 						className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
 					>
 						<CheckCircle2 className="h-4 w-4" />
-						Execute
+						执行
 					</button>
 				</div>
 			</div>
@@ -570,14 +580,25 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 	);
 }
 
-function VoteStat({ label, value }: { label: string; value: bigint }) {
+function VoteStat({ label, value, percent, color }: { label: string; value: bigint; percent?: number; color?: string }) {
 	return (
 		<div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
-			<div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-				{label}
+			<div className="mb-2 flex items-center justify-between">
+				<div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+					{label}
+				</div>
+				<div className="text-xs text-slate-500 dark:text-slate-400">
+					{percent}%
+				</div>
 			</div>
-			<div className="mt-2 text-lg font-semibold text-slate-950 dark:text-slate-100">
+			<div className="text-lg font-semibold text-slate-950 dark:text-slate-100">
 				{value.toString()}
+			</div>
+			<div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+				<div
+					className={`h-full ${color} transition-all duration-500 ease-out`}
+					style={{ width: `${percent}%` }}
+				/>
 			</div>
 		</div>
 	);

@@ -300,16 +300,16 @@ export default function ContentPage() {
                   className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
                 >
                   {isAuthenticating
-                    ? "Authenticating..."
+                    ? "正在验证身份..."
                     : uploading
-                      ? "Uploading..."
-                      : "Upload to Local IPFS"}
+                      ? "正在上传..."
+                      : "上传至本地 IPFS"}
                 </button>
 
                 {uploadedCid && (
                   <div className="space-y-3">
                     <CopyField label="CID" value={uploadedCid} />
-                    <CopyField label="Local Gateway URL" value={uploadedUrl} />
+                    <CopyField label="本地网关 URL" value={uploadedUrl} />
                   </div>
                 )}
 
@@ -318,7 +318,7 @@ export default function ContentPage() {
                   disabled={!uploadedCid || registering}
                   className="w-full rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
-                  {registering ? "Registering..." : "Register On-Chain"}
+                  {registering ? "正在注册..." : "链上注册"}
                 </button>
               </div>
             </SectionCard>

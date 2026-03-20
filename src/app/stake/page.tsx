@@ -230,7 +230,7 @@ export default function StakePage() {
 
 			<div className="grid gap-6 lg:grid-cols-2">
 				<SectionCard
-					title="Deposit / Activate"
+					title="质押与激活"
 					description="先发起 Deposit，把原生币锁进合约；等到激活区块数达到后，再点击 Activate 获得投票权。"
 				>
 					<div className="space-y-4">
@@ -245,20 +245,20 @@ export default function StakePage() {
 								onClick={handleDeposit}
 								className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
 							>
-								Deposit
+								存入
 							</button>
 							<button
 								onClick={handleActivate}
 								className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 							>
-								Activate
+								激活
 							</button>
 						</div>
 					</div>
 				</SectionCard>
 
 				<SectionCard
-					title="Request Withdraw / Withdraw"
+					title="退出与提现"
 					description="先申请退出，系统会立即减少你的投票权；等冷却期结束后，再执行 Withdraw 提取原生币。"
 				>
 					<div className="space-y-4">
@@ -273,13 +273,13 @@ export default function StakePage() {
 								onClick={handleRequestWithdraw}
 								className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 							>
-								Request Withdraw
+								申请退出
 							</button>
 							<button
 								onClick={handleWithdraw}
 								className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
 							>
-								Withdraw
+								提取
 							</button>
 						</div>
 					</div>
