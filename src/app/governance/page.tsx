@@ -297,8 +297,9 @@ export default function GovernancePage() {
 				</div>
 			</section>
 
-			<div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-				<SectionCard
+			<div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+				<div className="lg:order-2">
+					<SectionCard
 					title="创建提案"
 					description="当前 MVP 版本支持针对 KnowledgeContent 合约提出奖励规则更新的提案。"
 				>
@@ -339,14 +340,20 @@ export default function GovernancePage() {
 							创建提案
 						</button>
 					</div>
-				</SectionCard>
+					</SectionCard>
+				</div>
 
-				<SectionCard
-					title="提案列表"
-					description="浏览提案、检查当前状态并直接进行操作。"
-				>
+				<div className="space-y-4 lg:order-1 lg:col-span-2">
+					<div className="flex items-center justify-between gap-4">
+						<h2 className="text-xl font-semibold text-slate-950 dark:text-slate-100">
+							提案列表
+						</h2>
+						<div className="text-sm text-slate-500 dark:text-slate-400">
+							共 {proposals.length} 条
+						</div>
+					</div>
 					<ProposalList proposals={proposals} loading={loadingProposals} />
-				</SectionCard>
+				</div>
 			</div>
 		</main>
 	);
@@ -497,15 +504,15 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 	}
 
 	return (
-		<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-			<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-				<div className="min-w-0 flex-1">
-					<div className="mb-2 flex flex-wrap items-center gap-2">
-						<span className="text-sm font-medium text-slate-500 dark:text-slate-400">
+		<div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+			<div className="space-y-4">
+				<div className="min-w-0">
+					<div className="mb-1.5 flex flex-wrap items-center gap-2">
+						<span className="text-xs font-medium text-slate-500 dark:text-slate-400">
 							提案 #{proposal.proposalId.toString()}
 						</span>
 						<span
-							className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${stateBadgeClass(
+							className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${stateBadgeClass(
 								proposalState
 							)}`}
 						>
@@ -515,11 +522,11 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 
 					<Link
 						href={`/governance/${proposal.proposalId.toString()}`}
-						className="text-lg font-semibold text-slate-950 dark:text-slate-100">
+						className="text-base font-semibold text-slate-950 dark:text-slate-100">
 						{proposal.description || "无描述"}
 					</Link>
 
-					<div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+					<div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
 						<span>发起人：{shortenAddress(proposal.proposer)}</span>
 						<span>创建区块：{proposal.blockNumber.toString()}</span>
 						<span>
@@ -527,18 +534,18 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 						</span>
 					</div>
 
-					<div className="mt-4 space-y-3">
+					<div className="mt-3 space-y-2">
 						<VoteStat label="赞成" value={voteData.forVotes} percent={forPercent} color="bg-emerald-500" />
 						<VoteStat label="反对" value={voteData.againstVotes} percent={againstPercent} color="bg-rose-500" />
 						<VoteStat label="弃权" value={voteData.abstainVotes} percent={abstainPercent} color="bg-slate-500" />
 					</div>
 				</div>
 
-				<div className="flex flex-wrap gap-2 lg:w-85 lg:justify-end">
+				<div className="grid gap-2 border-t border-slate-200 pt-3 sm:grid-cols-2 xl:grid-cols-5 dark:border-slate-800">
 					<button
 						onClick={() => handleVote(1)}
 						disabled={!canVote}
-						className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+						className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
 					>
 						投赞成票
 					</button>
@@ -546,7 +553,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 					<button
 						onClick={() => handleVote(0)}
 						disabled={!canVote}
-						className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+						className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 					>
 						投反对票
 					</button>
@@ -554,7 +561,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 					<button
 						onClick={() => handleVote(2)}
 						disabled={!canVote}
-						className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+						className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 					>
 						弃权
 					</button>
@@ -562,7 +569,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 					<button
 						onClick={handleQueue}
 						disabled={!canQueue}
-						className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+						className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 					>
 						加入队列
 					</button>
@@ -570,7 +577,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 					<button
 						onClick={handleExecute}
 						disabled={!canExecute}
-						className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+						className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
 					>
 						<CheckCircle2 className="h-4 w-4" />
 						执行
@@ -586,19 +593,19 @@ function VoteStat({ label, value, percent, color }: { label: string; value: bigi
 	const formattedValue = value === 0n ? "0" : formatEther(value);
 
 	return (
-		<div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
-			<div className="mb-2 flex items-center justify-between">
-				<div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+		<div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-800/50">
+			<div className="mb-1 flex items-center justify-between">
+				<div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
 					{label}
 				</div>
-				<div className="text-xs text-slate-500 dark:text-slate-400">
+				<div className="text-[11px] text-slate-500 dark:text-slate-400">
 					{percent}%
 				</div>
 			</div>
-			<div className="text-lg font-semibold text-slate-950 dark:text-slate-100" title={value.toString()}>
+			<div className="text-sm font-semibold text-slate-950 dark:text-slate-100" title={value.toString()}>
 				{formattedValue}
 			</div>
-			<div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+			<div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
 				<div
 					className={`h-full ${color} transition-all duration-500 ease-out`}
 					style={{ width: `${percent}%` }}
