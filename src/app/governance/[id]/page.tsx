@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { keccak256, parseAbiItem, stringToBytes, toHex } from "viem";
+import { keccak256, parseAbiItem, stringToBytes, toHex, formatEther } from "viem";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { toast } from "sonner";
 import {
@@ -336,9 +336,8 @@ export default function ProposalDetailPage() {
 										提案人
 									</div>
 									<div className="flex items-center gap-2 text-sm text-slate-900 dark:text-slate-100">
-										<AddressBadge address={proposalDetail.proposer} />
-										<span className="text-slate-500 dark:text-slate-400">
-											{shortenAddress(proposalDetail.proposer)}
+										<span className="font-mono break-all">
+											{proposalDetail.proposer}
 										</span>
 									</div>
 								</div>
@@ -347,7 +346,9 @@ export default function ProposalDetailPage() {
 									<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
 										治理合约
 									</div>
-									<AddressBadge address={CONTRACTS.KnowledgeGovernor} />
+									<span className="font-mono text-sm text-slate-900 dark:text-slate-100 break-all">
+										{CONTRACTS.KnowledgeGovernor}
+									</span>
 								</div>
 							</div>
 						)}
@@ -490,8 +491,8 @@ export default function ProposalDetailPage() {
 							target="_blank"
 							rel="noreferrer"
 							className={`inline-flex items-center gap-2 text-sm font-medium ${proposalDetail?.transactionHash
-									? "text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-									: "text-slate-400 cursor-not-allowed"
+								? "text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+								: "text-slate-400 cursor-not-allowed"
 								}`}
 							// 如果没有 hash，阻止点击
 							onClick={(e) => {
@@ -592,6 +593,9 @@ function VoteBar({
 	percent: number;
 	color: string;
 }) {
+
+	const formattedValue = value === 0n ? "0" : formatEther(value);
+
 	return (
 		<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
 			<div className="mb-2 flex items-center justify-between">
@@ -599,7 +603,7 @@ function VoteBar({
 					{label}
 				</div>
 				<div className="text-sm text-slate-500 dark:text-slate-400 font-mono">
-					{value.toString()} <span className="mx-1">·</span> {percent}%
+					{formattedValue} <span className="mx-1">·</span> {percent}%
 				</div>
 			</div>
 

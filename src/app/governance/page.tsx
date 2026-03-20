@@ -582,6 +582,9 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 }
 
 function VoteStat({ label, value, percent, color }: { label: string; value: bigint; percent?: number; color?: string }) {
+	
+	const formattedValue = value === 0n ? "0" : formatEther(value);
+
 	return (
 		<div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
 			<div className="mb-2 flex items-center justify-between">
@@ -592,8 +595,8 @@ function VoteStat({ label, value, percent, color }: { label: string; value: bigi
 					{percent}%
 				</div>
 			</div>
-			<div className="text-lg font-semibold text-slate-950 dark:text-slate-100">
-				{value.toString()}
+			<div className="text-lg font-semibold text-slate-950 dark:text-slate-100" title={value.toString()}>
+				{formattedValue}
 			</div>
 			<div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
 				<div
