@@ -27,4 +27,5 @@ export interface ProposalItem {
   targets: readonly Address[]
   values: readonly bigint[]
   calldatas: readonly HexString[]
+	transactionHash?: HexString
 }

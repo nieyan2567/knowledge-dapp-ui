@@ -166,7 +166,7 @@ export default function ContentDetailPage() {
 			</div>
 
 			<PageHeader
-				eyebrow={`Content #${content.id.toString()}`}
+				eyebrow={`内容 #${content.id.toString()}`}
 				title={content.title}
 				description={content.description || "暂无内容描述。"}
 			/>
@@ -175,7 +175,7 @@ export default function ContentDetailPage() {
 				{/* Left */}
 				<div className="space-y-6">
 					<SectionCard
-						title="File Preview"
+						title="文件预览"
 						description="点击下方区域可在本地 IPFS Gateway 中打开原始文件。"
 					>
 						<a
@@ -199,7 +199,7 @@ export default function ContentDetailPage() {
 								</div>
 
 								<div className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 group-hover:text-blue-700 dark:text-blue-400 dark:group-hover:text-blue-300">
-									Open File
+									打开文件
 									<ExternalLink className="h-4 w-4" />
 								</div>
 							</div>
@@ -207,13 +207,13 @@ export default function ContentDetailPage() {
 					</SectionCard>
 
 					<SectionCard
-						title="Content Information"
+						title="内容信息"
 						description="链上登记的基础信息和内容元数据。"
 					>
 						<div className="grid gap-4 md:grid-cols-2">
 							<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
 								<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-									Author
+									作者
 								</div>
 								<div className="flex items-center gap-2 text-sm text-slate-900 dark:text-slate-100">
 									<User className="h-4 w-4 text-slate-400 dark:text-slate-500" />
@@ -223,7 +223,7 @@ export default function ContentDetailPage() {
 
 							<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
 								<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-									Upload Time
+									上传时间
 								</div>
 								<div className="text-sm font-medium text-slate-900 dark:text-slate-100">
 									{formatDate(content.timestamp)}
@@ -232,7 +232,7 @@ export default function ContentDetailPage() {
 
 							<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
 								<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-									Vote Count
+									投票数
 								</div>
 								<div className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
 									<Heart className="h-4 w-4 text-slate-400 dark:text-slate-500" />
@@ -242,7 +242,7 @@ export default function ContentDetailPage() {
 
 							<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
 								<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-									Reward Status
+									奖励状态
 								</div>
 								<div className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
 									<CheckCircle2 className="h-4 w-4 text-slate-400 dark:text-slate-500" />
@@ -256,7 +256,7 @@ export default function ContentDetailPage() {
 				{/* Right */}
 				<div className="space-y-6">
 					<SectionCard
-						title="Content Actions"
+						title="内容操作"
 						description="对当前内容进行社区投票或触发奖励记账。"
 					>
 						<div className="space-y-3">
@@ -265,7 +265,7 @@ export default function ContentDetailPage() {
 								className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
 							>
 								<Heart className="h-4 w-4" />
-								Vote
+								投票
 							</button>
 
 							<button
@@ -273,32 +273,32 @@ export default function ContentDetailPage() {
 								className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 							>
 								<Coins className="h-4 w-4" />
-								Accrue Reward
+								领取奖励
 							</button>
 						</div>
 					</SectionCard>
 
 					<SectionCard
-						title="On-chain Metadata"
+						title="链上元数据"
 						description="内容 CID 和本地网关访问地址。"
 					>
 						<div className="space-y-3">
 							<CopyField label="CID" value={content.ipfsHash} />
-							<CopyField label="Local Gateway URL" value={previewUrl} />
+							<CopyField label="本地网关地址" value={previewUrl} />
 						</div>
 					</SectionCard>
 
 					<SectionCard
-						title="Record Summary"
+						title="记录摘要"
 						description="这条内容在平台中的基础记录摘要。"
 					>
 						<div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
 							<div className="flex items-center gap-2">
 								<BookOpen className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-								<span>Content ID: {content.id.toString()}</span>
+								<span>内容 ID: {content.id.toString()}</span>
 							</div>
-							<div>Title: {content.title}</div>
-							<div>Description: {content.description || "暂无描述"}</div>
+							<div>标题：{content.title}</div>
+							<div>描述：{content.description || "暂无描述"}</div>
 						</div>
 					</SectionCard>
 				</div>
