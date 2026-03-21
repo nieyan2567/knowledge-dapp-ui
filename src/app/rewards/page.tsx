@@ -85,7 +85,7 @@ export default function RewardsPage() {
 				"领取奖励失败"
 			);
 
-			await refreshAfterTx(hash, refreshRewardsData);
+			await refreshAfterTx(hash, refreshRewardsData, ["rewards", "dashboard", "system"]);
 		} finally {
 			setLoading(false);
 		}

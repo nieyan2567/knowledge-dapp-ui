@@ -1,11 +1,13 @@
 "use client";
 
+import { useEffect } from "react";
 import { formatEther } from "viem";
 import { useReadContract } from "wagmi";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { SectionCard } from "@/components/section-card";
 import { PageHeader } from "@/components/page-header";
 import { AddressBadge } from "@/components/address-badge";
+import { subscribeTxConfirmed } from "@/lib/tx-events";
 import { BRANDING } from "@/lib/branding";
 import { asBigInt } from "@/lib/web3-types";
 
@@ -14,49 +16,49 @@ function explorerAddressUrl(address: string) {
 }
 
 export default function SystemPage() {
-	const { data: contentOwner } = useReadContract({
+	const { data: contentOwner, refetch: refetchContentOwner } = useReadContract({
 		address: CONTRACTS.KnowledgeContent as `0x${string}`,
 		abi: ABIS.KnowledgeContent,
 		functionName: "owner",
 	});
 
-	const { data: votesContract } = useReadContract({
+	const { data: votesContract, refetch: refetchVotesContract } = useReadContract({
 		address: CONTRACTS.KnowledgeContent as `0x${string}`,
 		abi: ABIS.KnowledgeContent,
 		functionName: "votesContract",
 	});
 
-	const { data: treasury } = useReadContract({
+	const { data: treasury, refetch: refetchTreasury } = useReadContract({
 		address: CONTRACTS.KnowledgeContent as `0x${string}`,
 		abi: ABIS.KnowledgeContent,
 		functionName: "treasury",
 	});
 
-	const { data: treasuryOwner } = useReadContract({
+	const { data: treasuryOwner, refetch: refetchTreasuryOwner } = useReadContract({
 		address: CONTRACTS.TreasuryNative as `0x${string}`,
 		abi: ABIS.TreasuryNative,
 		functionName: "owner",
 	});
 
-	const { data: epochBudget } = useReadContract({
+	const { data: epochBudget, refetch: refetchEpochBudget } = useReadContract({
 		address: CONTRACTS.TreasuryNative as `0x${string}`,
 		abi: ABIS.TreasuryNative,
 		functionName: "epochBudget",
 	});
 
-	const { data: epochSpent } = useReadContract({
+	const { data: epochSpent, refetch: refetchEpochSpent } = useReadContract({
 		address: CONTRACTS.TreasuryNative as `0x${string}`,
 		abi: ABIS.TreasuryNative,
 		functionName: "epochSpent",
 	});
 
-	const { data: minDelay } = useReadContract({
+	const { data: minDelay, refetch: refetchMinDelay } = useReadContract({
 		address: CONTRACTS.TimelockController as `0x${string}`,
 		abi: ABIS.TimelockController,
 		functionName: "getMinDelay",
 	});
 
-	const { data: governorToken } = useReadContract({
+	const { data: governorToken, refetch: refetchGovernorToken } = useReadContract({
 		address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 		abi: ABIS.KnowledgeGovernor,
 		functionName: "token",
@@ -65,6 +67,34 @@ export default function SystemPage() {
 	const epochBudgetValue = asBigInt(epochBudget);
 	const epochSpentValue = asBigInt(epochSpent);
 	const minDelayValue = asBigInt(minDelay);
+
+	useEffect(() => {
+		return subscribeTxConfirmed(({ domains }) => {
+			if (!domains.some((domain) => ["rewards", "content", "governance", "system"].includes(domain))) {
+				return;
+			}
+
+			void Promise.all([
+				refetchContentOwner(),
+				refetchVotesContract(),
+				refetchTreasury(),
+				refetchTreasuryOwner(),
+				refetchEpochBudget(),
+				refetchEpochSpent(),
+				refetchMinDelay(),
+				refetchGovernorToken(),
+			]);
+		});
+	}, [
+		refetchContentOwner,
+		refetchEpochBudget,
+		refetchEpochSpent,
+		refetchGovernorToken,
+		refetchMinDelay,
+		refetchTreasury,
+		refetchTreasuryOwner,
+		refetchVotesContract,
+	]);
 
 	return (
 		<main className="mx-auto max-w-7xl px-6 py-10 space-y-8">

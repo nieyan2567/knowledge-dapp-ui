@@ -214,7 +214,7 @@ export default function ProposalDetailPage() {
 			"投票失败"
 		);
 
-		await refreshAfterTx(hash, refreshProposalDetail);
+		await refreshAfterTx(hash, refreshProposalDetail, ["governance", "system"]);
 	}
 
 	async function queueProposal() {
@@ -241,7 +241,7 @@ export default function ProposalDetailPage() {
 			"排队失败"
 		);
 
-		await refreshAfterTx(hash, refreshProposalDetail);
+		await refreshAfterTx(hash, refreshProposalDetail, ["governance", "system"]);
 	}
 
 	async function executeProposal() {
@@ -268,7 +268,7 @@ export default function ProposalDetailPage() {
 			"执行失败"
 		);
 
-		await refreshAfterTx(hash, refreshProposalDetail);
+		await refreshAfterTx(hash, refreshProposalDetail, ["governance", "system"]);
 	}
 
 	const handleRefresh = () => {

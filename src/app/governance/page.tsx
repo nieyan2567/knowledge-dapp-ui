@@ -218,7 +218,7 @@ export default function GovernancePage() {
 			"提案提交失败"
 		);
 
-		await refreshAfterTx(hash, loadProposals);
+		await refreshAfterTx(hash, loadProposals, ["governance", "system"]);
 	}
 
 	return (
@@ -473,7 +473,7 @@ function ProposalCard({
 			"投票失败"
 		);
 
-		await refreshAfterTx(hash, refreshProposalCard);
+		await refreshAfterTx(hash, refreshProposalCard, ["governance", "system"]);
 	}
 
 	async function handleQueue() {
@@ -500,7 +500,7 @@ function ProposalCard({
 			"排队失败"
 		);
 
-		await refreshAfterTx(hash, refreshProposalCard);
+		await refreshAfterTx(hash, refreshProposalCard, ["governance", "system"]);
 	}
 
 	async function handleExecute() {
@@ -527,7 +527,7 @@ function ProposalCard({
 			"执行失败"
 		);
 
-		await refreshAfterTx(hash, refreshProposalCard);
+		await refreshAfterTx(hash, refreshProposalCard, ["governance", "system"]);
 	}
 
 	return (

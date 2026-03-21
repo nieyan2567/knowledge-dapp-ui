@@ -49,7 +49,7 @@ export function ContentCard({
 				"投票失败"
 			);
 
-			await refreshAfterTx(hash, onActionComplete);
+			await refreshAfterTx(hash, onActionComplete, ["content", "dashboard"]);
 		} catch (error) {
 			console.error(error);
 		}
@@ -75,7 +75,7 @@ export function ContentCard({
 				"奖励记账失败"
 			);
 
-			await refreshAfterTx(hash, onActionComplete);
+			await refreshAfterTx(hash, onActionComplete, ["content", "rewards", "dashboard", "system"]);
 		} catch (error) {
 			console.error(error);
 		}

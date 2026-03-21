@@ -242,7 +242,7 @@ export default function ContentPage() {
       setTitle("");
       setDesc("");
 
-      await refreshAfterTx(hash, refreshContentList);
+      await refreshAfterTx(hash, refreshContentList, ["content", "dashboard"]);
     } catch (error) {
       console.error(error);
     } finally {

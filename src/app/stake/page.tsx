@@ -103,7 +103,7 @@ export default function StakePage() {
 			"质押失败"
 		);
 
-		await refreshAfterTx(hash, refreshStakeData);
+		await refreshAfterTx(hash, refreshStakeData, ["stake", "dashboard"]);
 	}
 
 	async function handleActivate() {
@@ -124,7 +124,7 @@ export default function StakePage() {
 			"激活失败"
 		);
 
-		await refreshAfterTx(hash, refreshStakeData);
+		await refreshAfterTx(hash, refreshStakeData, ["stake", "dashboard"]);
 	}
 
 	async function handleRequestWithdraw() {
@@ -149,7 +149,7 @@ export default function StakePage() {
 			"退出申请失败"
 		);
 
-		await refreshAfterTx(hash, refreshStakeData);
+		await refreshAfterTx(hash, refreshStakeData, ["stake", "dashboard"]);
 	}
 
 	async function handleWithdraw() {
@@ -174,7 +174,7 @@ export default function StakePage() {
 			"提取失败"
 		);
 
-		await refreshAfterTx(hash, refreshStakeData);
+		await refreshAfterTx(hash, refreshStakeData, ["stake", "dashboard"]);
 	}
 
 	return (

@@ -119,7 +119,7 @@ export default function ContentDetailPage() {
 			"投票失败"
 		);
 
-		await refreshAfterTx(hash, refetchContent);
+		await refreshAfterTx(hash, refetchContent, ["content", "dashboard"]);
 	}
 
 	async function handleAccrueReward() {
@@ -146,7 +146,7 @@ export default function ContentDetailPage() {
 			"奖励记账失败"
 		);
 
-		await refreshAfterTx(hash, refetchContent);
+		await refreshAfterTx(hash, refetchContent, ["content", "rewards", "dashboard", "system"]);
 	}
 
 	return (

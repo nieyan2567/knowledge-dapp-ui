@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useReadContract } from "wagmi";
 import { useWalletReady } from "@/hooks/useWalletReady";
 import { ABIS, CONTRACTS } from "@/contracts";
@@ -8,25 +9,26 @@ import { StatCard } from "@/components/stat-card";
 import { BookOpen, Coins, ShieldCheck, Wallet } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { AddressBadge } from "@/components/address-badge";
+import { subscribeTxConfirmed } from "@/lib/tx-events";
 import { BRANDING } from "@/lib/branding";
 import { asBigInt } from "@/lib/web3-types";
 
 export default function HomePage() {
   const { address, isConnected, isCorrectChain } = useWalletReady();
 
-  const { data: epochBudget } = useReadContract({
+  const { data: epochBudget, refetch: refetchEpochBudget } = useReadContract({
     address: CONTRACTS.TreasuryNative as `0x${string}`,
     abi: ABIS.TreasuryNative,
     functionName: "epochBudget",
   });
 
-  const { data: contentCount } = useReadContract({
+  const { data: contentCount, refetch: refetchContentCount } = useReadContract({
     address: CONTRACTS.KnowledgeContent as `0x${string}`,
     abi: ABIS.KnowledgeContent,
     functionName: "contentCount",
   });
 
-  const { data: myVotes } = useReadContract({
+  const { data: myVotes, refetch: refetchMyVotes } = useReadContract({
     address: CONTRACTS.NativeVotes as `0x${string}`,
     abi: ABIS.NativeVotes,
     functionName: "getVotes",
@@ -34,7 +36,7 @@ export default function HomePage() {
     query: { enabled: !!address },
   });
 
-  const { data: myPendingRewards } = useReadContract({
+  const { data: myPendingRewards, refetch: refetchMyPendingRewards } = useReadContract({
     address: CONTRACTS.TreasuryNative as `0x${string}`,
     abi: ABIS.TreasuryNative,
     functionName: "pendingRewards",
@@ -46,6 +48,26 @@ export default function HomePage() {
   const contentCountValue = asBigInt(contentCount);
   const myVotesValue = asBigInt(myVotes);
   const myPendingRewardsValue = asBigInt(myPendingRewards);
+
+  useEffect(() => {
+    return subscribeTxConfirmed(({ domains }) => {
+      if (!domains.some((domain) => ["stake", "rewards", "content", "dashboard"].includes(domain))) {
+        return;
+      }
+
+      void Promise.all([
+        refetchEpochBudget(),
+        refetchContentCount(),
+        refetchMyVotes(),
+        refetchMyPendingRewards(),
+      ]);
+    });
+  }, [
+    refetchContentCount,
+    refetchEpochBudget,
+    refetchMyPendingRewards,
+    refetchMyVotes,
+  ]);
 
   return (
     <div>
