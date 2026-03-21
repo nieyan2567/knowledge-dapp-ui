@@ -3,12 +3,13 @@
 import { Coins, ShieldCheck, Wallet } from "lucide-react";
 import { formatEther } from "viem";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
 
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
+import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { BRANDING } from "@/lib/branding";
 import { txToast } from "@/lib/tx-toast";
 import { asBigInt } from "@/lib/web3-types";
@@ -16,10 +17,11 @@ import { asBigInt } from "@/lib/web3-types";
 export default function RewardsPage() {
 	const { address } = useAccount();
 	const { writeContractAsync } = useWriteContract();
+	const refreshAfterTx = useRefreshOnTxConfirmed();
 
 	const [loading, setLoading] = useState(false);
 
-	const { data: pendingRewards } = useReadContract({
+	const { data: pendingRewards, refetch: refetchPendingRewards } = useReadContract({
 		address: CONTRACTS.TreasuryNative as `0x${string}`,
 		abi: ABIS.TreasuryNative,
 		functionName: "pendingRewards",
@@ -27,13 +29,13 @@ export default function RewardsPage() {
 		query: { enabled: !!address },
 	});
 
-	const { data: epochBudget } = useReadContract({
+	const { data: epochBudget, refetch: refetchEpochBudget } = useReadContract({
 		address: CONTRACTS.TreasuryNative as `0x${string}`,
 		abi: ABIS.TreasuryNative,
 		functionName: "epochBudget",
 	});
 
-	const { data: epochSpent } = useReadContract({
+	const { data: epochSpent, refetch: refetchEpochSpent } = useReadContract({
 		address: CONTRACTS.TreasuryNative as `0x${string}`,
 		abi: ABIS.TreasuryNative,
 		functionName: "epochSpent",
@@ -49,6 +51,14 @@ export default function RewardsPage() {
 
 	const progress = budget ? Math.min((spent / budget) * 100, 100) : 0;
 
+	const refreshRewardsData = useCallback(async () => {
+		await Promise.all([
+			refetchPendingRewards(),
+			refetchEpochBudget(),
+			refetchEpochSpent(),
+		]);
+	}, [refetchEpochBudget, refetchEpochSpent, refetchPendingRewards]);
+
 	async function handleClaim() {
 		if (!address) {
 			toast.error("请先连接钱包");
@@ -63,7 +73,7 @@ export default function RewardsPage() {
 		try {
 			setLoading(true);
 
-			await txToast(
+			const hash = await txToast(
 				writeContractAsync({
 					address: CONTRACTS.TreasuryNative as `0x${string}`,
 					abi: ABIS.TreasuryNative,
@@ -74,6 +84,8 @@ export default function RewardsPage() {
 				"领取奖励交易已提交",
 				"领取奖励失败"
 			);
+
+			await refreshAfterTx(hash, refreshRewardsData);
 		} finally {
 			setLoading(false);
 		}

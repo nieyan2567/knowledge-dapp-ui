@@ -15,6 +15,7 @@ import { FileDrop } from "@/components/file-drop";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
+import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useUploadAuth } from "@/hooks/useUploadAuth";
 import { txToast } from "@/lib/tx-toast";
 import type { ContentCardData } from "@/types/content";
@@ -31,6 +32,7 @@ export default function ContentPage() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
+  const refreshAfterTx = useRefreshOnTxConfirmed();
   const { ensureUploadAuth, isAuthenticating } = useUploadAuth();
 
   const [title, setTitle] = useState("");
@@ -46,7 +48,7 @@ export default function ContentPage() {
   const [contentList, setContentList] = useState<ContentCardData[]>([]);
   const [loadingList, setLoadingList] = useState(false);
 
-  const { data: contentCount } = useReadContract({
+  const { data: contentCount, refetch: refetchContentCount } = useReadContract({
     address: CONTRACTS.KnowledgeContent as `0x${string}`,
     abi: ABIS.KnowledgeContent,
     functionName: "contentCount",
@@ -74,6 +76,26 @@ export default function ContentPage() {
     },
     [publicClient]
   );
+
+  const refreshContentList = useCallback(async () => {
+    if (!publicClient) {
+      setContentList([]);
+      return;
+    }
+
+    setLoadingList(true);
+
+    try {
+      const latestCount = Number((await refetchContentCount()).data ?? 0n);
+      const parsed = await readContents(latestCount);
+      setContentList(parsed);
+    } catch (error) {
+      console.error(error);
+      toast.error("鍔犺浇鍐呭鍒楄〃澶辫触");
+    } finally {
+      setLoadingList(false);
+    }
+  }, [publicClient, readContents, refetchContentCount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -201,7 +223,7 @@ export default function ContentPage() {
     setRegistering(true);
 
     try {
-      await txToast(
+      const hash = await txToast(
         writeContractAsync({
           address: CONTRACTS.KnowledgeContent as `0x${string}`,
           abi: ABIS.KnowledgeContent,
@@ -220,10 +242,7 @@ export default function ContentPage() {
       setTitle("");
       setDesc("");
 
-      if (contentCount !== undefined) {
-        const parsed = await readContents(Number(contentCount) + 1);
-        setContentList(parsed);
-      }
+      await refreshAfterTx(hash, refreshContentList);
     } catch (error) {
       console.error(error);
     } finally {
@@ -265,7 +284,11 @@ export default function ContentPage() {
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 {filteredContents.map((item) => (
-                  <ContentCard key={item.id.toString()} content={item} />
+                  <ContentCard
+                    key={item.id.toString()}
+                    content={item}
+                    onActionComplete={refreshContentList}
+                  />
                 ))}
               </div>
             )}

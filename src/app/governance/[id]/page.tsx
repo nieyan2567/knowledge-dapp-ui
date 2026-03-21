@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { keccak256, parseAbiItem, stringToBytes, toHex, formatEther } from "viem";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { AddressBadge } from "@/components/address-badge";
 import { ABIS, CONTRACTS } from "@/contracts";
+import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { txToast } from "@/lib/tx-toast";
 import { BRANDING } from "@/lib/branding";
 import type { ProposalItem, ProposalVotes } from "@/types/governance";
@@ -63,15 +64,12 @@ function stateBadgeClass(state?: bigint) {
 	}
 }
 
-function shortenAddress(address: string) {
-	return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
-
 export default function ProposalDetailPage() {
 	const params = useParams();
 	const publicClient = usePublicClient();
 	const { address } = useAccount();
 	const { writeContractAsync } = useWriteContract();
+	const refreshAfterTx = useRefreshOnTxConfirmed();
 
 	// [融合] 恢复 proposalDetail 状态以存储详细事件数据
 	const [proposalDetail, setProposalDetail] = useState<ProposalItem | null>(null);
@@ -125,8 +123,7 @@ export default function ProposalDetailPage() {
 	const canExecute = Number(proposalState ?? -1) === 5;
 
 	// [融合] 恢复轻量级事件监听，仅获取当前提案详情
-	useEffect(() => {
-		async function loadProposalDetail() {
+	const loadProposalDetail = useCallback(async () => {
 			if (!publicClient || proposalId === null) {
 				setProposalDetail(null);
 				return;
@@ -188,10 +185,15 @@ export default function ProposalDetailPage() {
 			} finally {
 				setLoadingDetail(false);
 			}
-		}
+	}, [proposalId, publicClient]);
 
-		loadProposalDetail();
-	}, [publicClient, proposalId]);
+	useEffect(() => {
+		void loadProposalDetail();
+	}, [loadProposalDetail]);
+
+	const refreshProposalDetail = useCallback(async () => {
+		await Promise.all([refetchState(), refetchVotes(), loadProposalDetail()]);
+	}, [loadProposalDetail, refetchState, refetchVotes]);
 
 	async function vote(support: 0 | 1 | 2) {
 		if (!address || !proposalId) {
@@ -199,7 +201,7 @@ export default function ProposalDetailPage() {
 			return;
 		}
 
-		await txToast(
+		const hash = await txToast(
 			writeContractAsync({
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 				abi: ABIS.KnowledgeGovernor,
@@ -211,6 +213,8 @@ export default function ProposalDetailPage() {
 			"投票成功",
 			"投票失败"
 		);
+
+		await refreshAfterTx(hash, refreshProposalDetail);
 	}
 
 	async function queueProposal() {
@@ -219,7 +223,7 @@ export default function ProposalDetailPage() {
 			return;
 		}
 
-		await txToast(
+		const hash = await txToast(
 			writeContractAsync({
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 				abi: ABIS.KnowledgeGovernor,
@@ -236,6 +240,8 @@ export default function ProposalDetailPage() {
 			"排队交易已提交",
 			"排队失败"
 		);
+
+		await refreshAfterTx(hash, refreshProposalDetail);
 	}
 
 	async function executeProposal() {
@@ -244,7 +250,7 @@ export default function ProposalDetailPage() {
 			return;
 		}
 
-		await txToast(
+		const hash = await txToast(
 			writeContractAsync({
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 				abi: ABIS.KnowledgeGovernor,
@@ -261,15 +267,15 @@ export default function ProposalDetailPage() {
 			"执行交易已提交",
 			"执行失败"
 		);
+
+		await refreshAfterTx(hash, refreshProposalDetail);
 	}
 
 	const handleRefresh = () => {
-		refetchState();
-		refetchVotes();
+		void refreshProposalDetail();
 		// 触发 effect 重新运行通常不需要手动操作，因为依赖项没变
 		// 但如果想强制重跑 effect，可以加一个 key 或者手动调用 loadProposalDetail
 		// 这里简单起见，重新挂载组件或提示用户
-		window.location.reload();
 	};
 
 	if (!proposalId) return null;

@@ -2,7 +2,7 @@
 
 import "@rainbow-me/rainbowkit/styles.css";
 
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   RainbowKitProvider,
@@ -11,18 +11,15 @@ import {
 } from "@rainbow-me/rainbowkit";
 import { ThemeProvider, useTheme } from "next-themes";
 import { WagmiProvider } from "wagmi";
+import { useIsClient } from "@/hooks/useIsClient";
 import { knowledgeChain } from "@/lib/chains";
 import { config } from "@/lib/wagmi";
 
 function RainbowKitThemeBridge({ children }: { children: ReactNode }) {
   const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const isClient = useIsClient();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const isDark = mounted && resolvedTheme === "dark";
+  const isDark = isClient && resolvedTheme === "dark";
 
   return (
     <RainbowKitProvider

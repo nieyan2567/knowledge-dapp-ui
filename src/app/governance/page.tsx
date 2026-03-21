@@ -30,6 +30,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
+import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { BRANDING } from "@/lib/branding";
 import { txToast } from "@/lib/tx-toast";
 import { asBigInt, asProposalVotes } from "@/lib/web3-types";
@@ -101,6 +102,7 @@ export default function GovernancePage() {
 	const { address } = useAccount();
 	const publicClient = usePublicClient();
 	const { writeContractAsync } = useWriteContract();
+	const refreshAfterTx = useRefreshOnTxConfirmed();
 
 	const [minVotes, setMinVotes] = useState("10");
 	const [rewardPerVote, setRewardPerVote] = useState("0.001");
@@ -198,7 +200,7 @@ export default function GovernancePage() {
 			return;
 		}
 
-		await txToast(
+		const hash = await txToast(
 			writeContractAsync({
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 				abi: ABIS.KnowledgeGovernor,
@@ -216,9 +218,7 @@ export default function GovernancePage() {
 			"提案提交失败"
 		);
 
-		setTimeout(() => {
-			loadProposals();
-		}, 1500);
+		await refreshAfterTx(hash, loadProposals);
 	}
 
 	return (
@@ -352,7 +352,11 @@ export default function GovernancePage() {
 							共 {proposals.length} 条
 						</div>
 					</div>
-					<ProposalList proposals={proposals} loading={loadingProposals} />
+					<ProposalList
+						proposals={proposals}
+						loading={loadingProposals}
+						onActionComplete={loadProposals}
+					/>
 				</div>
 			</div>
 		</main>
@@ -362,9 +366,11 @@ export default function GovernancePage() {
 function ProposalList({
 	proposals,
 	loading,
+	onActionComplete,
 }: {
 	proposals: ProposalItem[];
 	loading: boolean;
+	onActionComplete: () => void | Promise<void>;
 }) {
 	if (loading) {
 		return (
@@ -385,24 +391,35 @@ function ProposalList({
 	return (
 		<div className="space-y-4">
 			{proposals.map((proposal) => (
-				<ProposalCard key={proposal.proposalId.toString()} proposal={proposal} />
+				<ProposalCard
+					key={proposal.proposalId.toString()}
+					proposal={proposal}
+					onActionComplete={onActionComplete}
+				/>
 			))}
 		</div>
 	);
 }
 
-function ProposalCard({ proposal }: { proposal: ProposalItem }) {
+function ProposalCard({
+	proposal,
+	onActionComplete,
+}: {
+	proposal: ProposalItem;
+	onActionComplete: () => void | Promise<void>;
+}) {
 	const { address } = useAccount();
 	const { writeContractAsync } = useWriteContract();
+	const refreshAfterTx = useRefreshOnTxConfirmed();
 
-	const { data: state } = useReadContract({
+	const { data: state, refetch: refetchState } = useReadContract({
 		address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 		abi: ABIS.KnowledgeGovernor,
 		functionName: "state",
 		args: [proposal.proposalId],
 	});
 
-	const { data: votes } = useReadContract({
+	const { data: votes, refetch: refetchVotes } = useReadContract({
 		address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 		abi: ABIS.KnowledgeGovernor,
 		functionName: "proposalVotes",
@@ -429,6 +446,10 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 	const canQueue = Number(proposalState ?? -1) === 4;
 	const canExecute = Number(proposalState ?? -1) === 5;
 
+	async function refreshProposalCard() {
+		await Promise.all([refetchState(), refetchVotes(), onActionComplete()]);
+	}
+
 	async function handleVote(support: 0 | 1 | 2) {
 		if (!address) {
 			toast.error("请先连接钱包");
@@ -439,7 +460,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 		if (support === 0) actionText = "反对";
 		if (support === 2) actionText = "弃权";
 
-		await txToast(
+		const hash = await txToast(
 			writeContractAsync({
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 				abi: ABIS.KnowledgeGovernor,
@@ -451,6 +472,8 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 			"投票交易已提交",
 			"投票失败"
 		);
+
+		await refreshAfterTx(hash, refreshProposalCard);
 	}
 
 	async function handleQueue() {
@@ -459,7 +482,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 			return;
 		}
 
-		await txToast(
+		const hash = await txToast(
 			writeContractAsync({
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 				abi: ABIS.KnowledgeGovernor,
@@ -476,6 +499,8 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 			"排队交易已提交",
 			"排队失败"
 		);
+
+		await refreshAfterTx(hash, refreshProposalCard);
 	}
 
 	async function handleExecute() {
@@ -484,7 +509,7 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 			return;
 		}
 
-		await txToast(
+		const hash = await txToast(
 			writeContractAsync({
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 				abi: ABIS.KnowledgeGovernor,
@@ -501,6 +526,8 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 			"执行交易已提交",
 			"执行失败"
 		);
+
+		await refreshAfterTx(hash, refreshProposalCard);
 	}
 
 	return (

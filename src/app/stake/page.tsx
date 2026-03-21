@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Clock3, Coins, ShieldCheck, Wallet } from "lucide-react";
 import { formatEther, parseEther } from "viem";
 import { toast } from "sonner";
@@ -9,12 +9,14 @@ import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { BRANDING } from "@/lib/branding";
+import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { txToast } from "@/lib/tx-toast";
 import { asBigInt } from "@/lib/web3-types";
 
 export default function StakePage() {
 	const { address } = useAccount();
 	const { writeContractAsync } = useWriteContract();
+	const refreshAfterTx = useRefreshOnTxConfirmed();
 
 	const [depositAmount, setDepositAmount] = useState("1");
 	const [withdrawAmount, setWithdrawAmount] = useState("1");
@@ -33,7 +35,7 @@ export default function StakePage() {
 		}
 	}
 
-	const { data: votes } = useReadContract({
+	const { data: votes, refetch: refetchVotes } = useReadContract({
 		address: CONTRACTS.NativeVotes as `0x${string}`,
 		abi: ABIS.NativeVotes,
 		functionName: "getVotes",
@@ -41,7 +43,7 @@ export default function StakePage() {
 		query: { enabled: !!address },
 	});
 
-	const { data: staked } = useReadContract({
+	const { data: staked, refetch: refetchStaked } = useReadContract({
 		address: CONTRACTS.NativeVotes as `0x${string}`,
 		abi: ABIS.NativeVotes,
 		functionName: "staked",
@@ -49,7 +51,7 @@ export default function StakePage() {
 		query: { enabled: !!address },
 	});
 
-	const { data: pendingStake } = useReadContract({
+	const { data: pendingStake, refetch: refetchPendingStake } = useReadContract({
 		address: CONTRACTS.NativeVotes as `0x${string}`,
 		abi: ABIS.NativeVotes,
 		functionName: "pendingStake",
@@ -57,7 +59,7 @@ export default function StakePage() {
 		query: { enabled: !!address },
 	});
 
-	const { data: pendingWithdraw } = useReadContract({
+	const { data: pendingWithdraw, refetch: refetchPendingWithdraw } = useReadContract({
 		address: CONTRACTS.NativeVotes as `0x${string}`,
 		abi: ABIS.NativeVotes,
 		functionName: "pendingWithdraw",
@@ -70,6 +72,15 @@ export default function StakePage() {
 	const pendingStakeValue = asBigInt(pendingStake);
 	const pendingWithdrawValue = asBigInt(pendingWithdraw);
 
+	const refreshStakeData = useCallback(async () => {
+		await Promise.all([
+			refetchVotes(),
+			refetchStaked(),
+			refetchPendingStake(),
+			refetchPendingWithdraw(),
+		]);
+	}, [refetchPendingStake, refetchPendingWithdraw, refetchStaked, refetchVotes]);
+
 	async function handleDeposit() {
 		if (!address) {
 			toast.error("请先连接钱包");
@@ -79,7 +90,7 @@ export default function StakePage() {
 		const amount = parseAmount(depositAmount, "质押数量");
 		if (amount === null) return;
 
-		await txToast(
+		const hash = await txToast(
 			writeContractAsync({
 				address: CONTRACTS.NativeVotes as `0x${string}`,
 				abi: ABIS.NativeVotes,
@@ -91,6 +102,8 @@ export default function StakePage() {
 			"质押交易已提交",
 			"质押失败"
 		);
+
+		await refreshAfterTx(hash, refreshStakeData);
 	}
 
 	async function handleActivate() {
@@ -99,7 +112,7 @@ export default function StakePage() {
 			return;
 		}
 
-		await txToast(
+		const hash = await txToast(
 			writeContractAsync({
 				address: CONTRACTS.NativeVotes as `0x${string}`,
 				abi: ABIS.NativeVotes,
@@ -110,6 +123,8 @@ export default function StakePage() {
 			"激活交易已提交",
 			"激活失败"
 		);
+
+		await refreshAfterTx(hash, refreshStakeData);
 	}
 
 	async function handleRequestWithdraw() {
@@ -121,7 +136,7 @@ export default function StakePage() {
 		const amount = parseAmount(withdrawAmount, "提取数量");
 		if (amount === null) return;
 
-		await txToast(
+		const hash = await txToast(
 			writeContractAsync({
 				address: CONTRACTS.NativeVotes as `0x${string}`,
 				abi: ABIS.NativeVotes,
@@ -133,6 +148,8 @@ export default function StakePage() {
 			"退出申请已提交",
 			"退出申请失败"
 		);
+
+		await refreshAfterTx(hash, refreshStakeData);
 	}
 
 	async function handleWithdraw() {
@@ -144,7 +161,7 @@ export default function StakePage() {
 		const amount = parseAmount(withdrawAmount, "提取数量");
 		if (amount === null) return;
 
-		await txToast(
+		const hash = await txToast(
 			writeContractAsync({
 				address: CONTRACTS.NativeVotes as `0x${string}`,
 				abi: ABIS.NativeVotes,
@@ -156,6 +173,8 @@ export default function StakePage() {
 			"提取交易已提交",
 			"提取失败"
 		);
+
+		await refreshAfterTx(hash, refreshStakeData);
 	}
 
 	return (

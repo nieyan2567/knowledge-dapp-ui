@@ -21,6 +21,7 @@ import { SectionCard } from "@/components/section-card";
 import { CopyField } from "@/components/copy-field";
 import { AddressBadge } from "@/components/address-badge";
 import { ABIS, CONTRACTS } from "@/contracts";
+import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { txToast } from "@/lib/tx-toast";
 import { asContentData } from "@/lib/web3-types";
 
@@ -39,6 +40,7 @@ export default function ContentDetailPage() {
 	const params = useParams();
 	const { address } = useAccount();
 	const { writeContractAsync } = useWriteContract();
+	const refreshAfterTx = useRefreshOnTxConfirmed();
 
 	const rawId = params?.id;
 	const contentId = useMemo(() => {
@@ -47,7 +49,7 @@ export default function ContentDetailPage() {
 		return BigInt(rawId);
 	}, [rawId]);
 
-	const { data: contentData, isLoading } = useReadContract({
+	const { data: contentData, isLoading, refetch: refetchContent } = useReadContract({
 		address: CONTRACTS.KnowledgeContent as `0x${string}`,
 		abi: ABIS.KnowledgeContent,
 		functionName: "contents",
@@ -104,7 +106,7 @@ export default function ContentDetailPage() {
 			return;
 		}
 
-		await txToast(
+		const hash = await txToast(
 			writeContractAsync({
 				address: CONTRACTS.KnowledgeContent as `0x${string}`,
 				abi: ABIS.KnowledgeContent,
@@ -116,6 +118,8 @@ export default function ContentDetailPage() {
 			"投票交易已提交",
 			"投票失败"
 		);
+
+		await refreshAfterTx(hash, refetchContent);
 	}
 
 	async function handleAccrueReward() {
@@ -129,7 +133,7 @@ export default function ContentDetailPage() {
 			return;
 		}
 
-		await txToast(
+		const hash = await txToast(
 			writeContractAsync({
 				address: CONTRACTS.KnowledgeContent as `0x${string}`,
 				abi: ABIS.KnowledgeContent,
@@ -141,6 +145,8 @@ export default function ContentDetailPage() {
 			"奖励记账交易已提交",
 			"奖励记账失败"
 		);
+
+		await refreshAfterTx(hash, refetchContent);
 	}
 
 	return (

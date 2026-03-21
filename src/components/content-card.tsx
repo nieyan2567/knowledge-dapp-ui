@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useAccount, useWriteContract } from "wagmi";
 import { ABIS, CONTRACTS } from "@/contracts";
+import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { BookOpen, Coins, ExternalLink, Heart } from "lucide-react";
 import { toast } from "sonner";
 import { txToast } from "@/lib/tx-toast";
@@ -15,9 +16,16 @@ function shortenAddress(address: string) {
 	return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-export function ContentCard({ content }: { content: ContentCardData }) {
+export function ContentCard({
+	content,
+	onActionComplete,
+}: {
+	content: ContentCardData;
+	onActionComplete?: () => void | Promise<void>;
+}) {
 	const { address } = useAccount();
 	const { writeContractAsync } = useWriteContract();
+	const refreshAfterTx = useRefreshOnTxConfirmed();
 
 	const fileUrl = `${gatewayBase}/${content.ipfsHash}`;
 
@@ -28,7 +36,7 @@ export function ContentCard({ content }: { content: ContentCardData }) {
 		}
 
 		try {
-			await txToast(
+			const hash = await txToast(
 				writeContractAsync({
 					address: CONTRACTS.KnowledgeContent as `0x${string}`,
 					abi: ABIS.KnowledgeContent,
@@ -40,6 +48,8 @@ export function ContentCard({ content }: { content: ContentCardData }) {
 				"投票交易已提交",
 				"投票失败"
 			);
+
+			await refreshAfterTx(hash, onActionComplete);
 		} catch (error) {
 			console.error(error);
 		}
@@ -52,7 +62,7 @@ export function ContentCard({ content }: { content: ContentCardData }) {
 		}
 
 		try {
-			await txToast(
+			const hash = await txToast(
 				writeContractAsync({
 					address: CONTRACTS.KnowledgeContent as `0x${string}`,
 					abi: ABIS.KnowledgeContent,
@@ -64,6 +74,8 @@ export function ContentCard({ content }: { content: ContentCardData }) {
 				"奖励记账交易已提交",
 				"奖励记账失败"
 			);
+
+			await refreshAfterTx(hash, onActionComplete);
 		} catch (error) {
 			console.error(error);
 		}

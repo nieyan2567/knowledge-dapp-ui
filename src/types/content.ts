@@ -11,4 +11,4 @@ export interface ContentData {
   rewardAccrued: boolean
 }
 
-export interface ContentCardData extends ContentData {}
+export type ContentCardData = ContentData
