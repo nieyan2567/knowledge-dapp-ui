@@ -91,7 +91,7 @@ export default function ContentPage() {
       setContentList(parsed);
     } catch (error) {
       console.error(error);
-      toast.error("鍔犺浇鍐呭鍒楄〃澶辫触");
+      toast.error("加载内容列表失败");
     } finally {
       setLoadingList(false);
     }

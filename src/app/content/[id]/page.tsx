@@ -273,7 +273,7 @@ export default function ContentDetailPage() {
 								className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 							>
 								<Coins className="h-4 w-4" />
-								领取奖励
+								奖励记账
 							</button>
 						</div>
 					</SectionCard>
