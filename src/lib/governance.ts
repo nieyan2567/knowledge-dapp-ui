@@ -1,4 +1,4 @@
-﻿import { keccak256, parseAbiItem, stringToBytes, toHex } from "viem";
+import { keccak256, parseAbiItem, stringToBytes, toHex } from "viem";
 
 import type { Address, HexString } from "@/types/contracts";
 import type { ProposalItem } from "@/types/governance";
