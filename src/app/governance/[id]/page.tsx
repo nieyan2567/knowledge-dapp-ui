@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { keccak256, parseAbiItem, stringToBytes, toHex, formatEther } from "viem";
+import { formatEther } from "viem";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { toast } from "sonner";
 import {
@@ -20,48 +20,21 @@ import { SectionCard } from "@/components/section-card";
 import { AddressBadge } from "@/components/address-badge";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
-import { txToast } from "@/lib/tx-toast";
 import { BRANDING } from "@/lib/branding";
-import type { ProposalItem, ProposalVotes } from "@/types/governance";
-import type { HexString } from "@/types/contracts";
+import {
+	governanceStateBadgeClass as stateBadgeClass,
+	governanceStateLabel as stateLabel,
+	parseProposalCreatedLog,
+	proposalCreatedEvent,
+} from "@/lib/governance";
+import { txToast } from "@/lib/tx-toast";
 import { asBigInt, asProposalVotes } from "@/lib/web3-types";
+import type { ProposalItem, ProposalVotes } from "@/types/governance";
 
 // 解析 ProposalCreated 事件的 ABI
-const proposalCreatedEvent = parseAbiItem(
-	"event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)"
-);
-
 function explorerProposalUrl(txHash: string) {
 	if (!txHash || txHash === "0x") return "#";
 	return `${BRANDING.explorerUrl}/tx/${txHash}`;
-}
-
-function stateLabel(state?: bigint) {
-	switch (Number(state ?? -1)) {
-		case 0: return "待处理";
-		case 1: return "投票中";
-		case 2: return "已取消";
-		case 3: return "未通过";
-		case 4: return "已通过";
-		case 5: return "已排队";
-		case 6: return "已过期";
-		case 7: return "已执行";
-		default: return "未知";
-	}
-}
-
-function stateBadgeClass(state?: bigint) {
-	switch (Number(state ?? -1)) {
-		case 0: return "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300";
-		case 1: return "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300";
-		case 4: return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
-		case 5: return "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300";
-		case 7: return "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200";
-		case 2:
-		case 3:
-		case 6: return "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300";
-		default: return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
-	}
 }
 
 export default function ProposalDetailPage() {
@@ -153,32 +126,7 @@ export default function ProposalDetailPage() {
 					return;
 				}
 
-				const txHash = matched.transactionHash;
-
-				const args = matched.args as {
-					proposalId: bigint;
-					proposer: `0x${string}`;
-					targets: readonly `0x${string}`[];
-					values: readonly bigint[];
-					calldatas: readonly HexString[];
-					voteStart: bigint;
-					voteEnd: bigint;
-					description: string;
-				};
-
-				setProposalDetail({
-					proposalId: args.proposalId,
-					proposer: args.proposer,
-					targets: args.targets,
-					values: args.values,
-					calldatas: args.calldatas,
-					voteStart: args.voteStart,
-					voteEnd: args.voteEnd,
-					description: args.description,
-					descriptionHash: keccak256(toHex(stringToBytes(args.description))),
-					blockNumber: matched.blockNumber ?? 0n,
-					transactionHash: txHash,
-				});
+			setProposalDetail(parseProposalCreatedLog(matched));
 			} catch (error) {
 				console.error(error);
 				// 非致命错误，不阻断页面，只是详情不显示

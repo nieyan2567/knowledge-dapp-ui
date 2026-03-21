@@ -1,16 +1,8 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-	encodeFunctionData,
-	formatEther,
-	keccak256,
-	parseAbiItem,
-	parseEther,
-	stringToBytes,
-	toHex,
-} from "viem";
+import { encodeFunctionData, formatEther, parseEther } from "viem";
 import {
 	useAccount,
 	usePublicClient,
@@ -31,62 +23,20 @@ import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
+import {
+	formatProposalBlockRange,
+	governanceStateBadgeClass as stateBadgeClass,
+	governanceStateLabel as stateLabel,
+	parseProposalCreatedLog,
+	proposalCreatedEvent,
+} from "@/lib/governance";
 import { BRANDING } from "@/lib/branding";
 import { txToast } from "@/lib/tx-toast";
 import { asBigInt, asProposalVotes } from "@/lib/web3-types";
 import type { ProposalItem, ProposalVotes } from "@/types/governance";
-import type { HexString } from "@/types/contracts";
-
-const proposalCreatedEvent = parseAbiItem(
-	"event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)"
-);
 
 function shortenAddress(address: string) {
 	return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
-
-function stateLabel(state?: bigint) {
-	switch (Number(state ?? -1)) {
-		case 0:
-			return "待开始";
-		case 1:
-			return "投票中";
-		case 2:
-			return "已取消";
-		case 3:
-			return "未通过";
-		case 4:
-			return "已通过";
-		case 5:
-			return "已排队";
-		case 6:
-			return "已过期";
-		case 7:
-			return "已执行";
-		default:
-			return "未知状态";
-	}
-}
-
-function stateBadgeClass(state?: bigint) {
-	switch (Number(state ?? -1)) {
-		case 0:
-			return "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300";
-		case 1:
-			return "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300";
-		case 4:
-			return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
-		case 5:
-			return "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300";
-		case 7:
-			return "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200";
-		case 2:
-		case 3:
-		case 6:
-			return "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300";
-		default:
-			return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
-	}
 }
 
 function explorerAddressUrl(address: string) {
@@ -94,8 +44,7 @@ function explorerAddressUrl(address: string) {
 }
 
 function formatBlockRange(start?: bigint, end?: bigint) {
-	if (start === undefined || end === undefined) return "-";
-	return `${start.toString()} → ${end.toString()}`;
+	return formatProposalBlockRange(start, end);
 }
 
 export default function GovernancePage() {
@@ -106,10 +55,7 @@ export default function GovernancePage() {
 
 	const [minVotes, setMinVotes] = useState("10");
 	const [rewardPerVote, setRewardPerVote] = useState("0.001");
-	const [description, setDescription] = useState(
-		"提案：更新奖励规则"
-	);
-
+	const [description, setDescription] = useState("提案：更新奖励规则");
 	const [loadingProposals, setLoadingProposals] = useState(false);
 	const [proposals, setProposals] = useState<ProposalItem[]>([]);
 
@@ -153,34 +99,7 @@ export default function GovernancePage() {
 				toBlock: latestBlock,
 			});
 
-			const parsed: ProposalItem[] = logs
-				.map((log) => {
-					const args = log.args as {
-						proposalId: bigint;
-						proposer: `0x${string}`;
-						targets: readonly `0x${string}`[];
-						values: readonly bigint[];
-						calldatas: readonly HexString[];
-						voteStart: bigint;
-						voteEnd: bigint;
-						description: string;
-					};
-
-					return {
-						proposalId: args.proposalId,
-						proposer: args.proposer,
-						targets: args.targets,
-						values: args.values,
-						calldatas: args.calldatas,
-						voteStart: args.voteStart,
-						voteEnd: args.voteEnd,
-						description: args.description,
-						descriptionHash: keccak256(toHex(stringToBytes(args.description))),
-						blockNumber: log.blockNumber ?? 0n,
-					};
-				})
-				.reverse();
-
+			const parsed = logs.map((log) => parseProposalCreatedLog(log)).reverse();
 			setProposals(parsed);
 		} catch (error) {
 			console.error(error);
@@ -222,7 +141,7 @@ export default function GovernancePage() {
 	}
 
 	return (
-		<main className="mx-auto max-w-7xl px-6 py-10 space-y-8">
+		<main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
 			<PageHeader
 				eyebrow="Governor · Timelock · DAO"
 				title="Governance Center"
@@ -259,7 +178,9 @@ export default function GovernancePage() {
 						<Gavel className="h-5 w-5 text-slate-400 dark:text-slate-500" />
 					</div>
 					<div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
-						{proposalThreshold ? `${formatEther(proposalThreshold as bigint)} ${BRANDING.nativeTokenSymbol}` : "-"}
+						{proposalThreshold
+							? `${formatEther(proposalThreshold as bigint)} ${BRANDING.nativeTokenSymbol}`
+							: "-"}
 					</div>
 					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
 						创建提案所需的最低投票权。
@@ -300,46 +221,46 @@ export default function GovernancePage() {
 			<div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
 				<div className="lg:order-2">
 					<SectionCard
-					title="创建提案"
-					description="当前 MVP 版本支持针对 KnowledgeContent 合约提出奖励规则更新的提案。"
-				>
-					<div className="space-y-4">
-						<input
-							className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
-							value={minVotes}
-							onChange={(e) => setMinVotes(e.target.value)}
-							placeholder="最小获奖票数 (minVotesToReward)"
-						/>
+						title="创建提案"
+						description="当前 MVP 版本支持针对 KnowledgeContent 合约提出奖励规则更新的提案。"
+					>
+						<div className="space-y-4">
+							<input
+								className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
+								value={minVotes}
+								onChange={(event) => setMinVotes(event.target.value)}
+								placeholder="最小获奖票数 (minVotesToReward)"
+							/>
 
-						<input
-							className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
-							value={rewardPerVote}
-							onChange={(e) => setRewardPerVote(e.target.value)}
-							placeholder="单票奖励 (KC)"
-						/>
+							<input
+								className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
+								value={rewardPerVote}
+								onChange={(event) => setRewardPerVote(event.target.value)}
+								placeholder="单票奖励 (KC)"
+							/>
 
-						<textarea
-							className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
-							rows={4}
-							value={description}
-							onChange={(e) => setDescription(e.target.value)}
-							placeholder="提案描述"
-						/>
+							<textarea
+								className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
+								rows={4}
+								value={description}
+								onChange={(event) => setDescription(event.target.value)}
+								placeholder="提案描述"
+							/>
 
-						<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
-							本提案将调用：
-							<div className="mt-2 break-all rounded-xl bg-white p-3 font-mono text-xs text-slate-700 dark:bg-slate-950 dark:text-slate-300">
-								setRewardRules({minVotes}, {rewardPerVote})
+							<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
+								本提案将调用：
+								<div className="mt-2 break-all rounded-xl bg-white p-3 font-mono text-xs text-slate-700 dark:bg-slate-950 dark:text-slate-300">
+									setRewardRules({minVotes}, {rewardPerVote})
+								</div>
 							</div>
-						</div>
 
-						<button
-							onClick={handlePropose}
-							className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-						>
-							创建提案
-						</button>
-					</div>
+							<button
+								onClick={handlePropose}
+								className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+							>
+								创建提案
+							</button>
+						</div>
 					</SectionCard>
 				</div>
 
@@ -370,7 +291,7 @@ function ProposalList({
 }: {
 	proposals: ProposalItem[];
 	loading: boolean;
-	onActionComplete: () => void | Promise<void>;
+	onActionComplete: () => unknown | Promise<unknown>;
 }) {
 	if (loading) {
 		return (
@@ -406,7 +327,7 @@ function ProposalCard({
 	onActionComplete,
 }: {
 	proposal: ProposalItem;
-	onActionComplete: () => void | Promise<void>;
+	onActionComplete: () => unknown | Promise<unknown>;
 }) {
 	const { address } = useAccount();
 	const { writeContractAsync } = useWriteContract();
@@ -436,11 +357,14 @@ function ProposalCard({
 			abstainVotes: 0n,
 		};
 
-	const totalVotes = voteData.forVotes + voteData.againstVotes + voteData.abstainVotes;
-
-	const forPercent = totalVotes > 0n ? Number((voteData.forVotes * 100n) / totalVotes) : 0;
-	const againstPercent = totalVotes > 0n ? Number((voteData.againstVotes * 100n) / totalVotes) : 0;
-	const abstainPercent = totalVotes > 0n ? Number((voteData.abstainVotes * 100n) / totalVotes) : 0;
+	const totalVotes =
+		voteData.forVotes + voteData.againstVotes + voteData.abstainVotes;
+	const forPercent =
+		totalVotes > 0n ? Number((voteData.forVotes * 100n) / totalVotes) : 0;
+	const againstPercent =
+		totalVotes > 0n ? Number((voteData.againstVotes * 100n) / totalVotes) : 0;
+	const abstainPercent =
+		totalVotes > 0n ? Number((voteData.abstainVotes * 100n) / totalVotes) : 0;
 
 	const canVote = Number(proposalState ?? -1) === 1;
 	const canQueue = Number(proposalState ?? -1) === 4;
@@ -549,7 +473,8 @@ function ProposalCard({
 
 					<Link
 						href={`/governance/${proposal.proposalId.toString()}`}
-						className="text-base font-semibold text-slate-950 dark:text-slate-100">
+						className="text-base font-semibold text-slate-950 dark:text-slate-100"
+					>
 						{proposal.description || "无描述"}
 					</Link>
 
@@ -562,13 +487,28 @@ function ProposalCard({
 					</div>
 
 					<div className="mt-3 space-y-2">
-						<VoteStat label="赞成" value={voteData.forVotes} percent={forPercent} color="bg-emerald-500" />
-						<VoteStat label="反对" value={voteData.againstVotes} percent={againstPercent} color="bg-rose-500" />
-						<VoteStat label="弃权" value={voteData.abstainVotes} percent={abstainPercent} color="bg-slate-500" />
+						<VoteStat
+							label="赞成"
+							value={voteData.forVotes}
+							percent={forPercent}
+							color="bg-emerald-500"
+						/>
+						<VoteStat
+							label="反对"
+							value={voteData.againstVotes}
+							percent={againstPercent}
+							color="bg-rose-500"
+						/>
+						<VoteStat
+							label="弃权"
+							value={voteData.abstainVotes}
+							percent={abstainPercent}
+							color="bg-slate-500"
+						/>
 					</div>
 				</div>
 
-				<div className="grid gap-2 border-t border-slate-200 pt-3 sm:grid-cols-2 xl:grid-cols-5 dark:border-slate-800">
+				<div className="grid gap-2 border-t border-slate-200 pt-3 dark:border-slate-800 sm:grid-cols-2 xl:grid-cols-5">
 					<button
 						onClick={() => handleVote(1)}
 						disabled={!canVote}
@@ -615,8 +555,17 @@ function ProposalCard({
 	);
 }
 
-function VoteStat({ label, value, percent, color }: { label: string; value: bigint; percent?: number; color?: string }) {
-	
+function VoteStat({
+	label,
+	value,
+	percent,
+	color,
+}: {
+	label: string;
+	value: bigint;
+	percent?: number;
+	color?: string;
+}) {
 	const formattedValue = value === 0n ? "0" : formatEther(value);
 
 	return (
@@ -629,7 +578,10 @@ function VoteStat({ label, value, percent, color }: { label: string; value: bigi
 					{percent}%
 				</div>
 			</div>
-			<div className="text-sm font-semibold text-slate-950 dark:text-slate-100" title={value.toString()}>
+			<div
+				className="text-sm font-semibold text-slate-950 dark:text-slate-100"
+				title={value.toString()}
+			>
 				{formattedValue}
 			</div>
 			<div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
