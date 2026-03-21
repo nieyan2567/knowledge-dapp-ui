@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useMemo } from "react";
 import { useReadContract } from "wagmi";
 import { useWalletReady } from "@/hooks/useWalletReady";
 import { ABIS, CONTRACTS } from "@/contracts";
+import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 import { formatEther } from "viem";
 import { StatCard } from "@/components/stat-card";
 import { BookOpen, Coins, ShieldCheck, Wallet } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { AddressBadge } from "@/components/address-badge";
-import { subscribeTxConfirmed } from "@/lib/tx-events";
 import { BRANDING } from "@/lib/branding";
 import { asBigInt } from "@/lib/web3-types";
 
@@ -49,25 +49,27 @@ export default function HomePage() {
   const myVotesValue = asBigInt(myVotes);
   const myPendingRewardsValue = asBigInt(myPendingRewards);
 
-  useEffect(() => {
-    return subscribeTxConfirmed(({ domains }) => {
-      if (!domains.some((domain) => ["stake", "rewards", "content", "dashboard"].includes(domain))) {
-        return;
-      }
+  const dashboardRefreshDomains = useMemo(
+    () => ["stake", "rewards", "content", "dashboard"] as const,
+    []
+  );
 
-      void Promise.all([
-        refetchEpochBudget(),
-        refetchContentCount(),
-        refetchMyVotes(),
-        refetchMyPendingRewards(),
-      ]);
-    });
-  }, [
-    refetchContentCount,
-    refetchEpochBudget,
-    refetchMyPendingRewards,
-    refetchMyVotes,
-  ]);
+  const dashboardRefetchers = useMemo(
+    () => [
+      refetchContentCount,
+      refetchEpochBudget,
+      refetchMyPendingRewards,
+      refetchMyVotes,
+    ],
+    [
+      refetchContentCount,
+      refetchEpochBudget,
+      refetchMyPendingRewards,
+      refetchMyVotes,
+    ]
+  );
+
+  useTxEventRefetch(dashboardRefreshDomains, dashboardRefetchers);
 
   return (
     <div>

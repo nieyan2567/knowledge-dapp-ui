@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useMemo } from "react";
 import { formatEther } from "viem";
 import { useReadContract } from "wagmi";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { SectionCard } from "@/components/section-card";
 import { PageHeader } from "@/components/page-header";
 import { AddressBadge } from "@/components/address-badge";
-import { subscribeTxConfirmed } from "@/lib/tx-events";
 import { BRANDING } from "@/lib/branding";
 import { asBigInt } from "@/lib/web3-types";
+import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 
 function explorerAddressUrl(address: string) {
 	return `${BRANDING.explorerUrl}/address/${address}`;
@@ -68,33 +68,35 @@ export default function SystemPage() {
 	const epochSpentValue = asBigInt(epochSpent);
 	const minDelayValue = asBigInt(minDelay);
 
-	useEffect(() => {
-		return subscribeTxConfirmed(({ domains }) => {
-			if (!domains.some((domain) => ["rewards", "content", "governance", "system"].includes(domain))) {
-				return;
-			}
+	const systemRefreshDomains = useMemo(
+		() => ["rewards", "content", "governance", "system"] as const,
+		[]
+	);
 
-			void Promise.all([
-				refetchContentOwner(),
-				refetchVotesContract(),
-				refetchTreasury(),
-				refetchTreasuryOwner(),
-				refetchEpochBudget(),
-				refetchEpochSpent(),
-				refetchMinDelay(),
-				refetchGovernorToken(),
-			]);
-		});
-	}, [
-		refetchContentOwner,
-		refetchEpochBudget,
-		refetchEpochSpent,
-		refetchGovernorToken,
-		refetchMinDelay,
-		refetchTreasury,
-		refetchTreasuryOwner,
-		refetchVotesContract,
-	]);
+	const systemRefetchers = useMemo(
+		() => [
+			refetchContentOwner,
+			refetchEpochBudget,
+			refetchEpochSpent,
+			refetchGovernorToken,
+			refetchMinDelay,
+			refetchTreasury,
+			refetchTreasuryOwner,
+			refetchVotesContract,
+		],
+		[
+			refetchContentOwner,
+			refetchEpochBudget,
+			refetchEpochSpent,
+			refetchGovernorToken,
+			refetchMinDelay,
+			refetchTreasury,
+			refetchTreasuryOwner,
+			refetchVotesContract,
+		]
+	);
+
+	useTxEventRefetch(systemRefreshDomains, systemRefetchers);
 
 	return (
 		<main className="mx-auto max-w-7xl px-6 py-10 space-y-8">

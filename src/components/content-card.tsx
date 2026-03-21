@@ -4,13 +4,11 @@ import Link from "next/link";
 import { useAccount, useWriteContract } from "wagmi";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
+import { getIpfsFileUrl } from "@/lib/ipfs";
 import { BookOpen, Coins, ExternalLink, Heart } from "lucide-react";
 import { toast } from "sonner";
 import { txToast } from "@/lib/tx-toast";
 import type { ContentCardData } from "@/types/content";
-
-const gatewayBase =
-	process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || "http://127.0.0.1:8080/ipfs";
 
 function shortenAddress(address: string) {
 	return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -27,7 +25,7 @@ export function ContentCard({
 	const { writeContractAsync } = useWriteContract();
 	const refreshAfterTx = useRefreshOnTxConfirmed();
 
-	const fileUrl = `${gatewayBase}/${content.ipfsHash}`;
+	const fileUrl = getIpfsFileUrl(content.ipfsHash);
 
 	async function handleVote() {
 		if (!address) {

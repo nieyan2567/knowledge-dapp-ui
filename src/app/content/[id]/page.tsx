@@ -22,18 +22,12 @@ import { CopyField } from "@/components/copy-field";
 import { AddressBadge } from "@/components/address-badge";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
+import { getIpfsFileUrl } from "@/lib/ipfs";
 import { txToast } from "@/lib/tx-toast";
 import { asContentData } from "@/lib/web3-types";
 
-const gatewayBase =
-	process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || "http://127.0.0.1:8080/ipfs";
-
 function formatDate(timestamp: bigint) {
 	return new Date(Number(timestamp) * 1000).toLocaleString();
-}
-
-function getPreviewUrl(cid: string) {
-	return `${gatewayBase}/${cid}`;
 }
 
 export default function ContentDetailPage() {
@@ -93,7 +87,7 @@ export default function ContentDetailPage() {
 		);
 	}
 
-	const previewUrl = getPreviewUrl(content.ipfsHash);
+	const previewUrl = getIpfsFileUrl(content.ipfsHash);
 
 	async function handleVote() {
 		if (!content) {
