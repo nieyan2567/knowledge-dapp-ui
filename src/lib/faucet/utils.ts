@@ -14,6 +14,11 @@ export type FaucetClaimRecord = {
   ip: string | null;
 };
 
+export type FaucetClaimLock = {
+  key: string;
+  token: string;
+};
+
 let faucetClients:
   | {
       publicClient: ReturnType<typeof createPublicClient>;
@@ -71,8 +76,8 @@ function getAddressClaimKey(address: `0x${string}`) {
   return `faucet_claim:address:${address.toLowerCase()}`;
 }
 
-function getIpClaimKey(ip: string) {
-  return `faucet_claim:ip:${ip}`;
+function getAddressLockKey(address: `0x${string}`) {
+  return `faucet_lock:address:${address.toLowerCase()}`;
 }
 
 export async function getFaucetClients() {
@@ -110,9 +115,48 @@ export async function getCooldownRemainingSeconds(
   }
 
   const addressTtl = await redis.ttl(getAddressClaimKey(address));
-  const ipTtl = ip ? await redis.ttl(getIpClaimKey(ip)) : -1;
+  void ip;
 
-  return Math.max(addressTtl, ipTtl, 0);
+  return Math.max(addressTtl, 0);
+}
+
+export async function acquireFaucetClaimLock(
+  address: `0x${string}`
+): Promise<FaucetClaimLock | null> {
+  const redis = await getRedis();
+
+  if (!redis) {
+    throw new Error("Redis is required for the faucet backend");
+  }
+
+  const key = getAddressLockKey(address);
+  const token = crypto.randomUUID();
+  const lockSeconds = Math.max(getFaucetCooldownSeconds(), 60);
+
+  const result = await redis.set(key, token, {
+    NX: true,
+    EX: lockSeconds,
+  });
+
+  if (result !== "OK") {
+    return null;
+  }
+
+  return { key, token };
+}
+
+export async function releaseFaucetClaimLock(lock: FaucetClaimLock) {
+  const redis = await getRedis();
+
+  if (!redis) {
+    throw new Error("Redis is required for the faucet backend");
+  }
+
+  const currentToken = await redis.get(lock.key);
+
+  if (currentToken === lock.token) {
+    await redis.del(lock.key);
+  }
 }
 
 export async function markFaucetClaimed(record: FaucetClaimRecord) {
@@ -126,10 +170,6 @@ export async function markFaucetClaimed(record: FaucetClaimRecord) {
   const payload = JSON.stringify(record);
 
   await redis.set(getAddressClaimKey(record.address), payload, { EX: ttl });
-
-  if (record.ip) {
-    await redis.set(getIpClaimKey(record.ip), payload, { EX: ttl });
-  }
 }
 
 export function formatFaucetAmount(value: bigint) {

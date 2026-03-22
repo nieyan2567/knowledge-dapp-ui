@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildFaucetClaimMessage } from "@/lib/faucet/message";
 import { takeFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
 import {
+  acquireFaucetClaimLock,
   formatFaucetAmount,
   getCooldownRemainingSeconds,
   getFaucetAmount,
@@ -11,6 +12,7 @@ import {
   getFaucetMinBalance,
   getRequestIp,
   markFaucetClaimed,
+  releaseFaucetClaimLock,
 } from "@/lib/faucet/utils";
 import { getRequestSite } from "@/lib/auth/request";
 import { knowledgeChain } from "@/lib/chains";
@@ -100,36 +102,56 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const lock = await acquireFaucetClaimLock(address);
+
+  if (!lock) {
+    const lockedCooldownSeconds = await getCooldownRemainingSeconds(address, ip);
+
+    return NextResponse.json(
+      {
+        error:
+          lockedCooldownSeconds > 0
+            ? `Faucet cooldown active. Try again in ${lockedCooldownSeconds} seconds.`
+            : "Faucet request already in progress for this wallet.",
+      },
+      { status: 429 }
+    );
+  }
+
   const amount = getFaucetAmount();
   const minBalance = getFaucetMinBalance();
   const { account, publicClient, walletClient } = await getFaucetClients();
 
-  const [recipientBalance, faucetBalance] = await Promise.all([
-    publicClient.getBalance({ address }),
-    publicClient.getBalance({ address: account.address }),
-  ]);
-
-  if (recipientBalance >= minBalance) {
-    return NextResponse.json(
-      {
-        error: `Wallet balance is already above the faucet threshold (${formatFaucetAmount(
-          minBalance
-        )}).`,
-      },
-      { status: 400 }
-    );
-  }
-
-  if (faucetBalance < amount) {
-    return NextResponse.json(
-      {
-        error: "Faucet wallet does not have enough funds.",
-      },
-      { status: 503 }
-    );
-  }
-
   try {
+    const [recipientBalance, faucetBalance] = await Promise.all([
+      publicClient.getBalance({ address }),
+      publicClient.getBalance({ address: account.address }),
+    ]);
+
+    if (recipientBalance >= minBalance) {
+      await releaseFaucetClaimLock(lock);
+
+      return NextResponse.json(
+        {
+          error: `Wallet balance is already above the faucet threshold (${formatFaucetAmount(
+            minBalance
+          )}).`,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (faucetBalance < amount) {
+      await releaseFaucetClaimLock(lock);
+
+      return NextResponse.json(
+        {
+          error: "Faucet wallet does not have enough funds.",
+        },
+        { status: 503 }
+      );
+    }
+
     const txHash = await walletClient.sendTransaction({
       account,
       to: address,
@@ -160,6 +182,7 @@ export async function POST(req: NextRequest) {
       }
     );
   } catch (error) {
+    await releaseFaucetClaimLock(lock);
     console.error("Faucet transfer failed:", error);
 
     return NextResponse.json(
