@@ -233,8 +233,8 @@ export default function FaucetPage() {
                   Get starter {BRANDING.nativeTokenSymbol} for your first on-chain actions
                 </h1>
                 <p className="max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-                  This faucet gives new wallets a small amount of {BRANDING.nativeTokenSymbol} so they can
-                  pay gas, upload content, vote, and claim rewards inside {BRANDING.appName}.
+                  这个 Faucet 会为新钱包发放少量 {BRANDING.nativeTokenSymbol}，用于支付 Gas，并完成
+                  {BRANDING.appName} 中的首次上传、投票、领取奖励或质押操作。
                 </p>
               </div>
 
@@ -258,25 +258,25 @@ export default function FaucetPage() {
             <div className="grid gap-4 md:grid-cols-3">
               <div className="rounded-3xl border border-slate-200 bg-white/80 p-5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
                 <ShieldCheck className="mb-4 h-5 w-5 text-emerald-500" />
-                <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">Wallet signature only</div>
+                <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">仅需钱包签名</div>
                 <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  You only sign a message to request funds. The faucet server sends the starter funds.
+                  你只需要签名一条请求消息，真正的启动资金由 Faucet 服务端发出。
                 </p>
               </div>
 
               <div className="rounded-3xl border border-slate-200 bg-white/80 p-5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
                 <Sparkles className="mb-4 h-5 w-5 text-blue-500" />
-                <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">Built for first actions</div>
+                <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">用于首次操作</div>
                 <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  The starter grant is intended for gas and your first vote, upload, reward claim, or stake flow.
+                  这笔启动资金主要用于 Gas，以及你的首次投票、上传、奖励领取或质押流程。
                 </p>
               </div>
 
               <div className="rounded-3xl border border-slate-200 bg-white/80 p-5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
                 <Coins className="mb-4 h-5 w-5 text-violet-500" />
-                <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">Cooldown protected</div>
+                <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">受冷却期保护</div>
                 <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  Repeated claims are rate-limited, and wallets that already have enough gas may be rejected.
+                  重复领取会受到频率限制，余额已经足够的钱包也可能被拒绝。
                 </p>
               </div>
             </div>
@@ -285,7 +285,7 @@ export default function FaucetPage() {
           <div className="rounded-4xl border border-slate-200 bg-white/90 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 dark:shadow-[0_24px_80px_rgba(2,6,23,0.6)]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-medium text-slate-500 dark:text-slate-400">Request starter funds</div>
+                <div className="text-sm font-medium text-slate-500 dark:text-slate-400">申请启动资金</div>
                 <div className="mt-1 text-2xl font-semibold text-slate-950 dark:text-slate-100">
                   {BRANDING.nativeTokenSymbol} Faucet
                 </div>
@@ -325,14 +325,14 @@ export default function FaucetPage() {
               </button>
 
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-slate-500 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-400">
-                The faucet is for new wallets that need enough gas to begin using {BRANDING.appName}. If your wallet
-                already has enough {BRANDING.nativeTokenSymbol}, the request may be rejected.
+                这个 Faucet 面向需要初始 Gas 的新钱包。如果你的钱包已经持有足够的
+                {BRANDING.nativeTokenSymbol}，申请可能会被拒绝。
               </div>
 
               {txHash ? (
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30">
                   <div className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
-                    Starter funds sent{claimAmount ? `: ${claimAmount}` : ""}
+                    启动资金已发放{claimAmount ? `：${claimAmount}` : ""}
                   </div>
                   <a
                     href={`${BRANDING.explorerUrl}/tx/${txHash}`}
@@ -353,36 +353,36 @@ export default function FaucetPage() {
           <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
             <div className="flex items-center gap-3 text-slate-950 dark:text-slate-100">
               <Vote className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">What you can do next</h2>
+              <h2 className="text-lg font-semibold">接下来可以做什么</h2>
             </div>
             <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              <li>Use the first grant to pay gas for your first vote.</li>
-              <li>Upload content to IPFS and register it on-chain.</li>
-              <li>Claim accrued rewards or activate your first stake.</li>
+              <li>用这笔资金支付首次投票所需的 Gas。</li>
+              <li>上传内容到 IPFS，并完成链上登记。</li>
+              <li>领取已累计奖励，或激活你的第一笔质押。</li>
             </ul>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
             <div className="flex items-center gap-3 text-slate-950 dark:text-slate-100">
               <FileText className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">How it works</h2>
+              <h2 className="text-lg font-semibold">工作流程</h2>
             </div>
             <ol className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              <li>Connect a wallet on {BRANDING.chainName}.</li>
-              <li>Sign a faucet request message.</li>
-              <li>The backend verifies the signature and sends starter funds.</li>
+              <li>连接 {BRANDING.chainName} 上的钱包。</li>
+              <li>签署 Faucet 请求消息。</li>
+              <li>后端验证签名后发放启动资金。</li>
             </ol>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
             <div className="flex items-center gap-3 text-slate-950 dark:text-slate-100">
               <ShieldCheck className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">Rules</h2>
+              <h2 className="text-lg font-semibold">规则说明</h2>
             </div>
             <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              <li>Requests are rate-limited per wallet and IP.</li>
-              <li>Only wallets on {BRANDING.chainName} are accepted.</li>
-              <li>Requests may be rejected if the wallet already has enough gas.</li>
+              <li>每个钱包和 IP 都会受到领取频率限制。</li>
+              <li>仅接受 {BRANDING.chainName} 网络上的钱包。</li>
+              <li>如果钱包余额已经足够，申请可能会被拒绝。</li>
             </ul>
           </div>
         </section>
