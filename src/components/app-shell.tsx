@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import {
 	BookOpen,
+	Droplets,
 	ChevronLeft,
 	ChevronRight,
 	Coins,
@@ -31,6 +32,7 @@ const dangerButtonClass =
 
 const internalNavItems = [
 	{ href: "/", label: "Dashboard", icon: LayoutDashboard },
+	{ href: "/faucet", label: "Faucet", icon: Droplets },
 	{ href: "/stake", label: "Stake", icon: Wallet },
 	{ href: "/content", label: "Content", icon: BookOpen },
 	{ href: "/rewards", label: "Rewards", icon: Coins },
@@ -53,6 +55,7 @@ function getPageTitle(pathname: string) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
 	const pathname = usePathname();
+	const isStandaloneRoute = pathname.startsWith("/faucet");
 	const [collapsed, setCollapsed] = useState(() => {
 		if (typeof window === "undefined") return false;
 		const saved = localStorage.getItem("knowledge-sidebar-collapsed");
@@ -63,6 +66,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	useEffect(() => {
 		localStorage.setItem("knowledge-sidebar-collapsed", String(collapsed));
 	}, [collapsed]);
+
+	if (isStandaloneRoute) {
+		return <>{children}</>;
+	}
 
 	const sidebarWidth = collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH;
 
