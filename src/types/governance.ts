@@ -29,3 +29,13 @@ export interface ProposalItem {
   calldatas: readonly HexString[]
 	transactionHash?: HexString
 }
+
+export interface ProposalActionSummary {
+  target: Address
+  targetLabel: string
+  value: bigint
+  functionName: string
+  title: string
+  description: string
+  rawCalldata: HexString
+}

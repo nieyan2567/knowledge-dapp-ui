@@ -33,6 +33,7 @@ import {
 	governanceStateLabel as stateLabel,
 	parseProposalCreatedLog,
 	proposalCreatedEvent,
+	summarizeProposalActions,
 } from "@/lib/governance";
 import { txToast } from "@/lib/tx-toast";
 import { asBigInt, asProposalVotes } from "@/lib/web3-types";
@@ -102,6 +103,10 @@ export default function ProposalDetailPage() {
 	const canVote = Number(proposalState ?? -1) === 1;
 	const canQueue = Number(proposalState ?? -1) === 4;
 	const canExecute = Number(proposalState ?? -1) === 5;
+	const actionSummaries = useMemo(
+		() => (proposalDetail ? summarizeProposalActions(proposalDetail) : []),
+		[proposalDetail]
+	);
 
 	// [融合] 恢复轻量级事件监听，仅获取当前提案详情
 	const loadProposalDetail = useCallback(async () => {
@@ -390,17 +395,27 @@ export default function ProposalDetailPage() {
 												动作 #{index + 1}
 											</div>
 											<div className="space-y-2 text-sm text-slate-700 dark:text-slate-200">
+												{actionSummaries[index] && (
+													<div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+														<div className="font-medium text-slate-900 dark:text-slate-100">
+															{actionSummaries[index].title}
+														</div>
+														<div className="mt-1 text-slate-500 dark:text-slate-400">
+															{actionSummaries[index].description}
+														</div>
+													</div>
+												)}
 												<div>
 													<span className="text-slate-500 dark:text-slate-400">目标地址: </span>
 													<AddressBadge address={target} />
 												</div>
 												<div>
 													<span className="text-slate-500 dark:text-slate-400">价值: </span>
-													{proposalDetail.values[index]?.toString() ?? "0"} ETH
+													{proposalDetail.values[index]?.toString() ?? "0"} KC
 												</div>
 												<div className="break-all font-mono text-xs bg-slate-200 dark:bg-slate-900 p-2 rounded">
 													<span className="text-slate-500 dark:text-slate-400 block mb-1">调用数据: </span>
-													{proposalDetail.calldatas[index]}
+													{actionSummaries[index]?.rawCalldata ?? proposalDetail.calldatas[index]}
 												</div>
 											</div>
 										</div>

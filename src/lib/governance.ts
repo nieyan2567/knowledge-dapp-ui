@@ -1,7 +1,16 @@
-import { keccak256, parseAbiItem, stringToBytes, toHex } from "viem";
+import {
+	decodeFunctionData,
+	formatEther,
+	keccak256,
+	parseAbiItem,
+	stringToBytes,
+	toHex,
+} from "viem";
 
+import { ABIS, CONTRACTS } from "@/contracts";
+import { BRANDING } from "@/lib/branding";
 import type { Address, HexString } from "@/types/contracts";
-import type { ProposalItem } from "@/types/governance";
+import type { ProposalActionSummary, ProposalItem } from "@/types/governance";
 
 export const proposalCreatedEvent = parseAbiItem(
 	"event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)"
@@ -104,4 +113,197 @@ export function governanceStateBadgeClass(state?: bigint) {
 export function formatProposalBlockRange(start?: bigint, end?: bigint) {
 	if (start === undefined || end === undefined) return "-";
 	return `${start.toString()} → ${end.toString()}`;
+}
+
+function isSameAddress(left: string, right: string) {
+	return left.toLowerCase() === right.toLowerCase();
+}
+
+function getContractLabel(address: Address) {
+	if (isSameAddress(address, CONTRACTS.KnowledgeContent)) {
+		return "KnowledgeContent";
+	}
+
+	if (isSameAddress(address, CONTRACTS.TreasuryNative)) {
+		return "TreasuryNative";
+	}
+
+	if (isSameAddress(address, CONTRACTS.KnowledgeGovernor)) {
+		return "KnowledgeGovernor";
+	}
+
+	if (isSameAddress(address, CONTRACTS.TimelockController)) {
+		return "TimelockController";
+	}
+
+	if (isSameAddress(address, CONTRACTS.NativeVotes)) {
+		return "NativeVotes";
+	}
+
+	return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function formatGenericArgument(value: unknown): string {
+	if (typeof value === "bigint") {
+		return value.toString();
+	}
+
+	if (Array.isArray(value)) {
+		return `[${value.map((item) => formatGenericArgument(item)).join(", ")}]`;
+	}
+
+	return String(value);
+}
+
+function appendValueSuffix(description: string, value: bigint) {
+	if (value === 0n) {
+		return description;
+	}
+
+	return `${description}，并附带 ${formatEther(value)} ${BRANDING.nativeTokenSymbol}`;
+}
+
+function summarizeDecodedAction(
+	target: Address,
+	value: bigint,
+	calldata: HexString
+): ProposalActionSummary {
+	const targetLabel = getContractLabel(target);
+
+	try {
+		if (isSameAddress(target, CONTRACTS.KnowledgeContent)) {
+			const decoded = decodeFunctionData({
+				abi: ABIS.KnowledgeContent,
+				data: calldata,
+			});
+			const decodedArgs = decoded.args ?? [];
+
+			if (
+				decoded.functionName === "setRewardRules" &&
+				decodedArgs.length >= 2 &&
+				typeof decodedArgs[0] === "bigint" &&
+				typeof decodedArgs[1] === "bigint"
+			) {
+				const [minVotesToReward, rewardPerVote] = decodedArgs;
+				return {
+					target,
+					targetLabel,
+					value,
+					functionName: decoded.functionName,
+					title: "更新奖励规则",
+					description: appendValueSuffix(
+						`将最小获奖票数设为 ${minVotesToReward.toString()}，单票奖励设为 ${formatEther(
+							rewardPerVote
+						)} ${BRANDING.nativeTokenSymbol}`,
+						value
+					),
+					rawCalldata: calldata,
+				};
+			}
+
+			if (
+				decoded.functionName === "setTreasury" &&
+				decodedArgs.length >= 1 &&
+				typeof decodedArgs[0] === "string"
+			) {
+				return {
+					target,
+					targetLabel,
+					value,
+					functionName: decoded.functionName,
+					title: "更新 Treasury 地址",
+					description: appendValueSuffix(
+						`将 Treasury 更新为 ${decodedArgs[0]}`,
+						value
+					),
+					rawCalldata: calldata,
+				};
+			}
+		}
+
+		if (isSameAddress(target, CONTRACTS.TreasuryNative)) {
+			const decoded = decodeFunctionData({
+				abi: ABIS.TreasuryNative,
+				data: calldata,
+			});
+			const decodedArgs = decoded.args ?? [];
+
+			if (
+				decoded.functionName === "setBudget" &&
+				decodedArgs.length >= 2 &&
+				typeof decodedArgs[0] === "bigint" &&
+				typeof decodedArgs[1] === "bigint"
+			) {
+				const [epochDuration, epochBudget] = decodedArgs;
+				return {
+					target,
+					targetLabel,
+					value,
+					functionName: decoded.functionName,
+					title: "更新 Treasury 预算",
+					description: appendValueSuffix(
+						`将周期时长设为 ${epochDuration.toString()} 秒，周期预算设为 ${formatEther(
+							epochBudget
+						)} ${BRANDING.nativeTokenSymbol}`,
+						value
+					),
+					rawCalldata: calldata,
+				};
+			}
+		}
+
+		const abi =
+			isSameAddress(target, CONTRACTS.KnowledgeContent)
+				? ABIS.KnowledgeContent
+				: isSameAddress(target, CONTRACTS.TreasuryNative)
+					? ABIS.TreasuryNative
+					: isSameAddress(target, CONTRACTS.KnowledgeGovernor)
+						? ABIS.KnowledgeGovernor
+						: null;
+
+		if (abi) {
+			const decoded = decodeFunctionData({
+				abi,
+				data: calldata,
+			});
+			const decodedArgs = decoded.args ?? [];
+
+			return {
+				target,
+				targetLabel,
+				value,
+				functionName: decoded.functionName,
+				title: `调用 ${targetLabel}.${decoded.functionName}`,
+				description: appendValueSuffix(
+					`参数：${decodedArgs.map((arg) => formatGenericArgument(arg)).join(", ") || "无"}`,
+					value
+				),
+				rawCalldata: calldata,
+			};
+		}
+	} catch {
+		// Fall through to raw calldata fallback.
+	}
+
+	return {
+		target,
+		targetLabel,
+		value,
+		functionName: "unknown",
+		title: `调用 ${targetLabel}`,
+		description: appendValueSuffix("暂时无法解码该提案动作，下面保留原始 calldata", value),
+		rawCalldata: calldata,
+	};
+}
+
+export function summarizeProposalActions(
+	proposal: Pick<ProposalItem, "targets" | "values" | "calldatas">
+): ProposalActionSummary[] {
+	return proposal.targets.map((target, index) =>
+		summarizeDecodedAction(
+			target,
+			proposal.values[index] ?? 0n,
+			proposal.calldatas[index] ?? "0x"
+		)
+	);
 }

@@ -31,6 +31,7 @@ import {
 	governanceStateLabel as stateLabel,
 	parseProposalCreatedLog,
 	proposalCreatedEvent,
+	summarizeProposalActions,
 } from "@/lib/governance";
 import { BRANDING } from "@/lib/branding";
 import { txToast } from "@/lib/tx-toast";
@@ -369,6 +370,10 @@ function ProposalCard({
 
 	const proposalState = asBigInt(state);
 	const currentStateLabel = stateLabel(proposalState);
+	const actionSummaries = useMemo(
+		() => summarizeProposalActions(proposal),
+		[proposal]
+	);
 
 	const voteData: ProposalVotes =
 		asProposalVotes(votes) ?? {
@@ -505,6 +510,29 @@ function ProposalCard({
 					>
 						{proposal.description || "无描述"}
 					</Link>
+
+					{actionSummaries.length > 0 && (
+						<div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
+							<div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+								提案内容
+							</div>
+							<div className="mt-1.5 space-y-1.5 text-sm text-slate-700 dark:text-slate-200">
+								{actionSummaries.slice(0, 2).map((action, index) => (
+									<div key={`${action.functionName}-${index}`}>
+										<div className="font-medium">{action.title}</div>
+										<div className="text-slate-500 dark:text-slate-400">
+											{action.description}
+										</div>
+									</div>
+								))}
+								{actionSummaries.length > 2 && (
+									<div className="text-slate-500 dark:text-slate-400">
+										另有 {actionSummaries.length - 2} 个提案动作，请进入详情查看。
+									</div>
+								)}
+							</div>
+						</div>
+					)}
 
 					<div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
 						<span>发起人：{shortenAddress(proposal.proposer)}</span>
