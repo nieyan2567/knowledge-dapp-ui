@@ -12,7 +12,7 @@ import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { BRANDING } from "@/lib/branding";
-import { txToast } from "@/lib/tx-toast";
+import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt, asContentData } from "@/lib/web3-types";
 
 const rewardAccrueRequestedEvent = parseAbiItem(
@@ -296,17 +296,23 @@ export default function RewardsPage() {
 		try {
 			setLoading(true);
 
-			const hash = await txToast(
-				writeContractAsync({
+			const hash = await writeTxToast({
+				publicClient,
+				writeContractAsync,
+				request: {
 					address: CONTRACTS.TreasuryNative as `0x${string}`,
 					abi: ABIS.TreasuryNative,
 					functionName: "claim",
 					account: address,
-				}),
-				"正在提交领取奖励交易...",
-				"领取奖励交易已提交",
-				"领取奖励失败"
-			);
+				},
+				loading: "正在提交领取奖励交易...",
+				success: "领取奖励交易已提交",
+				fail: "领取奖励失败",
+			});
+
+			if (!hash) {
+				return;
+			}
 
 			await refreshAfterTx(hash, refreshRewardsData, ["rewards", "dashboard", "system"]);
 		} finally {

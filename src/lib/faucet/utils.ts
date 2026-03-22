@@ -19,6 +19,16 @@ export type FaucetClaimLock = {
   token: string;
 };
 
+export type FaucetClaimEligibilityResult =
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      status: number;
+      error: string;
+    };
+
 let faucetClients:
   | {
       publicClient: ReturnType<typeof createPublicClient>;
@@ -46,11 +56,11 @@ function getFaucetPrivateKey() {
 }
 
 export function getFaucetAmount() {
-  return parseEther(process.env.FAUCET_AMOUNT || "0.05");
+  return parseEther(process.env.FAUCET_AMOUNT || "2");
 }
 
 export function getFaucetMinBalance() {
-  return parseEther(process.env.FAUCET_MIN_BALANCE || "0.02");
+  return parseEther(process.env.FAUCET_MIN_BALANCE || "1");
 }
 
 export function getFaucetCooldownSeconds() {
@@ -118,6 +128,48 @@ export async function getCooldownRemainingSeconds(
   void ip;
 
   return Math.max(addressTtl, 0);
+}
+
+export async function checkFaucetClaimEligibility(
+  address: `0x${string}`,
+  ip: string | null
+): Promise<FaucetClaimEligibilityResult> {
+  const cooldownRemainingSeconds = await getCooldownRemainingSeconds(address, ip);
+
+  if (cooldownRemainingSeconds > 0) {
+    return {
+      ok: false,
+      status: 429,
+      error: `Faucet 冷却中，请在 ${cooldownRemainingSeconds} 秒后重试。`,
+    };
+  }
+
+  const amount = getFaucetAmount();
+  const minBalance = getFaucetMinBalance();
+  const { account, publicClient } = await getFaucetClients();
+
+  const [recipientBalance, faucetBalance] = await Promise.all([
+    publicClient.getBalance({ address }),
+    publicClient.getBalance({ address: account.address }),
+  ]);
+
+  if (recipientBalance >= minBalance) {
+    return {
+      ok: false,
+      status: 400,
+      error: `钱包余额已达到 Faucet 门槛（${formatFaucetAmount(minBalance)}），暂时无法领取。`,
+    };
+  }
+
+  if (faucetBalance < amount) {
+    return {
+      ok: false,
+      status: 503,
+      error: "Faucet 钱包余额不足，请稍后再试。",
+    };
+  }
+
+  return { ok: true };
 }
 
 export async function acquireFaucetClaimLock(

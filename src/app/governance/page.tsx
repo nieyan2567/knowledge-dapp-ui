@@ -34,7 +34,7 @@ import {
 	summarizeProposalActions,
 } from "@/lib/governance";
 import { BRANDING } from "@/lib/branding";
-import { txToast } from "@/lib/tx-toast";
+import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt, asProposalVotes } from "@/lib/web3-types";
 import type { ProposalItem, ProposalVotes } from "@/types/governance";
 
@@ -80,12 +80,36 @@ export default function GovernancePage() {
 		functionName: "votingPeriod",
 	});
 
-	const proposalCalldata = useMemo(() => {
-		return encodeFunctionData({
-			abi: ABIS.KnowledgeContent,
-			functionName: "setRewardRules",
-			args: [BigInt(minVotes || "0"), parseEther(rewardPerVote || "0")],
-		});
+	const parsedProposalInput = useMemo(() => {
+		const trimmedMinVotes = minVotes.trim();
+		if (!trimmedMinVotes || !/^\d+$/.test(trimmedMinVotes)) {
+			return null;
+		}
+
+		const minVotesValue = BigInt(trimmedMinVotes);
+		const trimmedRewardPerVote = rewardPerVote.trim();
+		if (!trimmedRewardPerVote) {
+			return null;
+		}
+
+		try {
+			const rewardPerVoteValue = parseEther(trimmedRewardPerVote);
+			if (rewardPerVoteValue <= 0n) {
+				return null;
+			}
+
+			return {
+				minVotesValue,
+				rewardPerVoteValue,
+				proposalCalldata: encodeFunctionData({
+					abi: ABIS.KnowledgeContent,
+					functionName: "setRewardRules",
+					args: [minVotesValue, rewardPerVoteValue],
+				}),
+			};
+		} catch {
+			return null;
+		}
 	}, [minVotes, rewardPerVote]);
 
 	const loadProposals = useCallback(async () => {
@@ -139,23 +163,43 @@ export default function GovernancePage() {
 			return;
 		}
 
-		const hash = await txToast(
-			writeContractAsync({
+		const trimmedMinVotes = minVotes.trim();
+		if (!trimmedMinVotes || !/^\d+$/.test(trimmedMinVotes)) {
+			toast.error("请输入有效的最小获奖票数");
+			return;
+		}
+
+		if (!rewardPerVote.trim()) {
+			toast.error("请输入单票奖励");
+			return;
+		}
+
+		if (!parsedProposalInput) {
+			toast.error("请输入有效的单票奖励，且奖励必须大于 0");
+			return;
+		}
+
+		const hash = await writeTxToast({
+			publicClient,
+			writeContractAsync,
+			request: {
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 				abi: ABIS.KnowledgeGovernor,
 				functionName: "propose",
 				args: [
 					[CONTRACTS.KnowledgeContent as `0x${string}`],
 					[0n],
-					[proposalCalldata],
+					[parsedProposalInput.proposalCalldata],
 					description,
 				],
 				account: address,
-			}),
-			"正在提交提案...",
-			"提案交易已提交",
-			"提案提交失败"
-		);
+			},
+			loading: "正在提交提案...",
+			success: "提案交易已提交",
+			fail: "提案提交失败",
+		});
+
+		if (!hash) return;
 
 		await refreshAfterTx(hash, loadProposals, ["governance", "system"]);
 	}
@@ -276,7 +320,8 @@ export default function GovernancePage() {
 
 							<button
 								onClick={handlePropose}
-								className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+								disabled={!parsedProposalInput}
+								className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
 							>
 								创建提案
 							</button>
@@ -350,6 +395,7 @@ function ProposalCard({
 	onActionComplete: () => unknown | Promise<unknown>;
 }) {
 	const { address } = useAccount();
+	const publicClient = usePublicClient();
 	const { data: blockNumber } = useBlockNumber({ watch: true });
 	const { writeContractAsync } = useWriteContract();
 	const refreshAfterTx = useRefreshOnTxConfirmed();
@@ -417,18 +463,22 @@ function ProposalCard({
 		if (support === 0) actionText = "反对";
 		if (support === 2) actionText = "弃权";
 
-		const hash = await txToast(
-			writeContractAsync({
+		const hash = await writeTxToast({
+			publicClient,
+			writeContractAsync,
+			request: {
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 				abi: ABIS.KnowledgeGovernor,
 				functionName: "castVote",
 				args: [proposal.proposalId, support],
 				account: address,
-			}),
-			`正在提交${actionText}投票...`,
-			"投票交易已提交",
-			"投票失败"
-		);
+			},
+			loading: `正在提交${actionText}投票...`,
+			success: "投票交易已提交",
+			fail: "投票失败",
+		});
+
+		if (!hash) return;
 
 		await refreshAfterTx(hash, refreshProposalCard, ["governance", "system"]);
 	}
@@ -439,8 +489,10 @@ function ProposalCard({
 			return;
 		}
 
-		const hash = await txToast(
-			writeContractAsync({
+		const hash = await writeTxToast({
+			publicClient,
+			writeContractAsync,
+			request: {
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 				abi: ABIS.KnowledgeGovernor,
 				functionName: "queue",
@@ -451,11 +503,13 @@ function ProposalCard({
 					proposal.descriptionHash,
 				],
 				account: address,
-			}),
-			"正在提交排队交易...",
-			"排队交易已提交",
-			"排队失败"
-		);
+			},
+			loading: "正在提交排队交易...",
+			success: "排队交易已提交",
+			fail: "排队失败",
+		});
+
+		if (!hash) return;
 
 		await refreshAfterTx(hash, refreshProposalCard, ["governance", "system"]);
 	}
@@ -466,8 +520,10 @@ function ProposalCard({
 			return;
 		}
 
-		const hash = await txToast(
-			writeContractAsync({
+		const hash = await writeTxToast({
+			publicClient,
+			writeContractAsync,
+			request: {
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 				abi: ABIS.KnowledgeGovernor,
 				functionName: "execute",
@@ -478,11 +534,13 @@ function ProposalCard({
 					proposal.descriptionHash,
 				],
 				account: address,
-			}),
-			"正在提交执行交易...",
-			"执行交易已提交",
-			"执行失败"
-		);
+			},
+			loading: "正在提交执行交易...",
+			success: "执行交易已提交",
+			fail: "执行失败",
+		});
+
+		if (!hash) return;
 
 		await refreshAfterTx(hash, refreshProposalCard, ["governance", "system"]);
 	}

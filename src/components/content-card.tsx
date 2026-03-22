@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useAccount, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { getIpfsFileUrl } from "@/lib/ipfs";
 import { BookOpen, Coins, ExternalLink, Heart } from "lucide-react";
 import { toast } from "sonner";
-import { txToast } from "@/lib/tx-toast";
+import { writeTxToast } from "@/lib/tx-toast";
 import type { ContentCardData } from "@/types/content";
 
 function shortenAddress(address: string) {
@@ -22,6 +22,7 @@ export function ContentCard({
 	onActionComplete?: () => void | Promise<void>;
 }) {
 	const { address } = useAccount();
+	const publicClient = usePublicClient();
 	const { writeContractAsync } = useWriteContract();
 	const refreshAfterTx = useRefreshOnTxConfirmed();
 
@@ -34,23 +35,27 @@ export function ContentCard({
 		}
 
 		try {
-			const hash = await txToast(
-				writeContractAsync({
+			const hash = await writeTxToast({
+				publicClient,
+				writeContractAsync,
+				request: {
 					address: CONTRACTS.KnowledgeContent as `0x${string}`,
 					abi: ABIS.KnowledgeContent,
 					functionName: "vote",
 					args: [content.id],
 					account: address,
-				}),
-				"正在提交投票交易...",
-				"投票交易已提交",
-				"投票失败"
-			);
+				},
+				loading: "正在提交投票交易...",
+				success: "投票交易已提交",
+				fail: "投票失败",
+			});
+
+			if (!hash) {
+				return;
+			}
 
 			await refreshAfterTx(hash, onActionComplete, ["content", "dashboard"]);
-		} catch (error) {
-			console.error(error);
-		}
+		} catch {}
 	}
 
 	async function handleDistributeReward() {
@@ -60,23 +65,27 @@ export function ContentCard({
 		}
 
 		try {
-			const hash = await txToast(
-				writeContractAsync({
+			const hash = await writeTxToast({
+				publicClient,
+				writeContractAsync,
+				request: {
 					address: CONTRACTS.KnowledgeContent as `0x${string}`,
 					abi: ABIS.KnowledgeContent,
 					functionName: "distributeReward",
 					args: [content.id],
 					account: address,
-				}),
-				"正在提交奖励记账交易...",
-				"奖励记账交易已提交",
-				"奖励记账失败"
-			);
+				},
+				loading: "正在提交奖励记账交易...",
+				success: "奖励记账交易已提交",
+				fail: "奖励记账失败",
+			});
+
+			if (!hash) {
+				return;
+			}
 
 			await refreshAfterTx(hash, onActionComplete, ["content", "rewards", "dashboard", "system"]);
-		} catch (error) {
-			console.error(error);
-		}
+		} catch {}
 	}
 
 	return (

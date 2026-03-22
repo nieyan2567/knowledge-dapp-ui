@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useMemo } from "react";
-import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { toast } from "sonner";
 import {
 	ArrowLeft,
@@ -23,7 +23,7 @@ import { AddressBadge } from "@/components/address-badge";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { getIpfsFileUrl } from "@/lib/ipfs";
-import { txToast } from "@/lib/tx-toast";
+import { writeTxToast } from "@/lib/tx-toast";
 import { asContentData } from "@/lib/web3-types";
 
 function formatDate(timestamp: bigint) {
@@ -33,6 +33,7 @@ function formatDate(timestamp: bigint) {
 export default function ContentDetailPage() {
 	const params = useParams();
 	const { address } = useAccount();
+	const publicClient = usePublicClient();
 	const { writeContractAsync } = useWriteContract();
 	const refreshAfterTx = useRefreshOnTxConfirmed();
 
@@ -100,19 +101,21 @@ export default function ContentDetailPage() {
 			return;
 		}
 
-		const hash = await txToast(
-			writeContractAsync({
+		const hash = await writeTxToast({
+			publicClient,
+			writeContractAsync,
+			request: {
 				address: CONTRACTS.KnowledgeContent as `0x${string}`,
 				abi: ABIS.KnowledgeContent,
 				functionName: "vote",
 				args: [content.id],
 				account: address,
-			}),
-			"正在提交投票...",
-			"投票交易已提交",
-			"投票失败"
-		);
-
+			},
+			loading: "正在提交投票...",
+			success: "投票交易已提交",
+			fail: "投票失败",
+		});
+		if (!hash) return;
 		await refreshAfterTx(hash, refetchContent, ["content", "dashboard"]);
 	}
 
@@ -127,19 +130,21 @@ export default function ContentDetailPage() {
 			return;
 		}
 
-		const hash = await txToast(
-			writeContractAsync({
+		const hash = await writeTxToast({
+			publicClient,
+			writeContractAsync,
+			request: {
 				address: CONTRACTS.KnowledgeContent as `0x${string}`,
 				abi: ABIS.KnowledgeContent,
 				functionName: "distributeReward",
 				args: [content.id],
 				account: address,
-			}),
-			"正在提交奖励记账交易...",
-			"奖励记账交易已提交",
-			"奖励记账失败"
-		);
-
+			},
+			loading: "正在提交奖励记账交易...",
+			success: "奖励记账交易已提交",
+			fail: "奖励记账失败",
+		});
+		if (!hash) return;
 		await refreshAfterTx(hash, refetchContent, ["content", "rewards", "dashboard", "system"]);
 	}
 

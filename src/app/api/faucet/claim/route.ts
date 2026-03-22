@@ -5,10 +5,11 @@ import { buildFaucetClaimMessage } from "@/lib/faucet/message";
 import { takeFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
 import {
   acquireFaucetClaimLock,
+  checkFaucetClaimEligibility,
   formatFaucetAmount,
-  getCooldownRemainingSeconds,
   getFaucetAmount,
   getFaucetClients,
+  getCooldownRemainingSeconds,
   getFaucetMinBalance,
   getRequestIp,
   markFaucetClaimed,
@@ -32,14 +33,14 @@ export async function POST(req: NextRequest) {
     body = (await req.json()) as FaucetClaimBody;
   } catch {
     return NextResponse.json(
-      { error: "Invalid request body" },
+      { error: "请求体格式无效" },
       { status: 400 }
     );
   }
 
   if (!body.address || !body.nonce || !body.signature) {
     return NextResponse.json(
-      { error: "Missing address, nonce, or signature" },
+      { error: "缺少地址、nonce 或签名" },
       { status: 400 }
     );
   }
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
     address = getAddress(body.address);
   } catch {
     return NextResponse.json(
-      { error: "Invalid wallet address" },
+      { error: "钱包地址格式无效" },
       { status: 400 }
     );
   }
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   if (!challenge) {
     return NextResponse.json(
-      { error: "Challenge expired or already used" },
+      { error: "签名挑战已过期或已被使用" },
       { status: 401 }
     );
   }
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
     challenge.chainId !== knowledgeChain.id
   ) {
     return NextResponse.json(
-      { error: "Challenge does not match current site" },
+      { error: "签名挑战与当前站点不匹配" },
       { status: 401 }
     );
   }
@@ -85,20 +86,18 @@ export async function POST(req: NextRequest) {
 
   if (!isValidSignature) {
     return NextResponse.json(
-      { error: "Invalid wallet signature" },
+      { error: "钱包签名无效" },
       { status: 401 }
     );
   }
 
   const ip = getRequestIp(req.headers);
-  const cooldownRemainingSeconds = await getCooldownRemainingSeconds(address, ip);
+  const eligibility = await checkFaucetClaimEligibility(address, ip);
 
-  if (cooldownRemainingSeconds > 0) {
+  if (!eligibility.ok) {
     return NextResponse.json(
-      {
-        error: `Faucet cooldown active. Try again in ${cooldownRemainingSeconds} seconds.`,
-      },
-      { status: 429 }
+      { error: eligibility.error },
+      { status: eligibility.status }
     );
   }
 
@@ -111,8 +110,8 @@ export async function POST(req: NextRequest) {
       {
         error:
           lockedCooldownSeconds > 0
-            ? `Faucet cooldown active. Try again in ${lockedCooldownSeconds} seconds.`
-            : "Faucet request already in progress for this wallet.",
+            ? `Faucet 冷却中，请在 ${lockedCooldownSeconds} 秒后重试。`
+            : "该钱包已有 Faucet 请求正在处理中，请稍后再试。",
       },
       { status: 429 }
     );
@@ -133,9 +132,9 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json(
         {
-          error: `Wallet balance is already above the faucet threshold (${formatFaucetAmount(
+          error: `钱包余额已达到 Faucet 门槛（${formatFaucetAmount(
             minBalance
-          )}).`,
+          )}），暂时无法领取。`,
         },
         { status: 400 }
       );
@@ -146,7 +145,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json(
         {
-          error: "Faucet wallet does not have enough funds.",
+          error: "Faucet 钱包余额不足，请稍后再试。",
         },
         { status: 503 }
       );
@@ -187,7 +186,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       {
-        error: "Failed to send faucet funds.",
+        error: "Faucet 发放失败，请稍后再试。",
       },
       { status: 500 }
     );

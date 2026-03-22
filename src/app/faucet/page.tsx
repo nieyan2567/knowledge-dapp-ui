@@ -36,6 +36,26 @@ type FaucetNonceError = {
   error?: string;
 };
 
+function isUserRejectedError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const code = (error as { code?: unknown }).code;
+  const message = `${(error as { shortMessage?: string }).shortMessage ?? ""} ${
+    (error as { message?: string }).message ?? ""
+  }`.toLowerCase();
+
+  return (
+    code === 4001 ||
+    code === "ACTION_REJECTED" ||
+    message.includes("user rejected") ||
+    message.includes("user denied") ||
+    message.includes("rejected the request") ||
+    message.includes("denied message signature")
+  );
+}
+
 function ConnectAction() {
   return (
     <ConnectButton.Custom>
@@ -127,7 +147,7 @@ export default function FaucetPage() {
     setTxHash(null);
 
     try {
-      const nonceRes = await fetch("/api/faucet/nonce", {
+      const nonceRes = await fetch(`/api/faucet/nonce?address=${encodeURIComponent(address)}`, {
         cache: "no-store",
         credentials: "same-origin",
       });
@@ -135,7 +155,8 @@ export default function FaucetPage() {
       const nonceData = (await nonceRes.json()) as FaucetAuthChallenge | FaucetNonceError;
 
       if (!nonceRes.ok || !("nonce" in nonceData)) {
-        throw new Error(("error" in nonceData && nonceData.error) || "Failed to create faucet challenge");
+        toast.error(("error" in nonceData && nonceData.error) || "创建 Faucet 签名挑战失败");
+        return;
       }
 
       const signature = await signMessageAsync({
@@ -158,15 +179,20 @@ export default function FaucetPage() {
       const claimData = (await claimRes.json()) as FaucetClaimResponse;
 
       if (!claimRes.ok || !claimData.ok || !claimData.txHash) {
-        throw new Error(claimData.error || "Failed to send faucet funds");
+        toast.error(claimData.error || "Faucet 发放失败，请稍后再试");
+        return;
       }
 
       setTxHash(claimData.txHash);
       setClaimAmount(claimData.displayAmount || null);
-      toast.success("Starter funds sent");
+      toast.success("启动资金已发放");
     } catch (error) {
-      console.error(error);
-      toast.error(error instanceof Error ? error.message : "Faucet request failed");
+      if (isUserRejectedError(error)) {
+        toast.info("已取消钱包签名");
+        return;
+      }
+
+      toast.error(error instanceof Error ? error.message : "Faucet 请求失败");
     } finally {
       setLoading(false);
     }

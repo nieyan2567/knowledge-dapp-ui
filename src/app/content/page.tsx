@@ -17,7 +17,7 @@ import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useUploadAuth } from "@/hooks/useUploadAuth";
-import { txToast } from "@/lib/tx-toast";
+import { txToast, writeTxToast } from "@/lib/tx-toast";
 import type { ContentCardData } from "@/types/content";
 import { asContentData } from "@/lib/web3-types";
 
@@ -223,18 +223,24 @@ export default function ContentPage() {
     setRegistering(true);
 
     try {
-      const hash = await txToast(
-        writeContractAsync({
+      const hash = await writeTxToast({
+        publicClient,
+        writeContractAsync,
+        request: {
           address: CONTRACTS.KnowledgeContent as `0x${string}`,
           abi: ABIS.KnowledgeContent,
           functionName: "registerContent",
           args: [uploadedCid, title.trim(), desc.trim()],
           account: address,
-        }),
-        "正在提交链上注册交易...",
-        "链上注册交易已提交",
-        "链上注册失败"
-      );
+        },
+        loading: "正在提交链上注册交易...",
+        success: "链上注册交易已提交",
+        fail: "链上注册失败",
+      });
+
+      if (!hash) {
+        return;
+      }
 
       setFile(null);
       setUploadedCid("");

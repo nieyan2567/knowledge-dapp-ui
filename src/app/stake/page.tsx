@@ -4,17 +4,18 @@ import { useCallback, useState } from "react";
 import { Clock3, Coins, ShieldCheck, Wallet } from "lucide-react";
 import { formatEther, parseEther } from "viem";
 import { toast } from "sonner";
-import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { BRANDING } from "@/lib/branding";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
-import { txToast } from "@/lib/tx-toast";
+import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt } from "@/lib/web3-types";
 
 export default function StakePage() {
 	const { address } = useAccount();
+	const publicClient = usePublicClient();
 	const { writeContractAsync } = useWriteContract();
 	const refreshAfterTx = useRefreshOnTxConfirmed();
 
@@ -28,7 +29,12 @@ export default function StakePage() {
 		}
 
 		try {
-			return parseEther(value.trim());
+			const amount = parseEther(value.trim());
+			if (amount <= 0n) {
+				toast.error(`${field}必须大于 0`);
+				return null;
+			}
+			return amount;
 		} catch {
 			toast.error(`请输入有效的${field}`);
 			return null;
@@ -90,18 +96,22 @@ export default function StakePage() {
 		const amount = parseAmount(depositAmount, "质押数量");
 		if (amount === null) return;
 
-		const hash = await txToast(
-			writeContractAsync({
+		const hash = await writeTxToast({
+			publicClient,
+			writeContractAsync,
+			request: {
 				address: CONTRACTS.NativeVotes as `0x${string}`,
 				abi: ABIS.NativeVotes,
 				functionName: "deposit",
 				value: amount,
 				account: address,
-			}),
-			"正在提交质押交易...",
-			"质押交易已提交",
-			"质押失败"
-		);
+			},
+			loading: "正在提交质押交易...",
+			success: "质押交易已提交",
+			fail: "质押失败",
+		});
+
+		if (!hash) return;
 
 		await refreshAfterTx(hash, refreshStakeData, ["stake", "dashboard"]);
 	}
@@ -112,17 +122,26 @@ export default function StakePage() {
 			return;
 		}
 
-		const hash = await txToast(
-			writeContractAsync({
+		if (!pendingStakeValue || pendingStakeValue <= 0n) {
+			toast.error("当前没有待激活的质押");
+			return;
+		}
+
+		const hash = await writeTxToast({
+			publicClient,
+			writeContractAsync,
+			request: {
 				address: CONTRACTS.NativeVotes as `0x${string}`,
 				abi: ABIS.NativeVotes,
 				functionName: "activate",
 				account: address,
-			}),
-			"正在提交激活交易...",
-			"激活交易已提交",
-			"激活失败"
-		);
+			},
+			loading: "正在提交激活交易...",
+			success: "激活交易已提交",
+			fail: "激活失败",
+		});
+
+		if (!hash) return;
 
 		await refreshAfterTx(hash, refreshStakeData, ["stake", "dashboard"]);
 	}
@@ -136,18 +155,32 @@ export default function StakePage() {
 		const amount = parseAmount(withdrawAmount, "提取数量");
 		if (amount === null) return;
 
-		const hash = await txToast(
-			writeContractAsync({
+		if (!stakedValue || stakedValue <= 0n) {
+			toast.error("当前没有可退出的已质押余额");
+			return;
+		}
+
+		if (amount > stakedValue) {
+			toast.error("提取数量不能超过已质押余额");
+			return;
+		}
+
+		const hash = await writeTxToast({
+			publicClient,
+			writeContractAsync,
+			request: {
 				address: CONTRACTS.NativeVotes as `0x${string}`,
 				abi: ABIS.NativeVotes,
 				functionName: "requestWithdraw",
 				args: [amount],
 				account: address,
-			}),
-			"正在提交退出申请...",
-			"退出申请已提交",
-			"退出申请失败"
-		);
+			},
+			loading: "正在提交退出申请...",
+			success: "退出申请已提交",
+			fail: "退出申请失败",
+		});
+
+		if (!hash) return;
 
 		await refreshAfterTx(hash, refreshStakeData, ["stake", "dashboard"]);
 	}
@@ -161,18 +194,32 @@ export default function StakePage() {
 		const amount = parseAmount(withdrawAmount, "提取数量");
 		if (amount === null) return;
 
-		const hash = await txToast(
-			writeContractAsync({
+		if (!pendingWithdrawValue || pendingWithdrawValue <= 0n) {
+			toast.error("当前没有可提取的待提取余额");
+			return;
+		}
+
+		if (amount > pendingWithdrawValue) {
+			toast.error("提取数量不能超过待提取余额");
+			return;
+		}
+
+		const hash = await writeTxToast({
+			publicClient,
+			writeContractAsync,
+			request: {
 				address: CONTRACTS.NativeVotes as `0x${string}`,
 				abi: ABIS.NativeVotes,
 				functionName: "withdraw",
 				args: [amount],
 				account: address,
-			}),
-			"正在提交提取交易...",
-			"提取交易已提交",
-			"提取失败"
-		);
+			},
+			loading: "正在提交提取交易...",
+			success: "提取交易已提交",
+			fail: "提取失败",
+		});
+
+		if (!hash) return;
 
 		await refreshAfterTx(hash, refreshStakeData, ["stake", "dashboard"]);
 	}

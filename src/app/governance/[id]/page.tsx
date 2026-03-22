@@ -35,7 +35,7 @@ import {
 	proposalCreatedEvent,
 	summarizeProposalActions,
 } from "@/lib/governance";
-import { txToast } from "@/lib/tx-toast";
+import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt, asProposalVotes } from "@/lib/web3-types";
 import type { ProposalItem, ProposalVotes } from "@/types/governance";
 
@@ -182,19 +182,21 @@ export default function ProposalDetailPage() {
 			return;
 		}
 
-		const hash = await txToast(
-			writeContractAsync({
+		const hash = await writeTxToast({
+			publicClient,
+			writeContractAsync,
+			request: {
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 				abi: ABIS.KnowledgeGovernor,
 				functionName: "castVote",
 				args: [proposalId, support],
 				account: address,
-			}),
-			"提交投票...",
-			"投票成功",
-			"投票失败"
-		);
-
+			},
+			loading: "提交投票...",
+			success: "投票成功",
+			fail: "投票失败",
+		});
+		if (!hash) return;
 		await refreshAfterTx(hash, refreshProposalDetail, ["governance", "system"]);
 	}
 
@@ -204,8 +206,10 @@ export default function ProposalDetailPage() {
 			return;
 		}
 
-		const hash = await txToast(
-			writeContractAsync({
+		const hash = await writeTxToast({
+			publicClient,
+			writeContractAsync,
+			request: {
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 				abi: ABIS.KnowledgeGovernor,
 				functionName: "queue",
@@ -216,12 +220,12 @@ export default function ProposalDetailPage() {
 					proposalDetail.descriptionHash,
 				],
 				account: address,
-			}),
-			"正在提交排队交易...",
-			"排队交易已提交",
-			"排队失败"
-		);
-
+			},
+			loading: "正在提交排队交易...",
+			success: "排队交易已提交",
+			fail: "排队失败",
+		});
+		if (!hash) return;
 		await refreshAfterTx(hash, refreshProposalDetail, ["governance", "system"]);
 	}
 
@@ -231,8 +235,10 @@ export default function ProposalDetailPage() {
 			return;
 		}
 
-		const hash = await txToast(
-			writeContractAsync({
+		const hash = await writeTxToast({
+			publicClient,
+			writeContractAsync,
+			request: {
 				address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 				abi: ABIS.KnowledgeGovernor,
 				functionName: "execute",
@@ -243,12 +249,12 @@ export default function ProposalDetailPage() {
 					proposalDetail.descriptionHash,
 				],
 				account: address,
-			}),
-			"正在提交执行交易...",
-			"执行交易已提交",
-			"执行失败"
-		);
-
+			},
+			loading: "正在提交执行交易...",
+			success: "执行交易已提交",
+			fail: "执行失败",
+		});
+		if (!hash) return;
 		await refreshAfterTx(hash, refreshProposalDetail, ["governance", "system"]);
 	}
 
