@@ -65,9 +65,9 @@ export default function RewardsPage() {
 	const [rewardHistory, setRewardHistory] = useState<RewardHistoryItem[]>([]);
 	const [rewardSources, setRewardSources] = useState<RewardSourceItem[]>([]);
 	const [historyPage, setHistoryPage] = useState(1);
-	const [historyPageSize, setHistoryPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(5);
+	const [historyPageSize, setHistoryPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(3);
 	const [sourcePage, setSourcePage] = useState(1);
-	const [sourcePageSize, setSourcePageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(5);
+	const [sourcePageSize, setSourcePageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(3);
 
 	const { data: pendingRewards, refetch: refetchPendingRewards } = useReadContract({
 		address: CONTRACTS.TreasuryNative as `0x${string}`,
