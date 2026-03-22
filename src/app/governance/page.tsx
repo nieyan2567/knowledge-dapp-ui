@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { encodeFunctionData, formatEther, parseEther } from "viem";
 import {
 	useAccount,
+	useBlockNumber,
 	usePublicClient,
 	useReadContract,
 	useWriteContract,
@@ -23,6 +24,7 @@ import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
+import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 import {
 	formatProposalBlockRange,
 	governanceStateBadgeClass as stateBadgeClass,
@@ -59,19 +61,19 @@ export default function GovernancePage() {
 	const [loadingProposals, setLoadingProposals] = useState(false);
 	const [proposals, setProposals] = useState<ProposalItem[]>([]);
 
-	const { data: proposalThreshold } = useReadContract({
+	const { data: proposalThreshold, refetch: refetchProposalThreshold } = useReadContract({
 		address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 		abi: ABIS.KnowledgeGovernor,
 		functionName: "proposalThreshold",
 	});
 
-	const { data: votingDelay } = useReadContract({
+	const { data: votingDelay, refetch: refetchVotingDelay } = useReadContract({
 		address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 		abi: ABIS.KnowledgeGovernor,
 		functionName: "votingDelay",
 	});
 
-	const { data: votingPeriod } = useReadContract({
+	const { data: votingPeriod, refetch: refetchVotingPeriod } = useReadContract({
 		address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
 		abi: ABIS.KnowledgeGovernor,
 		functionName: "votingPeriod",
@@ -112,6 +114,23 @@ export default function GovernancePage() {
 	useEffect(() => {
 		void loadProposals();
 	}, [loadProposals]);
+
+	const governanceRefreshDomains = useMemo(
+		() => ["governance", "system"] as const,
+		[]
+	);
+
+	const governanceRefetchers = useMemo(
+		() => [
+			loadProposals,
+			refetchProposalThreshold,
+			refetchVotingDelay,
+			refetchVotingPeriod,
+		],
+		[loadProposals, refetchProposalThreshold, refetchVotingDelay, refetchVotingPeriod]
+	);
+
+	useTxEventRefetch(governanceRefreshDomains, governanceRefetchers);
 
 	async function handlePropose() {
 		if (!address) {
@@ -330,6 +349,7 @@ function ProposalCard({
 	onActionComplete: () => unknown | Promise<unknown>;
 }) {
 	const { address } = useAccount();
+	const { data: blockNumber } = useBlockNumber({ watch: true });
 	const { writeContractAsync } = useWriteContract();
 	const refreshAfterTx = useRefreshOnTxConfirmed();
 
@@ -369,6 +389,14 @@ function ProposalCard({
 	const canVote = Number(proposalState ?? -1) === 1;
 	const canQueue = Number(proposalState ?? -1) === 4;
 	const canExecute = Number(proposalState ?? -1) === 5;
+
+	useEffect(() => {
+		if (blockNumber === undefined) {
+			return;
+		}
+
+		void Promise.all([refetchState(), refetchVotes()]);
+	}, [blockNumber, refetchState, refetchVotes]);
 
 	async function refreshProposalCard() {
 		await Promise.all([refetchState(), refetchVotes(), onActionComplete()]);

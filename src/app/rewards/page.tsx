@@ -1,9 +1,9 @@
 "use client";
 
 import { Coins, ShieldCheck, Wallet } from "lucide-react";
-import { formatEther } from "viem";
-import { toast } from "sonner";
 import { useCallback, useState } from "react";
+import { toast } from "sonner";
+import { formatEther } from "viem";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
 
 import { PageHeader } from "@/components/page-header";
@@ -48,7 +48,6 @@ export default function RewardsPage() {
 	const pending = pendingValue ? Number(formatEther(pendingValue)) : 0;
 	const budget = budgetValue ? Number(formatEther(budgetValue)) : 0;
 	const spent = spentValue ? Number(formatEther(spentValue)) : 0;
-
 	const progress = budget ? Math.min((spent / budget) * 100, 100) : 0;
 
 	const refreshRewardsData = useCallback(async () => {
@@ -96,18 +95,13 @@ export default function RewardsPage() {
 			<PageHeader
 				eyebrow="Treasury · Claimable Rewards"
 				title="Rewards Center"
-				description="领取已在金库中为当前连接钱包累积的奖励。"
+				description="领取当前连接钱包在金库中累计的奖励。"
 			/>
 
-			{/* ================= Stats ================= */}
-
 			<section className="grid gap-4 md:grid-cols-3">
-
 				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
 					<div className="mb-4 flex items-center justify-between">
-						<div className="text-sm text-slate-500 dark:text-slate-400">
-							待领取奖励
-						</div>
+						<div className="text-sm text-slate-500 dark:text-slate-400">待领取奖励</div>
 						<Wallet className="h-5 w-5 text-slate-400 dark:text-slate-500" />
 					</div>
 
@@ -120,29 +114,33 @@ export default function RewardsPage() {
 					</div>
 				</div>
 
-
 				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
 					<div className="mb-4 flex items-center justify-between">
-						<div className="text-sm text-slate-500 dark:text-slate-400">
-							周期预算
-						</div>
+						<div className="text-sm text-slate-500 dark:text-slate-400">周期预算使用</div>
 						<Coins className="h-5 w-5 text-slate-400 dark:text-slate-500" />
 					</div>
 
 					<div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
-						{budget} {BRANDING.nativeTokenSymbol}
+						{progress.toFixed(1)}%
 					</div>
 
-					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-						当前周期的奖励总预算。
+					<div className="mt-4 space-y-3">
+						<div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+							<div
+								className="h-full bg-blue-500 transition-all"
+								style={{ width: `${progress}%` }}
+							/>
+						</div>
+
+						<div className="text-sm text-slate-500 dark:text-slate-400">
+							已使用 {spent} / {budget} {BRANDING.nativeTokenSymbol}
+						</div>
 					</div>
 				</div>
 
 				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
 					<div className="mb-4 flex items-center justify-between">
-						<div className="text-sm text-slate-500 dark:text-slate-400">
-							周期已发放
-						</div>
+						<div className="text-sm text-slate-500 dark:text-slate-400">周期已发放</div>
 						<ShieldCheck className="h-5 w-5 text-slate-400 dark:text-slate-500" />
 					</div>
 
@@ -154,48 +152,15 @@ export default function RewardsPage() {
 						当前周期已分配的奖励。
 					</div>
 				</div>
-
 			</section>
-
-
-			{/* ================= Budget Progress ================= */}
-
-			<SectionCard
-				title="周期预算使用"
-				description="当前周期已使用的奖励预算比例。"
-			>
-
-				<div className="space-y-4">
-
-					<div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-						<div
-							className="h-full bg-blue-500 transition-all"
-							style={{ width: `${progress}%` }}
-						/>
-					</div>
-
-					<div className="text-sm text-slate-500 dark:text-slate-400">
-						已使用 {spent} / {budget} {BRANDING.nativeTokenSymbol}
-					</div>
-
-				</div>
-
-			</SectionCard>
-
-
-			{/* ================= Claim ================= */}
 
 			<SectionCard
 				title="领取奖励"
 				description="在奖励记录入库后，使用此操作进行领取。"
 			>
-
 				<div className="flex items-center justify-between">
-
 					<div>
-						<div className="text-sm text-slate-500 dark:text-slate-400">
-							可领取
-						</div>
+						<div className="text-sm text-slate-500 dark:text-slate-400">可领取</div>
 
 						<div className="text-xl font-semibold text-slate-950 dark:text-slate-100">
 							{pending} {BRANDING.nativeTokenSymbol}
@@ -209,11 +174,8 @@ export default function RewardsPage() {
 					>
 						{loading ? "领取中..." : "领取奖励"}
 					</button>
-
 				</div>
-
 			</SectionCard>
-
 		</main>
 	);
 }

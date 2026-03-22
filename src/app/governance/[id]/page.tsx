@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatEther } from "viem";
-import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
+import {
+	useAccount,
+	useBlockNumber,
+	usePublicClient,
+	useReadContract,
+	useWriteContract,
+} from "wagmi";
 import { toast } from "sonner";
 import {
 	ArrowLeft,
@@ -20,6 +26,7 @@ import { SectionCard } from "@/components/section-card";
 import { AddressBadge } from "@/components/address-badge";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
+import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 import { BRANDING } from "@/lib/branding";
 import {
 	governanceStateBadgeClass as stateBadgeClass,
@@ -41,6 +48,7 @@ export default function ProposalDetailPage() {
 	const params = useParams();
 	const publicClient = usePublicClient();
 	const { address } = useAccount();
+	const { data: blockNumber } = useBlockNumber({ watch: true });
 	const { writeContractAsync } = useWriteContract();
 	const refreshAfterTx = useRefreshOnTxConfirmed();
 
@@ -142,6 +150,26 @@ export default function ProposalDetailPage() {
 	const refreshProposalDetail = useCallback(async () => {
 		await Promise.all([refetchState(), refetchVotes(), loadProposalDetail()]);
 	}, [loadProposalDetail, refetchState, refetchVotes]);
+
+	const governanceRefreshDomains = useMemo(
+		() => ["governance", "system"] as const,
+		[]
+	);
+
+	const governanceRefetchers = useMemo(
+		() => [refreshProposalDetail],
+		[refreshProposalDetail]
+	);
+
+	useTxEventRefetch(governanceRefreshDomains, governanceRefetchers);
+
+	useEffect(() => {
+		if (blockNumber === undefined || proposalId === null) {
+			return;
+		}
+
+		void Promise.all([refetchState(), refetchVotes()]);
+	}, [blockNumber, proposalId, refetchState, refetchVotes]);
 
 	async function vote(support: 0 | 1 | 2) {
 		if (!address || !proposalId) {
