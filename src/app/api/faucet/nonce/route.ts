@@ -1,13 +1,13 @@
-import { getAddress } from "viem";
+﻿import { getAddress } from "viem";
 import { NextRequest, NextResponse } from "next/server";
 
-import { createFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
 import { getRequestSite } from "@/lib/auth/request";
 import { knowledgeChain } from "@/lib/chains";
 import {
   checkFaucetClaimEligibility,
   getRequestIp,
 } from "@/lib/faucet/utils";
+import { createFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
 
 export const runtime = "nodejs";
 

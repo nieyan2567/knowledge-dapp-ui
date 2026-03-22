@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 
+import { errorResponse, parseFile } from "@/lib/api-validation";
 import {
   clearUploadSessionCookie,
   readUploadSession,
@@ -15,10 +16,7 @@ export async function POST(req: NextRequest) {
   const session = readUploadSession(req);
 
   if (!session) {
-    const response = NextResponse.json(
-      { error: "Unauthorized upload request" },
-      { status: 401 }
-    );
+    const response = errorResponse("未授权的上传请求", 401);
     clearUploadSessionCookie(response);
     return response;
   }
@@ -27,10 +25,7 @@ export async function POST(req: NextRequest) {
     const provider = process.env.UPLOAD_PROVIDER || "local";
 
     if (provider !== "local") {
-      return NextResponse.json(
-        { error: "UPLOAD_PROVIDER is not local" },
-        { status: 400 }
-      );
+      return errorResponse("当前仅支持本地上传服务", 400);
     }
 
     const apiUrl = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
@@ -38,15 +33,13 @@ export async function POST(req: NextRequest) {
       process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080/ipfs";
 
     const incomingFormData = await req.formData();
-    const file = incomingFormData.get("file") as File | null;
+    const fileResult = parseFile(incomingFormData.get("file"));
 
-    if (!file) {
-      return NextResponse.json(
-        { error: "No file uploaded" },
-        { status: 400 }
-      );
+    if (!fileResult.ok) {
+      return fileResult.response;
     }
 
+    const file = fileResult.value;
     const kuboFormData = new FormData();
     kuboFormData.append("file", file, file.name);
 
@@ -59,7 +52,7 @@ export async function POST(req: NextRequest) {
       const text = await uploadRes.text();
       console.error("Kubo upload failed:", text);
       return NextResponse.json(
-        { error: "Kubo upload failed", detail: text },
+        { error: "IPFS 上传失败", detail: text },
         { status: 500 }
       );
     }
@@ -68,15 +61,22 @@ export async function POST(req: NextRequest) {
     let data: KuboAddResponse;
 
     try {
-      data = JSON.parse(raw);
+      data = JSON.parse(raw) as KuboAddResponse;
     } catch {
       return NextResponse.json(
-        { error: "Failed to parse Kubo response", detail: raw },
+        { error: "IPFS 返回结果解析失败", detail: raw },
         { status: 500 }
       );
     }
 
     const cid = data.Hash;
+
+    if (typeof cid !== "string" || !cid.trim()) {
+      return NextResponse.json(
+        { error: "IPFS 未返回有效 CID", detail: raw },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       provider: "local",
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("Local IPFS upload failed:", error);
     return NextResponse.json(
-      { error: "Local IPFS upload failed" },
+      { error: "本地 IPFS 上传失败" },
       { status: 500 }
     );
   }

@@ -1,68 +1,69 @@
-import { getAddress, verifyMessage } from "viem";
+﻿import { getAddress, verifyMessage } from "viem";
 import { NextRequest, NextResponse } from "next/server";
 
+import {
+  parseJsonObject,
+  parseRequiredString,
+} from "@/lib/api-validation";
+import { getRequestSite } from "@/lib/auth/request";
+import { knowledgeChain } from "@/lib/chains";
 import { buildFaucetClaimMessage } from "@/lib/faucet/message";
 import { takeFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
 import {
   acquireFaucetClaimLock,
   checkFaucetClaimEligibility,
   formatFaucetAmount,
+  getCooldownRemainingSeconds,
   getFaucetAmount,
   getFaucetClients,
-  getCooldownRemainingSeconds,
   getFaucetMinBalance,
   getRequestIp,
   markFaucetClaimed,
   releaseFaucetClaimLock,
 } from "@/lib/faucet/utils";
-import { getRequestSite } from "@/lib/auth/request";
-import { knowledgeChain } from "@/lib/chains";
 
 export const runtime = "nodejs";
 
-type FaucetClaimBody = {
-  address?: string;
-  nonce?: string;
-  signature?: string;
-};
-
 export async function POST(req: NextRequest) {
-  let body: FaucetClaimBody;
-
-  try {
-    body = (await req.json()) as FaucetClaimBody;
-  } catch {
-    return NextResponse.json(
-      { error: "请求体格式无效" },
-      { status: 400 }
-    );
+  const bodyResult = await parseJsonObject(req);
+  if (!bodyResult.ok) {
+    return bodyResult.response;
   }
 
-  if (!body.address || !body.nonce || !body.signature) {
-    return NextResponse.json(
-      { error: "缺少地址、nonce 或签名" },
-      { status: 400 }
-    );
+  const addressResult = parseRequiredString(bodyResult.value.address, "缺少钱包地址", {
+    maxLength: 128,
+  });
+  if (!addressResult.ok) {
+    return addressResult.response;
+  }
+
+  const nonceResult = parseRequiredString(bodyResult.value.nonce, "缺少 nonce", {
+    maxLength: 256,
+  });
+  if (!nonceResult.ok) {
+    return nonceResult.response;
+  }
+
+  const signatureResult = parseRequiredString(bodyResult.value.signature, "签名格式无效", {
+    maxLength: 256,
+    pattern: /^0x[0-9a-fA-F]+$/,
+  });
+  if (!signatureResult.ok) {
+    return signatureResult.response;
   }
 
   let address: `0x${string}`;
 
   try {
-    address = getAddress(body.address);
+    address = getAddress(addressResult.value);
   } catch {
-    return NextResponse.json(
-      { error: "钱包地址格式无效" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "钱包地址格式无效" }, { status: 400 });
   }
 
-  const challenge = await takeFaucetAuthChallenge(body.nonce);
+  const challenge = await takeFaucetAuthChallenge(nonceResult.value);
 
   if (!challenge) {
-    return NextResponse.json(
-      { error: "签名挑战已过期或已被使用" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "签名挑战已过期或已被使用" }, { status: 401 });
   }
 
   const { domain, origin } = getRequestSite(req);
@@ -72,23 +73,17 @@ export async function POST(req: NextRequest) {
     challenge.origin !== origin ||
     challenge.chainId !== knowledgeChain.id
   ) {
-    return NextResponse.json(
-      { error: "签名挑战与当前站点不匹配" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "签名挑战与当前站点不匹配" }, { status: 401 });
   }
 
   const isValidSignature = await verifyMessage({
     address,
     message: buildFaucetClaimMessage(challenge, address),
-    signature: body.signature as `0x${string}`,
+    signature: signatureResult.value as `0x${string}`,
   });
 
   if (!isValidSignature) {
-    return NextResponse.json(
-      { error: "钱包签名无效" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "钱包签名无效" }, { status: 401 });
   }
 
   const ip = getRequestIp(req.headers);
