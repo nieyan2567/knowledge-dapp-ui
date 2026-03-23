@@ -23,7 +23,7 @@ export const signedRequestBodySchema = z.object({
 });
 
 export const faucetNonceQuerySchema = z.object({
-  address: addressInputSchema.optional(),
+  address: addressInputSchema,
 });
 
 export const uploadFileSchema = z

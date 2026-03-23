@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import { createPublicClient, createWalletClient, formatEther, http, parseEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
@@ -30,6 +32,30 @@ export type FaucetClaimEligibilityResult =
       status: number;
       error: string;
     };
+
+export class FaucetError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "FaucetError";
+    this.status = status;
+  }
+}
+
+export class FaucetInfraError extends FaucetError {
+  constructor(message = "Faucet 服务暂时不可用，请稍后再试。") {
+    super(message, 503);
+    this.name = "FaucetInfraError";
+  }
+}
+
+export class FaucetRateLimitError extends FaucetError {
+  constructor(message: string) {
+    super(message, 429);
+    this.name = "FaucetRateLimitError";
+  }
+}
 
 let faucetClients:
   | {
@@ -80,7 +106,7 @@ function getIpLockKey(ip: string) {
 
 async function getPositiveTtl(redis: Awaited<ReturnType<typeof getRedis>>, key: string) {
   if (!redis) {
-    throw new Error("Redis is required for the faucet backend");
+    throw new FaucetInfraError();
   }
 
   const ttl = await redis.ttl(key);
@@ -105,6 +131,50 @@ export function getFaucetCooldownSeconds() {
   return Math.floor(hours * 60 * 60);
 }
 
+export function getFaucetLockTtlSeconds() {
+  const seconds = Number(process.env.FAUCET_LOCK_TTL_SECONDS || "60");
+
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    throw new Error("FAUCET_LOCK_TTL_SECONDS must be a positive number");
+  }
+
+  return Math.floor(seconds);
+}
+
+function getRateLimitWindowSeconds(kind: "nonce" | "claim") {
+  const fallback = kind === "nonce" ? "60" : "3600";
+  const value = Number(
+    process.env[
+      kind === "nonce"
+        ? "FAUCET_NONCE_RATE_LIMIT_WINDOW_SECONDS"
+        : "FAUCET_CLAIM_RATE_LIMIT_WINDOW_SECONDS"
+    ] || fallback
+  );
+
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`FAUCET_${kind.toUpperCase()}_RATE_LIMIT_WINDOW_SECONDS must be a positive number`);
+  }
+
+  return Math.floor(value);
+}
+
+function getRateLimitMax(kind: "nonce" | "claim") {
+  const fallback = kind === "nonce" ? "5" : "10";
+  const value = Number(
+    process.env[
+      kind === "nonce"
+        ? "FAUCET_NONCE_RATE_LIMIT_MAX"
+        : "FAUCET_CLAIM_RATE_LIMIT_MAX"
+    ] || fallback
+  );
+
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`FAUCET_${kind.toUpperCase()}_RATE_LIMIT_MAX must be a positive number`);
+  }
+
+  return Math.floor(value);
+}
+
 export function getRequestIp(headers: Headers) {
   const forwardedFor = headers.get("x-forwarded-for");
   if (forwardedFor) {
@@ -112,6 +182,37 @@ export function getRequestIp(headers: Headers) {
   }
 
   return headers.get("x-real-ip");
+}
+
+export function getRequestUserAgent(headers: Headers) {
+  const value = headers.get("user-agent")?.trim();
+  return value && value.length > 0 ? value : "unknown";
+}
+
+function hashValue(value: string) {
+  return createHash("sha256").update(value).digest("base64url");
+}
+
+export function createRequestContextHashes(input: {
+  address: `0x${string}`;
+  ip: string | null;
+  userAgent: string;
+}) {
+  return {
+    address: input.address,
+    ipHash: hashValue(normalizeIp(input.ip) ?? "unknown"),
+    userAgentHash: hashValue(input.userAgent.trim() || "unknown"),
+  };
+}
+
+async function getRequiredFaucetRedis() {
+  const redis = await getRedis();
+
+  if (!redis) {
+    throw new FaucetInfraError();
+  }
+
+  return redis;
 }
 
 export async function getFaucetClients() {
@@ -142,11 +243,7 @@ export async function getCooldownRemainingSeconds(
   address: `0x${string}`,
   ip: string | null
 ) {
-  const redis = await getRedis();
-
-  if (!redis) {
-    throw new Error("Redis is required for the faucet backend");
-  }
+  const redis = await getRequiredFaucetRedis();
 
   const normalizedIp = normalizeIp(ip);
   const ttlValues = await Promise.all([
@@ -205,14 +302,10 @@ export async function acquireFaucetClaimLock(
   address: `0x${string}`,
   ip: string | null
 ): Promise<FaucetClaimLock | null> {
-  const redis = await getRedis();
-
-  if (!redis) {
-    throw new Error("Redis is required for the faucet backend");
-  }
+  const redis = await getRequiredFaucetRedis();
 
   const normalizedIp = normalizeIp(ip);
-  const lockSeconds = Math.max(getFaucetCooldownSeconds(), 60);
+  const lockSeconds = getFaucetLockTtlSeconds();
   const entries = [
     { key: getAddressLockKey(address), token: crypto.randomUUID() },
     ...(normalizedIp ? [{ key: getIpLockKey(normalizedIp), token: crypto.randomUUID() }] : []),
@@ -240,11 +333,7 @@ export async function acquireFaucetClaimLock(
 }
 
 export async function releaseFaucetClaimLock(lock: FaucetClaimLock) {
-  const redis = await getRedis();
-
-  if (!redis) {
-    throw new Error("Redis is required for the faucet backend");
-  }
+  const redis = await getRequiredFaucetRedis();
 
   for (const entry of lock.entries) {
     const currentToken = await redis.get(entry.key);
@@ -256,11 +345,7 @@ export async function releaseFaucetClaimLock(lock: FaucetClaimLock) {
 }
 
 export async function markFaucetClaimed(record: FaucetClaimRecord) {
-  const redis = await getRedis();
-
-  if (!redis) {
-    throw new Error("Redis is required for the faucet backend");
-  }
+  const redis = await getRequiredFaucetRedis();
 
   const ttl = getFaucetCooldownSeconds();
   const payload = JSON.stringify(record);
@@ -275,4 +360,50 @@ export async function markFaucetClaimed(record: FaucetClaimRecord) {
 
 export function formatFaucetAmount(value: bigint) {
   return `${formatEther(value)} ${knowledgeChain.nativeCurrency.symbol}`;
+}
+
+function getRateLimitKey(kind: "nonce" | "claim", scope: "address" | "ip", value: string) {
+  return `faucet_rate:${kind}:${scope}:${value}`;
+}
+
+async function incrementRateLimitCounter(
+  kind: "nonce" | "claim",
+  scope: "address" | "ip",
+  value: string
+) {
+  const redis = await getRequiredFaucetRedis();
+  const key = getRateLimitKey(kind, scope, value);
+  const windowSeconds = getRateLimitWindowSeconds(kind);
+  const limit = getRateLimitMax(kind);
+  const total = await redis.incr(key);
+
+  if (total === 1) {
+    await redis.expire(key, windowSeconds);
+  }
+
+  if (total <= limit) {
+    return;
+  }
+
+  const ttl = await getPositiveTtl(redis, key);
+  throw new FaucetRateLimitError(
+    `请求过于频繁，请在 ${ttl} 秒后重试。`
+  );
+}
+
+export async function enforceFaucetRateLimit(
+  kind: "nonce" | "claim",
+  address: `0x${string}`,
+  ip: string | null
+) {
+  await incrementRateLimitCounter(kind, "address", address.toLowerCase());
+
+  const normalizedIp = normalizeIp(ip);
+  if (normalizedIp) {
+    await incrementRateLimitCounter(kind, "ip", normalizedIp);
+  }
+}
+
+export function isFaucetError(error: unknown): error is FaucetError {
+  return error instanceof FaucetError;
 }

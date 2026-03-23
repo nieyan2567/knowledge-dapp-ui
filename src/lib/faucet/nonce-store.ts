@@ -57,13 +57,16 @@ export async function createFaucetAuthChallenge(
   if (redis) {
     await redis.set(
       getNonceKey(challenge.nonce),
-      JSON.stringify({
-        nonce: challenge.nonce,
-        issuedAt: challenge.issuedAt,
-        domain: challenge.domain,
-        origin: challenge.origin,
-        chainId: challenge.chainId,
-      }),
+        JSON.stringify({
+          nonce: challenge.nonce,
+          issuedAt: challenge.issuedAt,
+          domain: challenge.domain,
+          origin: challenge.origin,
+          chainId: challenge.chainId,
+          address: challenge.address,
+          ipHash: challenge.ipHash,
+          userAgentHash: challenge.userAgentHash,
+        }),
       {
         EX: nonceTtlSeconds,
       }
@@ -78,6 +81,9 @@ export async function createFaucetAuthChallenge(
     domain: challenge.domain,
     origin: challenge.origin,
     chainId: challenge.chainId,
+    address: challenge.address,
+    ipHash: challenge.ipHash,
+    userAgentHash: challenge.userAgentHash,
   };
 }
 
@@ -117,5 +123,8 @@ export async function takeFaucetAuthChallenge(
     domain: challenge.domain,
     origin: challenge.origin,
     chainId: challenge.chainId,
+    address: challenge.address,
+    ipHash: challenge.ipHash,
+    userAgentHash: challenge.userAgentHash,
   };
 }

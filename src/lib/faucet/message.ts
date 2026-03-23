@@ -6,6 +6,9 @@ export type FaucetAuthChallenge = {
   domain: string;
   origin: string;
   chainId: number;
+  address: `0x${string}`;
+  ipHash: string;
+  userAgentHash: string;
 };
 
 export function buildFaucetClaimMessage(

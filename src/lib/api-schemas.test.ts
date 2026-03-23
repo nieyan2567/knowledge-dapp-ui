@@ -32,12 +32,22 @@ describe("api-schemas", () => {
     }
   });
 
-  it("accepts an optional address for faucet nonce query", () => {
+  it("requires an address for faucet nonce query", () => {
     const result = faucetNonceQuerySchema.safeParse({});
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a valid address for faucet nonce query", () => {
+    const result = faucetNonceQuerySchema.safeParse({
+      address: "  0x1111111111111111111111111111111111111111  ",
+    });
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data).toEqual({});
+      expect(result.data).toEqual({
+        address: "0x1111111111111111111111111111111111111111",
+      });
     }
   });
 
