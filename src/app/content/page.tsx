@@ -18,6 +18,11 @@ import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useUploadAuth } from "@/hooks/useUploadAuth";
 import { txToast, writeTxToast } from "@/lib/tx-toast";
+import {
+  formatUploadFileSize,
+  getUploadMaxFileSizeBytes,
+  validateUploadFile,
+} from "@/lib/upload-policy";
 import type { ContentCardData } from "@/types/content";
 import { asContentData } from "@/lib/web3-types";
 
@@ -47,6 +52,10 @@ export default function ContentPage() {
   const [search, setSearch] = useState("");
   const [contentList, setContentList] = useState<ContentCardData[]>([]);
   const [loadingList, setLoadingList] = useState(false);
+  const uploadMaxFileSizeText = useMemo(
+    () => formatUploadFileSize(getUploadMaxFileSizeBytes()),
+    []
+  );
 
   const { data: contentCount, refetch: refetchContentCount } = useReadContract({
     address: CONTRACTS.KnowledgeContent as `0x${string}`,
@@ -155,6 +164,12 @@ export default function ContentPage() {
       return;
     }
 
+    const uploadValidation = validateUploadFile(file);
+    if (!uploadValidation.ok) {
+      toast.error(uploadValidation.error);
+      return;
+    }
+
     const isAuthorized = await ensureUploadAuth();
 
     if (!isAuthorized) {
@@ -202,6 +217,17 @@ export default function ContentPage() {
     } finally {
       setUploading(false);
     }
+  }
+
+  function handleFileChange(selectedFile: File) {
+    const uploadValidation = validateUploadFile(selectedFile);
+
+    if (!uploadValidation.ok) {
+      toast.error(uploadValidation.error);
+      return;
+    }
+
+    setFile(selectedFile);
   }
 
   async function handleRegisterContent() {
@@ -321,7 +347,12 @@ export default function ContentPage() {
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
                 />
 
-                <FileDrop file={file} onChange={setFile} />
+                <FileDrop file={file} onChange={handleFileChange} />
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
+                  单文件大小上限：{uploadMaxFileSizeText}。当前默认拒绝高风险格式，例如 HTML、JS、SVG、
+                  EXE、BAT、PS1、SH 等文件。
+                </div>
 
                 <button
                   onClick={handleUploadToIpfs}

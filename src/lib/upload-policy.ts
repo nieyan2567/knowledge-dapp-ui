@@ -1,0 +1,136 @@
+export const DEFAULT_UPLOAD_MAX_FILE_SIZE_BYTES = 512 * 1024 * 1024;
+export const MAX_UPLOAD_FILENAME_LENGTH = 180;
+
+export const HIGH_RISK_UPLOAD_EXTENSIONS = new Set([
+  ".bat",
+  ".cmd",
+  ".com",
+  ".cjs",
+  ".dll",
+  ".exe",
+  ".htm",
+  ".html",
+  ".jar",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".msi",
+  ".php",
+  ".ps1",
+  ".scr",
+  ".sh",
+  ".svg",
+  ".svgz",
+  ".ts",
+  ".tsx",
+  ".vbs",
+]);
+
+export const HIGH_RISK_UPLOAD_MIME_TYPES = new Set([
+  "application/javascript",
+  "application/x-bat",
+  "application/x-httpd-php",
+  "application/x-javascript",
+  "application/x-msdos-program",
+  "application/x-msdownload",
+  "application/x-sh",
+  "image/svg+xml",
+  "text/html",
+  "text/javascript",
+  "text/php",
+  "text/x-shellscript",
+]);
+
+type UploadValidationResult =
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      error: string;
+      status: number;
+    };
+
+export function getUploadMaxFileSizeBytes() {
+  const value = Number(process.env.UPLOAD_MAX_FILE_SIZE_BYTES || DEFAULT_UPLOAD_MAX_FILE_SIZE_BYTES);
+
+  if (!Number.isFinite(value) || value <= 0) {
+    return DEFAULT_UPLOAD_MAX_FILE_SIZE_BYTES;
+  }
+
+  return Math.floor(value);
+}
+
+export function formatUploadFileSize(bytes: number) {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+  }
+
+  if (bytes >= 1024) {
+    return `${(bytes / 1024).toFixed(0)} KB`;
+  }
+
+  return `${bytes} B`;
+}
+
+function getFileExtension(fileName: string) {
+  const normalized = fileName.trim().toLowerCase();
+  const dotIndex = normalized.lastIndexOf(".");
+
+  if (dotIndex <= 0 || dotIndex === normalized.length - 1) {
+    return "";
+  }
+
+  return normalized.slice(dotIndex);
+}
+
+export function validateUploadFile(
+  file: Pick<File, "name" | "size" | "type">,
+  maxFileSizeBytes = getUploadMaxFileSizeBytes()
+): UploadValidationResult {
+  const fileName = file.name.trim();
+
+  if (!fileName || file.size <= 0) {
+    return {
+      ok: false,
+      error: "未检测到有效上传文件",
+      status: 400,
+    };
+  }
+
+  if (fileName.length > MAX_UPLOAD_FILENAME_LENGTH) {
+    return {
+      ok: false,
+      error: "文件名过长，请缩短后再上传",
+      status: 400,
+    };
+  }
+
+  if (file.size > maxFileSizeBytes) {
+    return {
+      ok: false,
+      error: `文件过大，当前上限为 ${formatUploadFileSize(maxFileSizeBytes)}`,
+      status: 413,
+    };
+  }
+
+  const extension = getFileExtension(fileName);
+  if (extension && HIGH_RISK_UPLOAD_EXTENSIONS.has(extension)) {
+    return {
+      ok: false,
+      error: "该文件格式存在安全风险，禁止上传",
+      status: 400,
+    };
+  }
+
+  const mimeType = file.type.trim().toLowerCase();
+  if (mimeType && HIGH_RISK_UPLOAD_MIME_TYPES.has(mimeType)) {
+    return {
+      ok: false,
+      error: "该文件类型存在安全风险，禁止上传",
+      status: 400,
+    };
+  }
+
+  return { ok: true };
+}

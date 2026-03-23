@@ -72,7 +72,7 @@ export function FileDrop({
             点击或拖拽文件到这里上传
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-400">
-            支持 PDF / TXT / MD 等文件格式
+            支持常见文档与图片，自动拒绝高风险格式
           </div>
         </div>
       )}

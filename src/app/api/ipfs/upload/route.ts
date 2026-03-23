@@ -9,6 +9,7 @@ import {
   clearUploadSessionCookie,
   readUploadSession,
 } from "@/lib/auth/session";
+import { validateUploadFile } from "@/lib/upload-policy";
 
 export const runtime = "nodejs";
 
@@ -44,6 +45,12 @@ export async function POST(req: NextRequest) {
     }
 
     const file = fileResult.value;
+    const uploadValidation = validateUploadFile(file);
+
+    if (!uploadValidation.ok) {
+      return errorResponse(uploadValidation.error, uploadValidation.status);
+    }
+
     const kuboFormData = new FormData();
     kuboFormData.append("file", file, file.name);
 
