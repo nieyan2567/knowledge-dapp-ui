@@ -1,4 +1,4 @@
-﻿import "server-only";
+import "server-only";
 
 import { createPublicClient, createWalletClient, formatEther, http, parseEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
