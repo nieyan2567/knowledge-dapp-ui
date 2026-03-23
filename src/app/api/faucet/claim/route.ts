@@ -1,6 +1,7 @@
-﻿import { getAddress, verifyMessage } from "viem";
+import { getAddress, verifyMessage } from "viem";
 import { NextRequest, NextResponse } from "next/server";
 
+import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { parseJsonBody } from "@/lib/api-validation";
 import { signedRequestBodySchema } from "@/lib/api-schemas";
 import { getRequestSite } from "@/lib/auth/request";
@@ -27,6 +28,11 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  const rateLimit = await enforceApiRateLimits(req.headers, ["faucet:claim"]);
+  if (!rateLimit.ok) {
+    return NextResponse.json({ error: rateLimit.error }, { status: rateLimit.status });
+  }
+
   const bodyResult = await parseJsonBody(req, signedRequestBodySchema);
   if (!bodyResult.ok) {
     return bodyResult.response;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import {
   clearUploadSessionCookie,
   readUploadSession,
@@ -9,6 +10,11 @@ import {
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
+  const rateLimit = await enforceApiRateLimits(req.headers, ["auth:session"]);
+  if (!rateLimit.ok) {
+    return NextResponse.json({ error: rateLimit.error }, { status: rateLimit.status });
+  }
+
   const session = await readUploadSession(req);
 
   if (!session) {
@@ -42,6 +48,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const rateLimit = await enforceApiRateLimits(req.headers, ["auth:logout"]);
+  if (!rateLimit.ok) {
+    return NextResponse.json({ error: rateLimit.error }, { status: rateLimit.status });
+  }
+
   await revokeUploadSessionFromRequest(req);
 
   const response = NextResponse.json({ authenticated: false });

@@ -1,8 +1,8 @@
 "use client";
 
-import { UploadCloud, FileText } from "lucide-react";
 import { useRef, useState } from "react";
 import clsx from "clsx";
+import { FileText, UploadCloud } from "lucide-react";
 
 export function FileDrop({
   file,

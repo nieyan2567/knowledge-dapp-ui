@@ -1,6 +1,7 @@
-﻿import { getAddress } from "viem";
+import { getAddress } from "viem";
 import { NextRequest, NextResponse } from "next/server";
 
+import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { parseValue } from "@/lib/api-validation";
 import { faucetNonceQuerySchema } from "@/lib/api-schemas";
 import { getRequestSite } from "@/lib/auth/request";
@@ -18,6 +19,19 @@ import { createFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
+  const rateLimit = await enforceApiRateLimits(req.headers, ["faucet:nonce"]);
+  if (!rateLimit.ok) {
+    return NextResponse.json(
+      { error: rateLimit.error },
+      {
+        status: rateLimit.status,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
+  }
+
   try {
     const queryResult = parseValue(
       {

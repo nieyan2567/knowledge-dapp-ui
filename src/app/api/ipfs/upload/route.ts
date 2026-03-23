@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+ï»¿import { NextRequest, NextResponse } from "next/server";
 
+import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { errorResponse, parseValue } from "@/lib/api-validation";
 import {
   kuboAddResponseSchema,
@@ -14,10 +15,18 @@ import { validateUploadFileServer } from "@/lib/upload-policy";
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  const rateLimit = await enforceApiRateLimits(req.headers, ["ipfs:upload"]);
+  if (!rateLimit.ok) {
+    return NextResponse.json(
+      { error: rateLimit.error },
+      { status: rateLimit.status }
+    );
+  }
+
   const session = await readUploadSession(req);
 
   if (!session) {
-    const response = errorResponse("Î´ÊÚÈ¨µÄÉÏ´«ÇëÇó", 401);
+    const response = errorResponse("æœªæˆæƒçš„ä¸Šä¼ è¯·æ±‚", 401);
     clearUploadSessionCookie(response);
     return response;
   }
@@ -26,7 +35,7 @@ export async function POST(req: NextRequest) {
     const provider = process.env.UPLOAD_PROVIDER || "local";
 
     if (provider !== "local") {
-      return errorResponse("µ±Ç°½öÖ§³Ö±¾µØÉÏ´«·şÎñ", 400);
+      return errorResponse("å½“å‰ä»…æ”¯æŒæœ¬åœ°ä¸Šä¼ æœåŠ¡", 400);
     }
 
     const apiUrl = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
@@ -37,7 +46,7 @@ export async function POST(req: NextRequest) {
     const fileResult = parseValue(
       incomingFormData.get("file"),
       uploadFileSchema,
-      "Î´¼ì²âµ½ÉÏ´«ÎÄ¼ş"
+      "æœªæ£€æµ‹åˆ°ä¸Šä¼ æ–‡ä»¶"
     );
 
     if (!fileResult.ok) {
@@ -63,7 +72,7 @@ export async function POST(req: NextRequest) {
       const text = await uploadRes.text();
       console.error("Kubo upload failed:", text);
       return NextResponse.json(
-        { error: "IPFS ÉÏ´«Ê§°Ü", detail: text },
+        { error: "IPFS ä¸Šä¼ å¤±è´¥", detail: text },
         { status: 500 }
       );
     }
@@ -75,7 +84,7 @@ export async function POST(req: NextRequest) {
       parsed = JSON.parse(raw);
     } catch {
       return NextResponse.json(
-        { error: "IPFS ·µ»Ø½á¹û½âÎöÊ§°Ü", detail: raw },
+        { error: "IPFS è¿”å›ç»“æœè§£æå¤±è´¥", detail: raw },
         { status: 500 }
       );
     }
@@ -83,12 +92,12 @@ export async function POST(req: NextRequest) {
     const kuboResult = parseValue(
       parsed,
       kuboAddResponseSchema,
-      "IPFS Î´·µ»ØÓĞĞ§ CID"
+      "IPFS æœªè¿”å›æœ‰æ•ˆ CID"
     );
 
     if (!kuboResult.ok) {
       return NextResponse.json(
-        { error: "IPFS Î´·µ»ØÓĞĞ§ CID", detail: raw },
+        { error: "IPFS æœªè¿”å›æœ‰æ•ˆ CID", detail: raw },
         { status: 500 }
       );
     }
@@ -106,9 +115,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Local IPFS upload failed:", error);
-    return NextResponse.json(
-      { error: "±¾µØ IPFS ÉÏ´«Ê§°Ü" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "æœ¬åœ° IPFS ä¸Šä¼ å¤±è´¥" }, { status: 500 });
   }
 }

@@ -70,8 +70,7 @@ export function useUploadAuth() {
       const nonceData = (await nonceRes.json()) as
         | UploadAuthChallenge
         | UploadNonceErrorResponse;
-      const nonceError =
-        "nonce" in nonceData ? undefined : nonceData.error;
+      const nonceError = "nonce" in nonceData ? undefined : nonceData.error;
 
       if (!nonceRes.ok || !("nonce" in nonceData)) {
         throw new Error(nonceError || "获取签名挑战失败");
