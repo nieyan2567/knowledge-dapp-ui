@@ -1,10 +1,8 @@
 ﻿import { getAddress, verifyMessage } from "viem";
 import { NextRequest, NextResponse } from "next/server";
 
-import {
-  parseJsonObject,
-  parseRequiredString,
-} from "@/lib/api-validation";
+import { parseJsonBody } from "@/lib/api-validation";
+import { signedRequestBodySchema } from "@/lib/api-schemas";
 import { getRequestSite } from "@/lib/auth/request";
 import { knowledgeChain } from "@/lib/chains";
 import { buildFaucetClaimMessage } from "@/lib/faucet/message";
@@ -25,42 +23,22 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
-  const bodyResult = await parseJsonObject(req);
+  const bodyResult = await parseJsonBody(req, signedRequestBodySchema);
   if (!bodyResult.ok) {
     return bodyResult.response;
   }
 
-  const addressResult = parseRequiredString(bodyResult.value.address, "缺少钱包地址", {
-    maxLength: 128,
-  });
-  if (!addressResult.ok) {
-    return addressResult.response;
-  }
-
-  const nonceResult = parseRequiredString(bodyResult.value.nonce, "缺少 nonce", {
-    maxLength: 256,
-  });
-  if (!nonceResult.ok) {
-    return nonceResult.response;
-  }
-
-  const signatureResult = parseRequiredString(bodyResult.value.signature, "签名格式无效", {
-    maxLength: 256,
-    pattern: /^0x[0-9a-fA-F]+$/,
-  });
-  if (!signatureResult.ok) {
-    return signatureResult.response;
-  }
+  const body = bodyResult.value;
 
   let address: `0x${string}`;
 
   try {
-    address = getAddress(addressResult.value);
+    address = getAddress(body.address);
   } catch {
     return NextResponse.json({ error: "钱包地址格式无效" }, { status: 400 });
   }
 
-  const challenge = await takeFaucetAuthChallenge(nonceResult.value);
+  const challenge = await takeFaucetAuthChallenge(body.nonce);
 
   if (!challenge) {
     return NextResponse.json({ error: "签名挑战已过期或已被使用" }, { status: 401 });
@@ -79,7 +57,7 @@ export async function POST(req: NextRequest) {
   const isValidSignature = await verifyMessage({
     address,
     message: buildFaucetClaimMessage(challenge, address),
-    signature: signatureResult.value as `0x${string}`,
+    signature: body.signature as `0x${string}`,
   });
 
   if (!isValidSignature) {
@@ -96,7 +74,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const lock = await acquireFaucetClaimLock(address);
+  const lock = await acquireFaucetClaimLock(address, ip);
 
   if (!lock) {
     const lockedCooldownSeconds = await getCooldownRemainingSeconds(address, ip);
@@ -106,7 +84,7 @@ export async function POST(req: NextRequest) {
         error:
           lockedCooldownSeconds > 0
             ? `Faucet 冷却中，请在 ${lockedCooldownSeconds} 秒后重试。`
-            : "该钱包已有 Faucet 请求正在处理中，请稍后再试。",
+            : "该钱包或当前网络已有 Faucet 请求正在处理中，请稍后再试。",
       },
       { status: 429 }
     );

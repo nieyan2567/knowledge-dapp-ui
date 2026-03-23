@@ -1,4 +1,4 @@
-import "server-only";
+﻿import "server-only";
 
 import { createPublicClient, createWalletClient, formatEther, http, parseEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -15,8 +15,10 @@ export type FaucetClaimRecord = {
 };
 
 export type FaucetClaimLock = {
-  key: string;
-  token: string;
+  entries: Array<{
+    key: string;
+    token: string;
+  }>;
 };
 
 export type FaucetClaimEligibilityResult =
@@ -55,6 +57,36 @@ function getFaucetPrivateKey() {
   return privateKey as `0x${string}`;
 }
 
+function normalizeIp(ip: string | null) {
+  const value = ip?.trim();
+  return value ? value.toLowerCase() : null;
+}
+
+function getAddressClaimKey(address: `0x${string}`) {
+  return `faucet_claim:address:${address.toLowerCase()}`;
+}
+
+function getIpClaimKey(ip: string) {
+  return `faucet_claim:ip:${ip}`;
+}
+
+function getAddressLockKey(address: `0x${string}`) {
+  return `faucet_lock:address:${address.toLowerCase()}`;
+}
+
+function getIpLockKey(ip: string) {
+  return `faucet_lock:ip:${ip}`;
+}
+
+async function getPositiveTtl(redis: Awaited<ReturnType<typeof getRedis>>, key: string) {
+  if (!redis) {
+    throw new Error("Redis is required for the faucet backend");
+  }
+
+  const ttl = await redis.ttl(key);
+  return Math.max(ttl, 0);
+}
+
 export function getFaucetAmount() {
   return parseEther(process.env.FAUCET_AMOUNT || "2");
 }
@@ -80,14 +112,6 @@ export function getRequestIp(headers: Headers) {
   }
 
   return headers.get("x-real-ip");
-}
-
-function getAddressClaimKey(address: `0x${string}`) {
-  return `faucet_claim:address:${address.toLowerCase()}`;
-}
-
-function getAddressLockKey(address: `0x${string}`) {
-  return `faucet_lock:address:${address.toLowerCase()}`;
 }
 
 export async function getFaucetClients() {
@@ -124,10 +148,15 @@ export async function getCooldownRemainingSeconds(
     throw new Error("Redis is required for the faucet backend");
   }
 
-  const addressTtl = await redis.ttl(getAddressClaimKey(address));
-  void ip;
+  const normalizedIp = normalizeIp(ip);
+  const ttlValues = await Promise.all([
+    getPositiveTtl(redis, getAddressClaimKey(address)),
+    getPositiveTtl(redis, getAddressLockKey(address)),
+    normalizedIp ? getPositiveTtl(redis, getIpClaimKey(normalizedIp)) : Promise.resolve(0),
+    normalizedIp ? getPositiveTtl(redis, getIpLockKey(normalizedIp)) : Promise.resolve(0),
+  ]);
 
-  return Math.max(addressTtl, 0);
+  return Math.max(...ttlValues, 0);
 }
 
 export async function checkFaucetClaimEligibility(
@@ -173,7 +202,8 @@ export async function checkFaucetClaimEligibility(
 }
 
 export async function acquireFaucetClaimLock(
-  address: `0x${string}`
+  address: `0x${string}`,
+  ip: string | null
 ): Promise<FaucetClaimLock | null> {
   const redis = await getRedis();
 
@@ -181,20 +211,32 @@ export async function acquireFaucetClaimLock(
     throw new Error("Redis is required for the faucet backend");
   }
 
-  const key = getAddressLockKey(address);
-  const token = crypto.randomUUID();
+  const normalizedIp = normalizeIp(ip);
   const lockSeconds = Math.max(getFaucetCooldownSeconds(), 60);
+  const entries = [
+    { key: getAddressLockKey(address), token: crypto.randomUUID() },
+    ...(normalizedIp ? [{ key: getIpLockKey(normalizedIp), token: crypto.randomUUID() }] : []),
+  ];
 
-  const result = await redis.set(key, token, {
-    NX: true,
-    EX: lockSeconds,
-  });
+  const acquired: FaucetClaimLock["entries"] = [];
 
-  if (result !== "OK") {
-    return null;
+  for (const entry of entries) {
+    const result = await redis.set(entry.key, entry.token, {
+      NX: true,
+      EX: lockSeconds,
+    });
+
+    if (result !== "OK") {
+      if (acquired.length > 0) {
+        await releaseFaucetClaimLock({ entries: acquired });
+      }
+      return null;
+    }
+
+    acquired.push(entry);
   }
 
-  return { key, token };
+  return { entries: acquired };
 }
 
 export async function releaseFaucetClaimLock(lock: FaucetClaimLock) {
@@ -204,10 +246,12 @@ export async function releaseFaucetClaimLock(lock: FaucetClaimLock) {
     throw new Error("Redis is required for the faucet backend");
   }
 
-  const currentToken = await redis.get(lock.key);
+  for (const entry of lock.entries) {
+    const currentToken = await redis.get(entry.key);
 
-  if (currentToken === lock.token) {
-    await redis.del(lock.key);
+    if (currentToken === entry.token) {
+      await redis.del(entry.key);
+    }
   }
 }
 
@@ -220,8 +264,13 @@ export async function markFaucetClaimed(record: FaucetClaimRecord) {
 
   const ttl = getFaucetCooldownSeconds();
   const payload = JSON.stringify(record);
+  const normalizedIp = normalizeIp(record.ip);
 
   await redis.set(getAddressClaimKey(record.address), payload, { EX: ttl });
+
+  if (normalizedIp) {
+    await redis.set(getIpClaimKey(normalizedIp), payload, { EX: ttl });
+  }
 }
 
 export function formatFaucetAmount(value: bigint) {

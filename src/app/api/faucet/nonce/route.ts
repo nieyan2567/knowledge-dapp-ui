@@ -1,6 +1,8 @@
 ﻿import { getAddress } from "viem";
 import { NextRequest, NextResponse } from "next/server";
 
+import { parseValue } from "@/lib/api-validation";
+import { faucetNonceQuerySchema } from "@/lib/api-schemas";
 import { getRequestSite } from "@/lib/auth/request";
 import { knowledgeChain } from "@/lib/chains";
 import {
@@ -12,7 +14,19 @@ import { createFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  const rawAddress = req.nextUrl.searchParams.get("address");
+  const queryResult = parseValue(
+    {
+      address: req.nextUrl.searchParams.get("address") ?? undefined,
+    },
+    faucetNonceQuerySchema,
+    "请求参数格式无效"
+  );
+
+  if (!queryResult.ok) {
+    return queryResult.response;
+  }
+
+  const rawAddress = queryResult.value.address;
 
   if (rawAddress) {
     let address: `0x${string}`;

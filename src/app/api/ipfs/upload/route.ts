@@ -1,14 +1,14 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 
-import { errorResponse, parseFile } from "@/lib/api-validation";
+import { errorResponse, parseValue } from "@/lib/api-validation";
+import {
+  kuboAddResponseSchema,
+  uploadFileSchema,
+} from "@/lib/api-schemas";
 import {
   clearUploadSessionCookie,
   readUploadSession,
 } from "@/lib/auth/session";
-
-type KuboAddResponse = {
-  Hash: string;
-};
 
 export const runtime = "nodejs";
 
@@ -33,7 +33,11 @@ export async function POST(req: NextRequest) {
       process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080/ipfs";
 
     const incomingFormData = await req.formData();
-    const fileResult = parseFile(incomingFormData.get("file"));
+    const fileResult = parseValue(
+      incomingFormData.get("file"),
+      uploadFileSchema,
+      "未检测到上传文件"
+    );
 
     if (!fileResult.ok) {
       return fileResult.response;
@@ -58,10 +62,10 @@ export async function POST(req: NextRequest) {
     }
 
     const raw = await uploadRes.text();
-    let data: KuboAddResponse;
+    let parsed: unknown;
 
     try {
-      data = JSON.parse(raw) as KuboAddResponse;
+      parsed = JSON.parse(raw);
     } catch {
       return NextResponse.json(
         { error: "IPFS 返回结果解析失败", detail: raw },
@@ -69,14 +73,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const cid = data.Hash;
+    const kuboResult = parseValue(parsed, kuboAddResponseSchema, "IPFS 未返回有效 CID");
 
-    if (typeof cid !== "string" || !cid.trim()) {
+    if (!kuboResult.ok) {
       return NextResponse.json(
         { error: "IPFS 未返回有效 CID", detail: raw },
         { status: 500 }
       );
     }
+
+    const { Hash: cid } = kuboResult.value;
 
     return NextResponse.json({
       provider: "local",
