@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "redis";
+import { getServerEnv } from "@/lib/env";
 
 type KnowledgeRedisClient = ReturnType<typeof createClient>;
 
@@ -12,7 +13,7 @@ declare global {
 }
 
 function createRedisClient(): KnowledgeRedisClient | null {
-  const url = process.env.REDIS_URL;
+  const { REDIS_URL: url } = getServerEnv();
 
   if (!url) {
     return null;
@@ -27,7 +28,7 @@ function createRedisClient(): KnowledgeRedisClient | null {
 }
 
 export async function getRedis(): Promise<KnowledgeRedisClient | null> {
-  if (!process.env.REDIS_URL) {
+  if (!getServerEnv().REDIS_URL) {
     return null;
   }
 

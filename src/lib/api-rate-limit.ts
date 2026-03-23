@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getServerEnv } from "@/lib/env";
 import { getRedis } from "@/lib/redis";
 
 export type ApiRateLimitPolicyName =
@@ -36,11 +37,13 @@ if (!globalThis.__knowledgeApiRateLimitStore) {
 }
 
 function getDefaultPolicy(name: ApiRateLimitPolicyName): ApiRateLimitPolicy {
+  const env = getServerEnv();
+
   switch (name) {
     case "global":
       return {
-        max: Number(process.env.API_RATE_LIMIT_MAX || "120"),
-        windowSeconds: Number(process.env.API_RATE_LIMIT_WINDOW_SECONDS || "60"),
+        max: env.API_RATE_LIMIT_MAX,
+        windowSeconds: env.API_RATE_LIMIT_WINDOW_SECONDS,
       };
     case "auth:nonce":
       return { max: 20, windowSeconds: 60 };

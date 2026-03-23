@@ -1,7 +1,7 @@
-const defaultGatewayBase = "http://127.0.0.1:8080/ipfs";
+import { getPublicEnv } from "./env";
 
 export function getIpfsGatewayBase() {
-  return process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || defaultGatewayBase;
+  return getPublicEnv().NEXT_PUBLIC_IPFS_GATEWAY_URL;
 }
 
 export function getIpfsFileUrl(cid: string) {

@@ -2,6 +2,7 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 
+import { getServerEnv } from "@/lib/env";
 import { getRedis } from "@/lib/redis";
 import type { FaucetAuthChallenge } from "@/lib/faucet/message";
 
@@ -23,9 +24,9 @@ if (!globalThis.__knowledgeFaucetNonceStore) {
   globalThis.__knowledgeFaucetNonceStore = nonceStore;
 }
 
-const nonceTtlSeconds = Number(
-  process.env.FAUCET_NONCE_TTL_SECONDS || "300"
-);
+function getFaucetNonceTtlSeconds() {
+  return getServerEnv().FAUCET_NONCE_TTL_SECONDS;
+}
 
 function getNonceKey(nonce: string) {
   return `faucet_nonce:${nonce}`;
@@ -44,6 +45,7 @@ export async function createFaucetAuthChallenge(
 ): Promise<FaucetAuthChallenge> {
   const now = Date.now();
   cleanupExpiredNonces(now);
+  const nonceTtlSeconds = getFaucetNonceTtlSeconds();
 
   const challenge: StoredFaucetChallenge = {
     ...input,

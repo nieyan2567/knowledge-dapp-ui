@@ -1,3 +1,4 @@
+import { getServerEnv } from "./env";
 import { scanTextContent } from "./upload-content-scan";
 import { areMimeTypesCompatible, inspectUploadFile } from "./upload-sniff";
 
@@ -67,7 +68,9 @@ function getFileExtension(fileName: string) {
 }
 
 export function getUploadMaxFileSizeBytes() {
-  const value = Number(process.env.UPLOAD_MAX_FILE_SIZE_BYTES || DEFAULT_UPLOAD_MAX_FILE_SIZE_BYTES);
+  const value =
+    getServerEnv().UPLOAD_MAX_FILE_SIZE_BYTES ||
+    DEFAULT_UPLOAD_MAX_FILE_SIZE_BYTES;
 
   if (!Number.isFinite(value) || value <= 0) {
     return DEFAULT_UPLOAD_MAX_FILE_SIZE_BYTES;

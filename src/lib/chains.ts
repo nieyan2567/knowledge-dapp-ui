@@ -1,9 +1,11 @@
 import { defineChain } from "viem";
 import { BRANDING } from "./branding";
+import { getPublicEnv } from "./env";
 
-const chainId = Number(process.env.NEXT_PUBLIC_BESU_CHAIN_ID || "20260");
-const rpcUrl = process.env.NEXT_PUBLIC_BESU_RPC_URL || "http://127.0.0.1:8545";
-const explorerUrl = process.env.NEXT_PUBLIC_CHAINLENS_URL || "http://127.0.0.1:8181";
+const env = getPublicEnv();
+const chainId = env.NEXT_PUBLIC_BESU_CHAIN_ID;
+const rpcUrl = env.NEXT_PUBLIC_BESU_RPC_URL;
+const explorerUrl = env.NEXT_PUBLIC_CHAINLENS_URL;
 
 export const knowledgeChain = defineChain({
   id: chainId,

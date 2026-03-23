@@ -10,6 +10,7 @@ import {
   clearUploadSessionCookie,
   readUploadSession,
 } from "@/lib/auth/session";
+import { getServerEnv } from "@/lib/env";
 import { validateUploadFileServer } from "@/lib/upload-policy";
 
 export const runtime = "nodejs";
@@ -32,15 +33,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const provider = process.env.UPLOAD_PROVIDER || "local";
+    const env = getServerEnv();
+    const provider = env.UPLOAD_PROVIDER;
 
     if (provider !== "local") {
       return errorResponse("当前仅支持本地上传服务", 400);
     }
 
-    const apiUrl = process.env.IPFS_API_URL || "http://127.0.0.1:5001";
-    const gatewayUrl =
-      process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080/ipfs";
+    const apiUrl = env.IPFS_API_URL;
+    const gatewayUrl = env.IPFS_GATEWAY_URL;
 
     const incomingFormData = await req.formData();
     const fileResult = parseValue(

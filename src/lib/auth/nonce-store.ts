@@ -3,6 +3,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 
 import type { UploadAuthChallenge } from "@/lib/auth/message";
+import { getServerEnv } from "@/lib/env";
 import { getRedis } from "@/lib/redis";
 
 type StoredUploadAuthChallenge = UploadAuthChallenge & {
@@ -24,9 +25,9 @@ if (!globalThis.__knowledgeUploadNonceStore) {
   globalThis.__knowledgeUploadNonceStore = nonceStore;
 }
 
-const nonceTtlSeconds = Number(
-  process.env.UPLOAD_AUTH_NONCE_TTL_SECONDS || "300"
-);
+function getUploadAuthNonceTtlSeconds() {
+  return getServerEnv().UPLOAD_AUTH_NONCE_TTL_SECONDS;
+}
 
 function cleanupExpiredNonces(now: number) {
   for (const [nonce, challenge] of nonceStore.entries()) {
@@ -47,6 +48,7 @@ async function createUploadAuthChallengeInternal(
 ): Promise<UploadAuthChallenge> {
   const now = Date.now();
   cleanupExpiredNonces(now);
+  const nonceTtlSeconds = getUploadAuthNonceTtlSeconds();
 
   const challenge: StoredUploadAuthChallenge = {
     ...input,

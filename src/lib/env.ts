@@ -1,0 +1,174 @@
+import { z } from "zod";
+
+const emptyStringToUndefined = (value: unknown) => {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const positiveIntWithDefault = (defaultValue: number) =>
+  z.preprocess(
+    emptyStringToUndefined,
+    z.coerce.number().int().positive().optional()
+  ).transform((value) => value ?? defaultValue);
+
+const urlWithDefault = (defaultValue: string) =>
+  z.preprocess(
+    emptyStringToUndefined,
+    z.string().url().optional()
+  ).transform((value) => value ?? defaultValue);
+
+const positiveNumberStringWithDefault = (defaultValue: string) =>
+  z.preprocess(
+    emptyStringToUndefined,
+    z
+      .string()
+      .trim()
+      .refine((value) => Number(value) > 0, "Must be a positive number")
+      .optional()
+  ).transform((value) => value ?? defaultValue);
+
+const optionalUrl = z.preprocess(
+  emptyStringToUndefined,
+  z.string().url().optional()
+);
+
+const publicEnvSchema = z.object({
+  NEXT_PUBLIC_BESU_RPC_URL: urlWithDefault("http://127.0.0.1:8545"),
+  NEXT_PUBLIC_BESU_CHAIN_ID: positiveIntWithDefault(20260),
+  NEXT_PUBLIC_CHAINLENS_URL: urlWithDefault("http://127.0.0.1:8181"),
+  NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: z.string().trim().default(""),
+  NEXT_PUBLIC_IPFS_GATEWAY_URL: urlWithDefault("http://127.0.0.1:8080/ipfs"),
+});
+
+const serverEnvSchema = publicEnvSchema
+  .extend({
+    NODE_ENV: z
+      .enum(["development", "test", "production"])
+      .default("development"),
+    UPLOAD_PROVIDER: z.enum(["local"]).default("local"),
+    IPFS_API_URL: urlWithDefault("http://127.0.0.1:5001"),
+    IPFS_GATEWAY_URL: urlWithDefault("http://127.0.0.1:8080/ipfs"),
+    UPLOAD_AUTH_SECRET: z.preprocess(
+      emptyStringToUndefined,
+      z.string().min(1).optional()
+    ),
+    UPLOAD_AUTH_NONCE_TTL_SECONDS: positiveIntWithDefault(300),
+    UPLOAD_AUTH_SESSION_TTL_SECONDS: positiveIntWithDefault(2 * 60 * 60),
+    UPLOAD_MAX_FILE_SIZE_BYTES: positiveIntWithDefault(512 * 1024 * 1024),
+    REDIS_URL: optionalUrl,
+    API_RATE_LIMIT_WINDOW_SECONDS: positiveIntWithDefault(60),
+    API_RATE_LIMIT_MAX: positiveIntWithDefault(120),
+    FAUCET_PRIVATE_KEY: z.preprocess(
+      emptyStringToUndefined,
+      z
+        .string()
+        .regex(/^0x[0-9a-fA-F]+$/, "Must be a 0x-prefixed hex string")
+        .optional()
+    ),
+    FAUCET_AMOUNT: positiveNumberStringWithDefault("2"),
+    FAUCET_MIN_BALANCE: positiveNumberStringWithDefault("1"),
+    FAUCET_COOLDOWN_HOURS: positiveIntWithDefault(24),
+    FAUCET_LOCK_TTL_SECONDS: positiveIntWithDefault(60),
+    FAUCET_NONCE_TTL_SECONDS: positiveIntWithDefault(300),
+    FAUCET_NONCE_RATE_LIMIT_WINDOW_SECONDS: positiveIntWithDefault(60),
+    FAUCET_NONCE_RATE_LIMIT_MAX: positiveIntWithDefault(5),
+    FAUCET_CLAIM_RATE_LIMIT_WINDOW_SECONDS: positiveIntWithDefault(3600),
+    FAUCET_CLAIM_RATE_LIMIT_MAX: positiveIntWithDefault(10),
+  })
+  .superRefine((env, ctx) => {
+    if (env.NODE_ENV === "production" && !env.UPLOAD_AUTH_SECRET) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["UPLOAD_AUTH_SECRET"],
+        message: "Required when NODE_ENV=production",
+      });
+    }
+  });
+
+type PublicEnvSchema = z.infer<typeof publicEnvSchema>;
+type ServerEnvSchema = z.infer<typeof serverEnvSchema>;
+
+function formatEnvErrors(scope: string, error: z.ZodError) {
+  const details = error.issues
+    .map((issue) => {
+      const path = issue.path.join(".") || "<root>";
+      return `${path}: ${issue.message}`;
+    })
+    .join("; ");
+
+  return `Invalid ${scope} environment variables: ${details}`;
+}
+
+function parseEnv<TSchema extends z.ZodTypeAny>(
+  schema: TSchema,
+  rawEnv: Record<string, string | undefined>,
+  scope: string
+): z.infer<TSchema> {
+  const result = schema.safeParse(rawEnv);
+
+  if (!result.success) {
+    throw new Error(formatEnvErrors(scope, result.error));
+  }
+
+  return result.data;
+}
+
+function getPublicEnvSource() {
+  return {
+    NEXT_PUBLIC_BESU_RPC_URL: process.env.NEXT_PUBLIC_BESU_RPC_URL,
+    NEXT_PUBLIC_BESU_CHAIN_ID: process.env.NEXT_PUBLIC_BESU_CHAIN_ID,
+    NEXT_PUBLIC_CHAINLENS_URL: process.env.NEXT_PUBLIC_CHAINLENS_URL,
+    NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:
+      process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
+    NEXT_PUBLIC_IPFS_GATEWAY_URL: process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL,
+  };
+}
+
+function getServerEnvSource() {
+  return {
+    ...getPublicEnvSource(),
+    NODE_ENV: process.env.NODE_ENV,
+    UPLOAD_PROVIDER: process.env.UPLOAD_PROVIDER,
+    IPFS_API_URL: process.env.IPFS_API_URL,
+    IPFS_GATEWAY_URL: process.env.IPFS_GATEWAY_URL,
+    UPLOAD_AUTH_SECRET: process.env.UPLOAD_AUTH_SECRET,
+    UPLOAD_AUTH_NONCE_TTL_SECONDS: process.env.UPLOAD_AUTH_NONCE_TTL_SECONDS,
+    UPLOAD_AUTH_SESSION_TTL_SECONDS:
+      process.env.UPLOAD_AUTH_SESSION_TTL_SECONDS,
+    UPLOAD_MAX_FILE_SIZE_BYTES: process.env.UPLOAD_MAX_FILE_SIZE_BYTES,
+    REDIS_URL: process.env.REDIS_URL,
+    API_RATE_LIMIT_WINDOW_SECONDS: process.env.API_RATE_LIMIT_WINDOW_SECONDS,
+    API_RATE_LIMIT_MAX: process.env.API_RATE_LIMIT_MAX,
+    FAUCET_PRIVATE_KEY: process.env.FAUCET_PRIVATE_KEY,
+    FAUCET_AMOUNT: process.env.FAUCET_AMOUNT,
+    FAUCET_MIN_BALANCE: process.env.FAUCET_MIN_BALANCE,
+    FAUCET_COOLDOWN_HOURS: process.env.FAUCET_COOLDOWN_HOURS,
+    FAUCET_LOCK_TTL_SECONDS: process.env.FAUCET_LOCK_TTL_SECONDS,
+    FAUCET_NONCE_TTL_SECONDS: process.env.FAUCET_NONCE_TTL_SECONDS,
+    FAUCET_NONCE_RATE_LIMIT_WINDOW_SECONDS:
+      process.env.FAUCET_NONCE_RATE_LIMIT_WINDOW_SECONDS,
+    FAUCET_NONCE_RATE_LIMIT_MAX: process.env.FAUCET_NONCE_RATE_LIMIT_MAX,
+    FAUCET_CLAIM_RATE_LIMIT_WINDOW_SECONDS:
+      process.env.FAUCET_CLAIM_RATE_LIMIT_WINDOW_SECONDS,
+    FAUCET_CLAIM_RATE_LIMIT_MAX: process.env.FAUCET_CLAIM_RATE_LIMIT_MAX,
+  };
+}
+
+export function getPublicEnv(): PublicEnvSchema {
+  return parseEnv(publicEnvSchema, getPublicEnvSource(), "public");
+}
+
+export function getServerEnv(): ServerEnvSchema {
+  if (typeof window !== "undefined") {
+    throw new Error("Server environment variables are not available in the browser");
+  }
+
+  return parseEnv(serverEnvSchema, getServerEnvSource(), "server");
+}
+
+export type PublicEnv = PublicEnvSchema;
+export type ServerEnv = ServerEnvSchema;

@@ -5,6 +5,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { NextRequest, NextResponse } from "next/server";
 
 import { getRequestSite } from "@/lib/auth/request";
+import { getServerEnv } from "@/lib/env";
 
 import {
   createUploadSessionRecord,
@@ -28,21 +29,13 @@ export type UploadSession = {
 };
 
 function getUploadSessionSecret() {
-  if (process.env.UPLOAD_AUTH_SECRET) {
-    return process.env.UPLOAD_AUTH_SECRET;
-  }
-
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("UPLOAD_AUTH_SECRET must be configured in production");
-  }
-
-  return "knowledge-dapp-dev-upload-secret";
+  return getServerEnv().UPLOAD_AUTH_SECRET || "knowledge-dapp-dev-upload-secret";
 }
 
 export function getUploadSessionTtlSeconds() {
-  const ttl = Number(
-    process.env.UPLOAD_AUTH_SESSION_TTL_SECONDS || defaultUploadSessionTtlSeconds
-  );
+  const ttl =
+    getServerEnv().UPLOAD_AUTH_SESSION_TTL_SECONDS ||
+    defaultUploadSessionTtlSeconds;
 
   if (!Number.isFinite(ttl) || ttl <= 0) {
     throw new Error("UPLOAD_AUTH_SESSION_TTL_SECONDS must be a positive number");
@@ -123,7 +116,9 @@ export async function createUploadSession(input: {
   };
 }
 
-export async function readUploadSession(req: NextRequest): Promise<UploadSession | null> {
+export async function readUploadSession(
+  req: NextRequest
+): Promise<UploadSession | null> {
   const sessionId = readSignedSessionId(req);
 
   if (!sessionId) {
@@ -181,7 +176,7 @@ export function setUploadSessionCookie(res: NextResponse, token: string) {
     name: uploadSessionCookieName,
     value: token,
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: getServerEnv().NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: getUploadSessionTtlSeconds(),
@@ -193,7 +188,7 @@ export function clearUploadSessionCookie(res: NextResponse) {
     name: uploadSessionCookieName,
     value: "",
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: getServerEnv().NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: 0,

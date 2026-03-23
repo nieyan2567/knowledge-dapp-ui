@@ -6,6 +6,7 @@ import { createPublicClient, createWalletClient, formatEther, http, parseEther }
 import { privateKeyToAccount } from "viem/accounts";
 
 import { knowledgeChain } from "@/lib/chains";
+import { getServerEnv } from "@/lib/env";
 import { getRedis } from "@/lib/redis";
 
 export type FaucetClaimRecord = {
@@ -66,11 +67,11 @@ let faucetClients:
   | undefined;
 
 function getRpcUrl() {
-  return process.env.NEXT_PUBLIC_BESU_RPC_URL || "http://127.0.0.1:8545";
+  return getServerEnv().NEXT_PUBLIC_BESU_RPC_URL;
 }
 
 function getFaucetPrivateKey() {
-  const privateKey = process.env.FAUCET_PRIVATE_KEY;
+  const privateKey = getServerEnv().FAUCET_PRIVATE_KEY;
 
   if (!privateKey) {
     throw new Error("FAUCET_PRIVATE_KEY is not configured");
@@ -114,15 +115,15 @@ async function getPositiveTtl(redis: Awaited<ReturnType<typeof getRedis>>, key: 
 }
 
 export function getFaucetAmount() {
-  return parseEther(process.env.FAUCET_AMOUNT || "2");
+  return parseEther(getServerEnv().FAUCET_AMOUNT);
 }
 
 export function getFaucetMinBalance() {
-  return parseEther(process.env.FAUCET_MIN_BALANCE || "1");
+  return parseEther(getServerEnv().FAUCET_MIN_BALANCE);
 }
 
 export function getFaucetCooldownSeconds() {
-  const hours = Number(process.env.FAUCET_COOLDOWN_HOURS || "24");
+  const hours = getServerEnv().FAUCET_COOLDOWN_HOURS;
 
   if (!Number.isFinite(hours) || hours <= 0) {
     throw new Error("FAUCET_COOLDOWN_HOURS must be a positive number");
@@ -132,7 +133,7 @@ export function getFaucetCooldownSeconds() {
 }
 
 export function getFaucetLockTtlSeconds() {
-  const seconds = Number(process.env.FAUCET_LOCK_TTL_SECONDS || "60");
+  const seconds = getServerEnv().FAUCET_LOCK_TTL_SECONDS;
 
   if (!Number.isFinite(seconds) || seconds <= 0) {
     throw new Error("FAUCET_LOCK_TTL_SECONDS must be a positive number");
@@ -142,14 +143,11 @@ export function getFaucetLockTtlSeconds() {
 }
 
 function getRateLimitWindowSeconds(kind: "nonce" | "claim") {
-  const fallback = kind === "nonce" ? "60" : "3600";
-  const value = Number(
-    process.env[
-      kind === "nonce"
-        ? "FAUCET_NONCE_RATE_LIMIT_WINDOW_SECONDS"
-        : "FAUCET_CLAIM_RATE_LIMIT_WINDOW_SECONDS"
-    ] || fallback
-  );
+  const env = getServerEnv();
+  const value =
+    kind === "nonce"
+      ? env.FAUCET_NONCE_RATE_LIMIT_WINDOW_SECONDS
+      : env.FAUCET_CLAIM_RATE_LIMIT_WINDOW_SECONDS;
 
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`FAUCET_${kind.toUpperCase()}_RATE_LIMIT_WINDOW_SECONDS must be a positive number`);
@@ -159,14 +157,11 @@ function getRateLimitWindowSeconds(kind: "nonce" | "claim") {
 }
 
 function getRateLimitMax(kind: "nonce" | "claim") {
-  const fallback = kind === "nonce" ? "5" : "10";
-  const value = Number(
-    process.env[
-      kind === "nonce"
-        ? "FAUCET_NONCE_RATE_LIMIT_MAX"
-        : "FAUCET_CLAIM_RATE_LIMIT_MAX"
-    ] || fallback
-  );
+  const env = getServerEnv();
+  const value =
+    kind === "nonce"
+      ? env.FAUCET_NONCE_RATE_LIMIT_MAX
+      : env.FAUCET_CLAIM_RATE_LIMIT_MAX;
 
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`FAUCET_${kind.toUpperCase()}_RATE_LIMIT_MAX must be a positive number`);
