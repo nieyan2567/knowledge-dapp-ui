@@ -9,7 +9,7 @@ import {
   clearUploadSessionCookie,
   readUploadSession,
 } from "@/lib/auth/session";
-import { validateUploadFile } from "@/lib/upload-policy";
+import { validateUploadFileServer } from "@/lib/upload-policy";
 
 export const runtime = "nodejs";
 
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     }
 
     const file = fileResult.value;
-    const uploadValidation = validateUploadFile(file);
+    const uploadValidation = await validateUploadFileServer(file);
 
     if (!uploadValidation.ok) {
       return errorResponse(uploadValidation.error, uploadValidation.status);

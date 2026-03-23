@@ -351,7 +351,7 @@ export default function ContentPage() {
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
                   单文件大小上限：{uploadMaxFileSizeText}。当前默认拒绝高风险格式，例如 HTML、JS、SVG、
-                  EXE、BAT、PS1、SH 等文件。
+                  EXE、BAT、PS1、SH 等文件。服务端会重新识别文件真实类型，并对文本内容做风险扫描。
                 </div>
 
                 <button
