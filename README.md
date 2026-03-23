@@ -1,61 +1,54 @@
 # Knowledge DApp UI
 
-基于 Next.js 16、React 19、Wagmi 与 RainbowKit 构建的知识协作 DApp 前端。项目围绕本地 KnowChain 网络运行，提供内容上链、质押投票、DAO 治理、Treasury 奖励领取，以及链上系统概览等功能。
+基于 Next.js 16、React 19、Wagmi 和 RainbowKit 的知识内容协作 DApp 前端。项目面向本地 KnowChain 网络，提供内容上链、质押投票、治理提案、奖励领取、Faucet 和系统概览等功能。
 
-## 项目简介
+## 项目概览
 
-这个项目是一个面向本地联盟链场景的知识内容治理前端，核心流程包括：
+当前前端覆盖的主要流程：
 
-- 用户连接钱包并切换到 KnowChain
-- 上传文件到本地 IPFS
-- 将内容 CID 和元数据登记到 `KnowledgeContent` 合约
+- 连接钱包并切换到 KnowChain
+- 上传文件到本地 IPFS，并将内容登记到 `KnowledgeContent`
 - 通过 `NativeVotes` 质押原生币并激活投票权
-- 对内容投票、触发奖励记账、领取 Treasury 奖励
-- 通过 `KnowledgeGovernor + TimelockController` 发起和执行治理提案
+- 对内容投票、触发奖励记账、领取 `TreasuryNative` 奖励
+- 通过 `KnowledgeGovernor + TimelockController` 发起、投票、排队和执行治理提案
+- 通过 Faucet 为新钱包发放启动资金
 
-## 当前功能模块
+## 功能模块
 
-### 1. Dashboard
+### Dashboard
 
-- 展示钱包连接状态和网络状态
-- 展示当前账户投票权、待领取奖励
-- 展示内容总数和 Treasury 周期预算
+- 展示钱包连接状态和当前网络
+- 展示投票权、待领取奖励、内容数量和 Treasury 概览
 
-### 2. Stake
+### Stake
 
-- 向 `NativeVotes` 合约存入原生币
-- 激活已存入的质押以获得投票权
-- 发起退出申请
-- 冷却期后执行提现
+- 质押原生币到 `NativeVotes`
+- 激活待生效质押，获取投票权
+- 发起退出申请，并在冷却期后提取
 
-### 3. Content
+### Content
 
-- 先通过钱包签名完成上传身份认证
-- 将文件上传到本地 IPFS
+- 通过钱包签名完成上传鉴权
+- 上传文件到本地 IPFS
 - 调用 `registerContent` 将内容登记上链
-- 浏览内容列表、搜索内容、查看内容详情
-- 对内容调用 `vote`
-- 对内容调用 `distributeReward`
+- 浏览内容列表、查看详情、投票、发起奖励记账
 
-### 4. Rewards
+### Rewards
 
-- 查询当前账户待领取奖励
-- 查看当前 Treasury 周期预算和已发放金额
+- 查看当前账户待领取奖励
+- 查看奖励历史记录和奖励来源
 - 调用 `claim` 领取奖励
 
-### 5. Governance
+### Governance
 
-- 查询提案门槛、投票延迟、投票周期
+- 查看提案门槛、投票延迟和投票周期
 - 发起针对 `KnowledgeContent.setRewardRules(...)` 的治理提案
-- 浏览提案列表和投票结果
-- 对提案进行投票、排队、执行
-- 查看单个提案详情
+- 浏览提案列表、查看详情、投票、排队和执行
 
-### 6. System
+### System
 
 - 查看核心合约地址
-- 查看合约 owner / treasury / votesContract 等链上信息
-- 查看 Timelock 延迟、Treasury 预算等系统参数
+- 查看 owner、treasury、votesContract、timelock 等关键链上信息
 
 ## 技术栈
 
@@ -68,7 +61,9 @@
 - Viem
 - TanStack Query
 - Sonner
-- Redis（可选，用于上传认证 nonce 存储）
+- Redis
+- Zod
+- Vitest
 
 ## 项目结构
 
@@ -76,79 +71,49 @@
 src/
   app/
     page.tsx                  # Dashboard
+    faucet/page.tsx           # Faucet
     stake/page.tsx            # 质押与投票权
     content/page.tsx          # 内容上传与列表
     content/[id]/page.tsx     # 内容详情
-    rewards/page.tsx          # 奖励领取
+    rewards/page.tsx          # 奖励中心
     governance/page.tsx       # 治理中心
     governance/[id]/page.tsx  # 提案详情
     system/page.tsx           # 系统概览
     api/
       auth/                   # 上传鉴权
+      faucet/                 # Faucet nonce / claim
       ipfs/upload/            # 本地 IPFS 上传
-  contracts/                  # ABI 与部署地址
   components/                 # 通用 UI 组件
-  hooks/                      # 钱包与上传认证逻辑
-  lib/                        # 链配置、认证、工具函数
+  contracts/                  # ABI 与部署地址
+  hooks/                      # Wagmi / 刷新 / 上传鉴权 hooks
+  lib/                        # 链配置、鉴权、Faucet、治理和工具函数
 ```
 
-## 本地开发要求
+## 本地依赖
 
-启动这个前端前，建议先确保以下服务可用：
+建议先确保以下服务可用：
 
-- 本地 Besu / EVM RPC：默认 `http://127.0.0.1:8545`
-- Chainlens 区块浏览器：默认 `http://127.0.0.1:8181`
-- 本地 IPFS Kubo API：默认 `http://127.0.0.1:5001`
-- 本地 IPFS Gateway：默认 `http://127.0.0.1:8080/ipfs`
-- Redis：可选；如果未配置 `REDIS_URL`，上传认证 nonce 会退回到内存存储
+- Besu / EVM RPC：`http://127.0.0.1:8545`
+- ChainLens：`http://127.0.0.1:8181`
+- IPFS Kubo API：`http://127.0.0.1:5001`
+- IPFS Gateway：`http://127.0.0.1:8080/ipfs`
+- Redis：用于上传鉴权 nonce 和 Faucet 限流
 
-## 安装依赖
+## 安装与启动
+
+安装依赖：
 
 ```bash
 npm install
 ```
 
-## 环境变量
+复制环境变量模板并按需填写：
 
-项目当前依赖以下环境变量。建议创建 `.env.local`：
-
-```env
-NEXT_PUBLIC_BESU_RPC_URL=http://127.0.0.1:8545
-NEXT_PUBLIC_BESU_CHAIN_ID=20260
-NEXT_PUBLIC_CHAINLENS_URL=http://127.0.0.1:8181
-NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
-
-UPLOAD_PROVIDER=local
-IPFS_API_URL=http://127.0.0.1:5001
-IPFS_GATEWAY_URL=http://127.0.0.1:8080/ipfs
-NEXT_PUBLIC_IPFS_GATEWAY_URL=http://127.0.0.1:8080/ipfs
-
-UPLOAD_AUTH_SECRET=replace_with_a_long_random_secret
-UPLOAD_AUTH_NONCE_TTL_SECONDS=300
-UPLOAD_AUTH_SESSION_TTL_SECONDS=86400
-
-# 可选
-REDIS_URL=redis://localhost:6379
+```bash
+cp .env.example .env.local
 ```
 
-### 环境变量说明
-
-- `NEXT_PUBLIC_BESU_RPC_URL`：前端连接的钱包 RPC 地址
-- `NEXT_PUBLIC_BESU_CHAIN_ID`：KnowChain 链 ID，当前项目为 `20260`
-- `NEXT_PUBLIC_CHAINLENS_URL`：浏览器地址
-- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`：RainbowKit / WalletConnect 项目 ID
-- `UPLOAD_PROVIDER`：当前仅支持 `local`
-- `IPFS_API_URL`：服务端上传文件时调用的 Kubo API 地址
-- `IPFS_GATEWAY_URL`：服务端返回给前端的网关地址
-- `NEXT_PUBLIC_IPFS_GATEWAY_URL`：前端查看内容详情时使用的网关地址
-- `UPLOAD_AUTH_SECRET`：上传会话 Cookie 签名密钥
-- `UPLOAD_AUTH_NONCE_TTL_SECONDS`：上传签名挑战有效期
-- `UPLOAD_AUTH_SESSION_TTL_SECONDS`：上传认证会话有效期
-- `REDIS_URL`：可选；用于多实例或更稳定的 nonce 存储
-
-## 启动项目
-
-开发环境：
+启动开发环境：
 
 ```bash
 npm run dev
@@ -167,9 +132,64 @@ npm run build
 npm run start
 ```
 
-## 当前链与合约配置
+## 环境变量
 
-当前仓库中的部署配置来自 `src/contracts/deployment.json`：
+项目提供了 [.env.example](./.env.example) 作为模板。当前主要变量如下：
+
+### 链与钱包
+
+- `NEXT_PUBLIC_BESU_RPC_URL`：前端读取链上数据的 RPC 地址
+- `NEXT_PUBLIC_BESU_CHAIN_ID`：当前链 ID，默认 `20260`
+- `NEXT_PUBLIC_CHAINLENS_URL`：区块浏览器地址
+- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`：WalletConnect 项目 ID
+
+### 上传服务
+
+- `UPLOAD_PROVIDER`：当前仅支持 `local`
+- `IPFS_API_URL`：服务端调用 Kubo 上传文件时使用的 API 地址
+- `IPFS_GATEWAY_URL`：服务端拼接返回的网关地址
+- `NEXT_PUBLIC_IPFS_GATEWAY_URL`：前端查看内容时使用的网关地址
+- `UPLOAD_AUTH_SECRET`：上传鉴权 session 的签名密钥
+- `UPLOAD_AUTH_NONCE_TTL_SECONDS`：上传鉴权 nonce 有效期
+- `UPLOAD_AUTH_SESSION_TTL_SECONDS`：上传鉴权 session 有效期
+
+### Redis
+
+- `REDIS_URL`：上传鉴权和 Faucet 限流依赖的 Redis 地址
+
+### Faucet
+
+- `FAUCET_PRIVATE_KEY`：Faucet 发放账户私钥
+- `FAUCET_AMOUNT`：每次领取的启动资金数量
+- `FAUCET_MIN_BALANCE`：钱包余额达到该阈值后不再允许领取
+- `FAUCET_COOLDOWN_HOURS`：领取冷却时间
+- `FAUCET_NONCE_TTL_SECONDS`：Faucet 签名 challenge 有效期
+
+## 质量门禁
+
+常用脚本：
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run test:run
+npm run check
+```
+
+其中：
+
+- `lint`：运行 ESLint
+- `typecheck`：运行 TypeScript 类型检查
+- `test`：启动 Vitest 监听模式
+- `test:run`：执行一次性测试
+- `check`：依次执行 lint、typecheck 和 test:run
+
+GitHub Actions 也已接入 CI，会在 push 和 pull request 时自动执行上述质量门禁。
+
+## 当前合约配置
+
+当前仓库里的部署配置来自 `src/contracts/deployment.json`：
 
 - Network: `consortium`
 - Chain ID: `20260`
@@ -179,28 +199,46 @@ npm run start
 - TimelockController: `0xd0de0912991896691E3671157A2adada5B102aFB`
 - KnowledgeGovernor: `0x5f1F054903776a5025806Fc4FEeB0b0e55799A68`
 
-## 上传认证说明
+## 上传鉴权流程
 
-为避免任何钱包都能直接调用上传接口，项目对 `/api/ipfs/upload` 做了签名认证保护：
+`/api/ipfs/upload` 受签名鉴权保护，基本流程如下：
 
 1. 前端请求 `/api/auth/nonce`
-2. 用户使用钱包签名认证消息
+2. 用户使用钱包签名上传鉴权消息
 3. 服务端通过 `/api/auth/verify` 校验签名
-4. 校验通过后写入上传会话 Cookie
-5. 前端才能继续调用 `/api/ipfs/upload`
+4. 校验通过后写入上传 session Cookie
+5. 前端再调用 `/api/ipfs/upload`
 
-这套流程主要用于“上传文件到本地 IPFS”这一操作，不影响普通链上读写。
+## Faucet 限流说明
 
-## 可用脚本
+Faucet 当前采用“钱包地址 + IP”双限流：
 
-```bash
-npm run dev
-npm run build
-npm run start
-npm run lint
-```
+- 同一个钱包不能重复领取
+- 同一个来源频繁切换新钱包也会被限制
+- 领取前会先做预检，避免先弹签名再失败
+
+## 常见排查
+
+### 页面一直连不上链
+
+- 检查 `NEXT_PUBLIC_BESU_RPC_URL`
+- 检查本地链是否启动
+- 检查钱包是否切换到正确的 Chain ID
+
+### IPFS 上传失败
+
+- 检查 `IPFS_API_URL` 对应的 Kubo API 是否正常
+- 检查 `UPLOAD_AUTH_SECRET` 是否已配置
+- 检查 Redis 是否可用
+
+### Faucet 无法领取
+
+- 检查钱包余额是否已经高于 `FAUCET_MIN_BALANCE`
+- 检查是否仍在冷却期内
+- 检查 Faucet 私钥账户余额是否充足
 
 ## 说明
 
-- 这是一个面向本地链开发环境的前端，不是通用公网部署模板
-- README 中的配置说明已按当前仓库实现整理，不再是默认的 Next.js 模板说明
+- 这个项目目前主要面向本地链开发环境
+- 前端已具备基础质量门禁、API schema 校验和 Faucet 双限流
+- 后续仍建议继续补全全局错误监控、事件索引优化和更多测试覆盖
