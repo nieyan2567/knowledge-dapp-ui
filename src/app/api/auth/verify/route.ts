@@ -1,4 +1,4 @@
-锘縤mport { getAddress, verifyMessage } from "viem";
+import { getAddress, verifyMessage } from "viem";
 import { NextRequest, NextResponse } from "next/server";
 
 import { parseJsonBody } from "@/lib/api-validation";
@@ -7,7 +7,7 @@ import { buildUploadAuthMessage } from "@/lib/auth/message";
 import { takeUploadAuthChallenge } from "@/lib/auth/nonce-store";
 import { getRequestSite } from "@/lib/auth/request";
 import {
-  createUploadSessionToken,
+  createUploadSession,
   setUploadSessionCookie,
 } from "@/lib/auth/session";
 import { knowledgeChain } from "@/lib/chains";
@@ -27,13 +27,13 @@ export async function POST(req: NextRequest) {
   try {
     address = getAddress(body.address);
   } catch {
-    return NextResponse.json({ error: "閽卞寘鍦板潃鏍煎紡鏃犳晥" }, { status: 400 });
+    return NextResponse.json({ error: "钱包地址格式无效" }, { status: 400 });
   }
 
   const challenge = await takeUploadAuthChallenge(body.nonce);
 
   if (!challenge) {
-    return NextResponse.json({ error: "绛惧悕鎸戞垬宸茶繃鏈熸垨宸茶浣跨敤" }, { status: 401 });
+    return NextResponse.json({ error: "签名挑战已过期或已被使用" }, { status: 401 });
   }
 
   const { domain, origin } = getRequestSite(req);
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     challenge.origin !== origin ||
     challenge.chainId !== knowledgeChain.id
   ) {
-    return NextResponse.json({ error: "绛惧悕鎸戞垬涓庡綋鍓嶇珯鐐逛笉鍖归厤" }, { status: 401 });
+    return NextResponse.json({ error: "签名挑战与当前站点不匹配" }, { status: 401 });
   }
 
   const isValidSignature = await verifyMessage({
@@ -53,19 +53,24 @@ export async function POST(req: NextRequest) {
   });
 
   if (!isValidSignature) {
-    return NextResponse.json({ error: "閽卞寘绛惧悕鏃犳晥" }, { status: 401 });
+    return NextResponse.json({ error: "钱包签名无效" }, { status: 401 });
   }
+
+  const { session, token } = await createUploadSession({
+    address,
+    chainId: challenge.chainId,
+    req,
+  });
 
   const response = NextResponse.json({
     authenticated: true,
     address,
     chainId: challenge.chainId,
+    sessionVersion: session.version,
+    expiresAt: session.expiresAt,
   });
 
-  setUploadSessionCookie(
-    response,
-    createUploadSessionToken(address, challenge.chainId)
-  );
+  setUploadSessionCookie(response, token);
 
   return response;
 }

@@ -1,20 +1,30 @@
 import "server-only";
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 import type { NextRequest, NextResponse } from "next/server";
 
-const uploadSessionCookieName = "knowledge_upload_session";
-const uploadSessionTtlSeconds = Number(
-  process.env.UPLOAD_AUTH_SESSION_TTL_SECONDS || "86400"
-);
+import { getRequestSite } from "@/lib/auth/request";
 
-type UploadSessionPayload = {
+import {
+  createUploadSessionRecord,
+  getUploadSessionRecord,
+  isUploadSessionVersionCurrent,
+  revokeUploadSession,
+  touchUploadSessionRecord,
+} from "@/lib/auth/session-store";
+
+const uploadSessionCookieName = "knowledge_upload_session";
+const defaultUploadSessionTtlSeconds = 2 * 60 * 60;
+
+export type UploadSession = {
+  id: string;
   sub: `0x${string}`;
   chainId: number;
-  iat: number;
-  exp: number;
-  v: 1;
+  version: number;
+  createdAt: number;
+  expiresAt: number;
+  lastUsedAt: number;
 };
 
 function getUploadSessionSecret() {
@@ -29,58 +39,42 @@ function getUploadSessionSecret() {
   return "knowledge-dapp-dev-upload-secret";
 }
 
+export function getUploadSessionTtlSeconds() {
+  const ttl = Number(
+    process.env.UPLOAD_AUTH_SESSION_TTL_SECONDS || defaultUploadSessionTtlSeconds
+  );
+
+  if (!Number.isFinite(ttl) || ttl <= 0) {
+    throw new Error("UPLOAD_AUTH_SESSION_TTL_SECONDS must be a positive number");
+  }
+
+  return Math.floor(ttl);
+}
+
 function sign(value: string) {
   return createHmac("sha256", getUploadSessionSecret())
     .update(value)
     .digest("base64url");
 }
 
-function encodePayload(payload: UploadSessionPayload) {
-  return Buffer.from(JSON.stringify(payload)).toString("base64url");
+function createSignedSessionToken(sessionId: string) {
+  return `${sessionId}.${sign(sessionId)}`;
 }
 
-function decodePayload(value: string) {
-  try {
-    const json = Buffer.from(value, "base64url").toString("utf8");
-    return JSON.parse(json) as UploadSessionPayload;
-  } catch {
-    return null;
-  }
-}
-
-export function createUploadSessionToken(
-  address: `0x${string}`,
-  chainId: number
-) {
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const payload: UploadSessionPayload = {
-    sub: address,
-    chainId,
-    iat: issuedAt,
-    exp: issuedAt + uploadSessionTtlSeconds,
-    v: 1,
-  };
-
-  const encodedPayload = encodePayload(payload);
-  const signature = sign(encodedPayload);
-
-  return `${encodedPayload}.${signature}`;
-}
-
-export function readUploadSession(req: NextRequest) {
+function readSignedSessionId(req: NextRequest) {
   const token = req.cookies.get(uploadSessionCookieName)?.value;
 
   if (!token) {
     return null;
   }
 
-  const [encodedPayload, providedSignature] = token.split(".");
+  const [sessionId, providedSignature] = token.split(".");
 
-  if (!encodedPayload || !providedSignature) {
+  if (!sessionId || !providedSignature) {
     return null;
   }
 
-  const expectedSignature = sign(encodedPayload);
+  const expectedSignature = sign(sessionId);
   const provided = Buffer.from(providedSignature);
   const expected = Buffer.from(expectedSignature);
 
@@ -91,19 +85,98 @@ export function readUploadSession(req: NextRequest) {
     return null;
   }
 
-  const payload = decodePayload(encodedPayload);
+  return sessionId;
+}
 
-  if (!payload || payload.exp <= Math.floor(Date.now() / 1000)) {
+function hashUserAgent(value: string | null) {
+  return createHash("sha256")
+    .update(value?.trim() || "unknown")
+    .digest("base64url");
+}
+
+export async function createUploadSession(input: {
+  address: `0x${string}`;
+  chainId: number;
+  req: NextRequest;
+}) {
+  const { domain, origin } = getRequestSite(input.req);
+  const record = await createUploadSessionRecord({
+    address: input.address,
+    chainId: input.chainId,
+    domain,
+    origin,
+    userAgentHash: hashUserAgent(input.req.headers.get("user-agent")),
+    ttlSeconds: getUploadSessionTtlSeconds(),
+  });
+
+  return {
+    session: {
+      id: record.id,
+      sub: record.address,
+      chainId: record.chainId,
+      version: record.version,
+      createdAt: record.createdAt,
+      expiresAt: record.expiresAt,
+      lastUsedAt: record.lastUsedAt,
+    } satisfies UploadSession,
+    token: createSignedSessionToken(record.id),
+  };
+}
+
+export async function readUploadSession(req: NextRequest): Promise<UploadSession | null> {
+  const sessionId = readSignedSessionId(req);
+
+  if (!sessionId) {
     return null;
   }
 
-  return payload;
+  const record = await getUploadSessionRecord(sessionId);
+
+  if (!record) {
+    return null;
+  }
+
+  const { domain, origin } = getRequestSite(req);
+  const userAgentHash = hashUserAgent(req.headers.get("user-agent"));
+  const isCurrentVersion = await isUploadSessionVersionCurrent(record);
+
+  if (
+    record.domain !== domain ||
+    record.origin !== origin ||
+    record.userAgentHash !== userAgentHash ||
+    !isCurrentVersion
+  ) {
+    await revokeUploadSession(record.id);
+    return null;
+  }
+
+  const updatedRecord = await touchUploadSessionRecord(
+    record,
+    getUploadSessionTtlSeconds()
+  );
+
+  return {
+    id: updatedRecord.id,
+    sub: updatedRecord.address,
+    chainId: updatedRecord.chainId,
+    version: updatedRecord.version,
+    createdAt: updatedRecord.createdAt,
+    expiresAt: updatedRecord.expiresAt,
+    lastUsedAt: updatedRecord.lastUsedAt,
+  };
 }
 
-export function setUploadSessionCookie(
-  res: NextResponse,
-  token: string
-) {
+export async function revokeUploadSessionFromRequest(req: NextRequest) {
+  const sessionId = readSignedSessionId(req);
+
+  if (!sessionId) {
+    return;
+  }
+
+  await revokeUploadSession(sessionId);
+}
+
+export function setUploadSessionCookie(res: NextResponse, token: string) {
   res.cookies.set({
     name: uploadSessionCookieName,
     value: token,
@@ -111,7 +184,7 @@ export function setUploadSessionCookie(
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: uploadSessionTtlSeconds,
+    maxAge: getUploadSessionTtlSeconds(),
   });
 }
 

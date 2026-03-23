@@ -3,15 +3,16 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   clearUploadSessionCookie,
   readUploadSession,
+  revokeUploadSessionFromRequest,
 } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  const session = readUploadSession(req);
+  const session = await readUploadSession(req);
 
   if (!session) {
-    return NextResponse.json(
+    const response = NextResponse.json(
       { authenticated: false },
       {
         headers: {
@@ -19,15 +20,18 @@ export async function GET(req: NextRequest) {
         },
       }
     );
+    clearUploadSessionCookie(response);
+    return response;
   }
-
-  // 前后端验证签名，session，配置redis
 
   return NextResponse.json(
     {
       authenticated: true,
       address: session.sub,
       chainId: session.chainId,
+      sessionVersion: session.version,
+      expiresAt: session.expiresAt,
+      lastUsedAt: session.lastUsedAt,
     },
     {
       headers: {
@@ -38,7 +42,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  void req;
+  await revokeUploadSessionFromRequest(req);
 
   const response = NextResponse.json({ authenticated: false });
   clearUploadSessionCookie(response);
