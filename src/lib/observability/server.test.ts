@@ -76,6 +76,31 @@ describe("observability/server", () => {
     });
   });
 
+  it("writes warning events to console.warn", async () => {
+    await captureServerEvent({
+      message: "Rate limit threshold reached",
+      source: "api.rate-limit",
+      severity: "warn",
+      context: { route: "/api/auth/nonce" },
+    });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(infoSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    const payload = JSON.parse(String(warnSpy.mock.calls[0]?.[0]));
+    expect(payload).toMatchObject({
+      service: "knowledge-dapp-ui",
+      deployment: "test",
+      severity: "warn",
+      source: "api.rate-limit",
+      message: "Rate limit threshold reached",
+      context: {
+        route: "/api/auth/nonce",
+      },
+    });
+  });
+
   it("dispatches deduplicated alerts for server exceptions", async () => {
     mutableEnv.OBS_ALERT_WEBHOOK_URL = "https://example.com/alert";
 
