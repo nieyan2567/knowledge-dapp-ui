@@ -10,6 +10,7 @@ import {
   type UploadAuthChallenge,
 } from "@/lib/auth/message";
 import { knowledgeChain } from "@/lib/chains";
+import { reportClientError } from "@/lib/observability/client";
 
 type UploadSessionResponse = {
   authenticated: boolean;
@@ -55,7 +56,13 @@ export function useUploadAuth() {
         }
       }
     } catch (error) {
-      console.error("Failed to read upload session:", error);
+      void reportClientError({
+        message: "Failed to read upload session",
+        source: "upload-auth.session-check",
+        severity: "warn",
+        handled: true,
+        error,
+      });
     }
 
     const loadingToastId = toast.loading("正在验证上传身份...");
@@ -101,7 +108,17 @@ export function useUploadAuth() {
       toast.success("上传身份验证成功", { id: loadingToastId });
       return true;
     } catch (error) {
-      console.error("Upload auth failed:", error);
+      void reportClientError({
+        message: "Upload auth failed",
+        source: "upload-auth.authenticate",
+        severity: "error",
+        handled: true,
+        error,
+        context: {
+          address,
+          chainId,
+        },
+      });
       toast.error(error instanceof Error ? error.message : "上传身份验证失败", {
         id: loadingToastId,
       });

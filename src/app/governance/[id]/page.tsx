@@ -35,6 +35,7 @@ import {
 	proposalCreatedEvent,
 	summarizeProposalActions,
 } from "@/lib/governance";
+import { reportClientError } from "@/lib/observability/client";
 import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt, asProposalVotes } from "@/lib/web3-types";
 import type { ProposalItem, ProposalVotes } from "@/types/governance";
@@ -43,6 +44,16 @@ import type { ProposalItem, ProposalVotes } from "@/types/governance";
 function explorerProposalUrl(txHash: string) {
 	if (!txHash || txHash === "0x") return "#";
 	return `${BRANDING.explorerUrl}/tx/${txHash}`;
+}
+
+function reportProposalDetailError(message: string, error: unknown) {
+	void reportClientError({
+		message,
+		source: "governance.detail",
+		severity: "error",
+		handled: true,
+		error,
+	});
 }
 
 export default function ProposalDetailPage() {
@@ -141,7 +152,7 @@ export default function ProposalDetailPage() {
 
 			setProposalDetail(parseProposalCreatedLog(matched));
 			} catch (error) {
-				console.error(error);
+				reportProposalDetailError("Failed to load proposal detail", error);
 				// 非致命错误，不阻断页面，只是详情不显示
 			} finally {
 				setLoadingDetail(false);

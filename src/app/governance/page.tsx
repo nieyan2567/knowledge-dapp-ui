@@ -34,6 +34,7 @@ import {
 	summarizeProposalActions,
 } from "@/lib/governance";
 import { BRANDING } from "@/lib/branding";
+import { reportClientError } from "@/lib/observability/client";
 import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt, asProposalVotes } from "@/lib/web3-types";
 import type { ProposalItem, ProposalVotes } from "@/types/governance";
@@ -48,6 +49,16 @@ function explorerAddressUrl(address: string) {
 
 function formatBlockRange(start?: bigint, end?: bigint) {
 	return formatProposalBlockRange(start, end);
+}
+
+function reportGovernancePageError(message: string, error: unknown) {
+	void reportClientError({
+		message,
+		source: "governance.page",
+		severity: "error",
+		handled: true,
+		error,
+	});
 }
 
 export default function GovernancePage() {
@@ -129,7 +140,7 @@ export default function GovernancePage() {
 			const parsed = logs.map((log) => parseProposalCreatedLog(log)).reverse();
 			setProposals(parsed);
 		} catch (error) {
-			console.error(error);
+			reportGovernancePageError("Failed to load governance proposals", error);
 			toast.error("加载提案列表失败");
 		} finally {
 			setLoadingProposals(false);

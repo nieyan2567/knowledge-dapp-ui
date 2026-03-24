@@ -11,6 +11,10 @@ import {
   readUploadSession,
 } from "@/lib/auth/session";
 import { getServerEnv } from "@/lib/env";
+import {
+  captureServerEvent,
+  captureServerException,
+} from "@/lib/observability/server";
 import { validateUploadFileServer } from "@/lib/upload-policy";
 
 export const runtime = "nodejs";
@@ -71,7 +75,18 @@ export async function POST(req: NextRequest) {
 
     if (!uploadRes.ok) {
       const text = await uploadRes.text();
-      console.error("Kubo upload failed:", text);
+      await captureServerEvent({
+        message: "Kubo upload returned a non-success response",
+        source: "api.ipfs.upload",
+        severity: "error",
+        request: req,
+        context: {
+          provider,
+          apiUrl,
+          detail: text,
+          uploadedBy: session.sub,
+        },
+      });
       return NextResponse.json(
         { error: "IPFS 上传失败", detail: text },
         { status: 500 }
@@ -115,7 +130,15 @@ export async function POST(req: NextRequest) {
       sessionVersion: session.version,
     });
   } catch (error) {
-    console.error("Local IPFS upload failed:", error);
+    await captureServerException("Local IPFS upload failed", {
+      source: "api.ipfs.upload",
+      severity: "error",
+      request: req,
+      error,
+      context: {
+        sessionSub: session.sub,
+      },
+    });
     return NextResponse.json({ error: "本地 IPFS 上传失败" }, { status: 500 });
   }
 }

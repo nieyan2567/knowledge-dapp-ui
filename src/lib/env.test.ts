@@ -15,6 +15,13 @@ const originalEnv = {
   UPLOAD_AUTH_SECRET: process.env["UPLOAD_AUTH_SECRET"],
   API_RATE_LIMIT_MAX: process.env["API_RATE_LIMIT_MAX"],
   REDIS_URL: process.env["REDIS_URL"],
+  OBS_SERVICE_NAME: process.env["OBS_SERVICE_NAME"],
+  OBS_DEPLOYMENT_ENV: process.env["OBS_DEPLOYMENT_ENV"],
+  OBS_LOG_LEVEL: process.env["OBS_LOG_LEVEL"],
+  OBS_ALERT_WEBHOOK_URL: process.env["OBS_ALERT_WEBHOOK_URL"],
+  OBS_ALERT_MIN_SEVERITY: process.env["OBS_ALERT_MIN_SEVERITY"],
+  OBS_ALERT_DEDUP_WINDOW_SECONDS: process.env["OBS_ALERT_DEDUP_WINDOW_SECONDS"],
+  OBS_CLIENT_ERROR_SAMPLE_RATE: process.env["OBS_CLIENT_ERROR_SAMPLE_RATE"],
   FAUCET_PRIVATE_KEY: process.env["FAUCET_PRIVATE_KEY"],
 };
 
@@ -37,6 +44,13 @@ function applyValidServerEnv() {
   mutableEnv.UPLOAD_AUTH_SECRET = "test-upload-secret";
   mutableEnv.API_RATE_LIMIT_MAX = "120";
   mutableEnv.REDIS_URL = "redis://localhost:6379";
+  mutableEnv.OBS_SERVICE_NAME = "knowledge-dapp-ui";
+  mutableEnv.OBS_DEPLOYMENT_ENV = "test";
+  mutableEnv.OBS_LOG_LEVEL = "info";
+  mutableEnv.OBS_ALERT_WEBHOOK_URL = "https://alerts.example.com/webhook";
+  mutableEnv.OBS_ALERT_MIN_SEVERITY = "error";
+  mutableEnv.OBS_ALERT_DEDUP_WINDOW_SECONDS = "300";
+  mutableEnv.OBS_CLIENT_ERROR_SAMPLE_RATE = "1";
   mutableEnv.FAUCET_PRIVATE_KEY = `0x${"1".repeat(64)}`;
 }
 
@@ -53,6 +67,19 @@ afterEach(() => {
   restoreEnvValue("UPLOAD_AUTH_SECRET", originalEnv.UPLOAD_AUTH_SECRET);
   restoreEnvValue("API_RATE_LIMIT_MAX", originalEnv.API_RATE_LIMIT_MAX);
   restoreEnvValue("REDIS_URL", originalEnv.REDIS_URL);
+  restoreEnvValue("OBS_SERVICE_NAME", originalEnv.OBS_SERVICE_NAME);
+  restoreEnvValue("OBS_DEPLOYMENT_ENV", originalEnv.OBS_DEPLOYMENT_ENV);
+  restoreEnvValue("OBS_LOG_LEVEL", originalEnv.OBS_LOG_LEVEL);
+  restoreEnvValue("OBS_ALERT_WEBHOOK_URL", originalEnv.OBS_ALERT_WEBHOOK_URL);
+  restoreEnvValue("OBS_ALERT_MIN_SEVERITY", originalEnv.OBS_ALERT_MIN_SEVERITY);
+  restoreEnvValue(
+    "OBS_ALERT_DEDUP_WINDOW_SECONDS",
+    originalEnv.OBS_ALERT_DEDUP_WINDOW_SECONDS
+  );
+  restoreEnvValue(
+    "OBS_CLIENT_ERROR_SAMPLE_RATE",
+    originalEnv.OBS_CLIENT_ERROR_SAMPLE_RATE
+  );
   restoreEnvValue("FAUCET_PRIVATE_KEY", originalEnv.FAUCET_PRIVATE_KEY);
 });
 
@@ -93,6 +120,14 @@ describe("env", () => {
     delete process.env.UPLOAD_AUTH_SECRET;
 
     expect(() => getServerEnv()).toThrow(/UPLOAD_AUTH_SECRET/i);
+  });
+
+  it("requires an alert webhook in production", () => {
+    applyValidServerEnv();
+    mutableEnv.NODE_ENV = "production";
+    delete process.env.OBS_ALERT_WEBHOOK_URL;
+
+    expect(() => getServerEnv()).toThrow(/OBS_ALERT_WEBHOOK_URL/i);
   });
 
   it("validates faucet private key format when configured", () => {

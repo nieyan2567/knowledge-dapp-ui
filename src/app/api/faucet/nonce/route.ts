@@ -15,6 +15,7 @@ import {
   getRequestIp,
 } from "@/lib/faucet/utils";
 import { createFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
+import { captureServerException } from "@/lib/observability/server";
 
 export const runtime = "nodejs";
 
@@ -108,7 +109,12 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    console.error("Failed to create faucet challenge:", error);
+    await captureServerException("Failed to create faucet challenge", {
+      source: "api.faucet.nonce",
+      severity: "error",
+      request: req,
+      error,
+    });
     return NextResponse.json(
       { error: "Faucet 服务暂时不可用，请稍后再试。" },
       {

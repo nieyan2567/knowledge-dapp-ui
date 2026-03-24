@@ -29,6 +29,10 @@ vi.mock("@/lib/faucet/utils", () => ({
   isFaucetError: vi.fn(() => false),
 }));
 
+vi.mock("@/lib/observability/server", () => ({
+  captureServerException: vi.fn().mockResolvedValue("event-1"),
+}));
+
 const address = "0x1234567890abcdef1234567890abcdef12345678" as `0x${string}`;
 
 describe("GET /api/faucet/nonce", () => {

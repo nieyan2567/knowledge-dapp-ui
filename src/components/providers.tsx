@@ -12,6 +12,7 @@ import {
 import { ThemeProvider, useTheme } from "next-themes";
 import { WagmiProvider } from "wagmi";
 import { useIsClient } from "@/hooks/useIsClient";
+import { ObservabilityProvider } from "@/components/observability-provider";
 import { knowledgeChain } from "@/lib/chains";
 import { config } from "@/lib/wagmi";
 
@@ -56,6 +57,7 @@ export function Providers({ children }: { children: ReactNode }) {
     >
       <WagmiProvider config={config}>
         <QueryClientProvider client={queryClient}>
+          <ObservabilityProvider />
           <RainbowKitThemeBridge>{children}</RainbowKitThemeBridge>
         </QueryClientProvider>
       </WagmiProvider>

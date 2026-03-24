@@ -1,6 +1,7 @@
 import type { Abi } from "viem";
 import { BaseError } from "viem";
 import { toast } from "sonner";
+import { reportClientError } from "@/lib/observability/client";
 
 type ContractWriteRequest = {
   address: `0x${string}`;
@@ -133,6 +134,13 @@ function showTxErrorToast(error: unknown, fail: string, id?: string | number) {
     return;
   }
 
+  void reportClientError({
+    message: fail,
+    source: "tx-toast",
+    severity: "error",
+    handled: true,
+    error,
+  });
   toast.error(extractErrorMessage(error, fail), { id });
 }
 

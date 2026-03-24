@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "redis";
 import { getServerEnv } from "@/lib/env";
+import { captureServerException } from "@/lib/observability/server";
 
 type KnowledgeRedisClient = ReturnType<typeof createClient>;
 
@@ -21,7 +22,12 @@ function createRedisClient(): KnowledgeRedisClient | null {
 
   const client = createClient({ url });
   client.on("error", (error) => {
-    console.error("Redis client error:", error);
+    void captureServerException("Redis client error", {
+      source: "redis.client",
+      severity: "error",
+      error,
+      alert: false,
+    });
   });
 
   return client;

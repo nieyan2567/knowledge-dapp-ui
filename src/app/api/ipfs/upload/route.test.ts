@@ -23,6 +23,11 @@ vi.mock("@/lib/upload-policy", () => ({
   validateUploadFileServer: vi.fn(),
 }));
 
+vi.mock("@/lib/observability/server", () => ({
+  captureServerEvent: vi.fn().mockResolvedValue("event-1"),
+  captureServerException: vi.fn().mockResolvedValue("event-1"),
+}));
+
 const address = "0x1234567890abcdef1234567890abcdef12345678" as `0x${string}`;
 
 describe("POST /api/ipfs/upload", () => {
@@ -47,6 +52,14 @@ describe("POST /api/ipfs/upload", () => {
       REDIS_URL: undefined,
       API_RATE_LIMIT_WINDOW_SECONDS: 60,
       API_RATE_LIMIT_MAX: 120,
+      OBS_SERVICE_NAME: "knowledge-dapp-ui",
+      OBS_DEPLOYMENT_ENV: "test",
+      OBS_LOG_LEVEL: "info",
+      OBS_ALERT_WEBHOOK_URL: "https://alerts.example.com/webhook",
+      OBS_ALERT_WEBHOOK_TOKEN: undefined,
+      OBS_ALERT_MIN_SEVERITY: "error",
+      OBS_ALERT_DEDUP_WINDOW_SECONDS: 300,
+      OBS_CLIENT_ERROR_SAMPLE_RATE: 1,
       FAUCET_PRIVATE_KEY: undefined,
       FAUCET_AMOUNT: "2",
       FAUCET_MIN_BALANCE: "1",

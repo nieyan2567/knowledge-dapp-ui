@@ -1,5 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
+
+import { reportClientError } from "@/lib/observability/client";
+
 export default function GlobalError({
   error,
   reset,
@@ -7,6 +11,19 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    void reportClientError({
+      message: "Next.js global error boundary triggered",
+      source: "app.global-error",
+      severity: "fatal",
+      handled: false,
+      error,
+      context: {
+        digest: error.digest,
+      },
+    });
+  }, [error]);
+
   return (
     <html lang="zh-CN">
       <body className="min-h-screen bg-slate-100 text-slate-950 dark:bg-slate-950 dark:text-slate-100">

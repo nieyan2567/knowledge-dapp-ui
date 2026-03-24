@@ -10,6 +10,7 @@ export type ApiRateLimitPolicyName =
   | "auth:session"
   | "auth:logout"
   | "ipfs:upload"
+  | "client:error"
   | "faucet:nonce"
   | "faucet:claim";
 
@@ -55,6 +56,8 @@ function getDefaultPolicy(name: ApiRateLimitPolicyName): ApiRateLimitPolicy {
       return { max: 20, windowSeconds: 60 };
     case "ipfs:upload":
       return { max: 10, windowSeconds: 300 };
+    case "client:error":
+      return { max: 30, windowSeconds: 60 };
     case "faucet:nonce":
       return { max: 20, windowSeconds: 60 };
     case "faucet:claim":

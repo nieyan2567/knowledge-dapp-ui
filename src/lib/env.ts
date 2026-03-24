@@ -31,6 +31,15 @@ const positiveNumberStringWithDefault = (defaultValue: string) =>
       .optional()
   ).transform((value) => value ?? defaultValue);
 
+const numberWithRangeDefault = (
+  defaultValue: number,
+  constraints: { min: number; max: number }
+) =>
+  z.preprocess(
+    emptyStringToUndefined,
+    z.coerce.number().min(constraints.min).max(constraints.max).optional()
+  ).transform((value) => value ?? defaultValue);
+
 const optionalUrl = z.preprocess(
   emptyStringToUndefined,
   z.string().url().optional()
@@ -62,6 +71,30 @@ const serverEnvSchema = publicEnvSchema
     REDIS_URL: optionalUrl,
     API_RATE_LIMIT_WINDOW_SECONDS: positiveIntWithDefault(60),
     API_RATE_LIMIT_MAX: positiveIntWithDefault(120),
+    OBS_SERVICE_NAME: z.preprocess(
+      emptyStringToUndefined,
+      z.string().trim().min(1).optional()
+    ).transform((value) => value ?? "knowledge-dapp-ui"),
+    OBS_DEPLOYMENT_ENV: z.preprocess(
+      emptyStringToUndefined,
+      z.string().trim().min(1).optional()
+    ).transform((value) => value ?? "development"),
+    OBS_LOG_LEVEL: z
+      .enum(["debug", "info", "warn", "error", "fatal"])
+      .default("info"),
+    OBS_ALERT_WEBHOOK_URL: optionalUrl,
+    OBS_ALERT_WEBHOOK_TOKEN: z.preprocess(
+      emptyStringToUndefined,
+      z.string().trim().min(1).optional()
+    ),
+    OBS_ALERT_MIN_SEVERITY: z
+      .enum(["debug", "info", "warn", "error", "fatal"])
+      .default("error"),
+    OBS_ALERT_DEDUP_WINDOW_SECONDS: positiveIntWithDefault(300),
+    OBS_CLIENT_ERROR_SAMPLE_RATE: numberWithRangeDefault(1, {
+      min: 0,
+      max: 1,
+    }),
     FAUCET_PRIVATE_KEY: z.preprocess(
       emptyStringToUndefined,
       z
@@ -84,6 +117,14 @@ const serverEnvSchema = publicEnvSchema
       ctx.addIssue({
         code: "custom",
         path: ["UPLOAD_AUTH_SECRET"],
+        message: "Required when NODE_ENV=production",
+      });
+    }
+
+    if (env.NODE_ENV === "production" && !env.OBS_ALERT_WEBHOOK_URL) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["OBS_ALERT_WEBHOOK_URL"],
         message: "Required when NODE_ENV=production",
       });
     }
@@ -143,6 +184,15 @@ function getServerEnvSource() {
     REDIS_URL: process.env.REDIS_URL,
     API_RATE_LIMIT_WINDOW_SECONDS: process.env.API_RATE_LIMIT_WINDOW_SECONDS,
     API_RATE_LIMIT_MAX: process.env.API_RATE_LIMIT_MAX,
+    OBS_SERVICE_NAME: process.env.OBS_SERVICE_NAME,
+    OBS_DEPLOYMENT_ENV: process.env.OBS_DEPLOYMENT_ENV,
+    OBS_LOG_LEVEL: process.env.OBS_LOG_LEVEL,
+    OBS_ALERT_WEBHOOK_URL: process.env.OBS_ALERT_WEBHOOK_URL,
+    OBS_ALERT_WEBHOOK_TOKEN: process.env.OBS_ALERT_WEBHOOK_TOKEN,
+    OBS_ALERT_MIN_SEVERITY: process.env.OBS_ALERT_MIN_SEVERITY,
+    OBS_ALERT_DEDUP_WINDOW_SECONDS:
+      process.env.OBS_ALERT_DEDUP_WINDOW_SECONDS,
+    OBS_CLIENT_ERROR_SAMPLE_RATE: process.env.OBS_CLIENT_ERROR_SAMPLE_RATE,
     FAUCET_PRIVATE_KEY: process.env.FAUCET_PRIVATE_KEY,
     FAUCET_AMOUNT: process.env.FAUCET_AMOUNT,
     FAUCET_MIN_BALANCE: process.env.FAUCET_MIN_BALANCE,

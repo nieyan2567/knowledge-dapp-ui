@@ -53,6 +53,10 @@ vi.mock("viem", async () => {
   };
 });
 
+vi.mock("@/lib/observability/server", () => ({
+  captureServerException: vi.fn().mockResolvedValue("event-1"),
+}));
+
 const address = "0x1234567890abcdef1234567890abcdef12345678" as `0x${string}`;
 const challenge = {
   nonce: "nonce-1",

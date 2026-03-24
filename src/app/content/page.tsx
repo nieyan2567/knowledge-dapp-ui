@@ -23,6 +23,7 @@ import {
   getUploadMaxFileSizeBytes,
   validateUploadFile,
 } from "@/lib/upload-policy";
+import { reportClientError } from "@/lib/observability/client";
 import type { ContentCardData } from "@/types/content";
 import { asContentData } from "@/lib/web3-types";
 
@@ -31,6 +32,21 @@ function parseContentResults(results: readonly unknown[]): ContentCardData[] {
     .map((item) => asContentData(item))
 		.filter((item): item is ContentCardData => !!item)
     .reverse();
+}
+
+function reportContentPageError(
+  message: string,
+  error: unknown,
+  context?: Record<string, unknown>
+) {
+  void reportClientError({
+    message,
+    source: "content.page",
+    severity: "error",
+    handled: true,
+    error,
+    context,
+  });
 }
 
 export default function ContentPage() {
@@ -99,7 +115,7 @@ export default function ContentPage() {
       const parsed = await readContents(latestCount);
       setContentList(parsed);
     } catch (error) {
-      console.error(error);
+      reportContentPageError("Failed to refresh content list", error);
       toast.error("加载内容列表失败");
     } finally {
       setLoadingList(false);
@@ -124,7 +140,7 @@ export default function ContentPage() {
           setContentList(parsed);
         }
       } catch (error) {
-        console.error(error);
+        reportContentPageError("Failed to load content list", error);
         if (!cancelled) {
           toast.error("加载内容列表失败");
         }
@@ -213,7 +229,9 @@ export default function ContentPage() {
       setUploadedCid(data.cid);
       setUploadedUrl(data.url);
     } catch (error) {
-      console.error(error);
+      reportContentPageError("Failed to upload content to IPFS", error, {
+        fileName: file.name,
+      });
     } finally {
       setUploading(false);
     }
@@ -276,7 +294,9 @@ export default function ContentPage() {
 
       await refreshAfterTx(hash, refreshContentList, ["content", "dashboard"]);
     } catch (error) {
-      console.error(error);
+      reportContentPageError("Failed to register content on-chain", error, {
+        cid: uploadedCid,
+      });
     } finally {
       setRegistering(false);
     }

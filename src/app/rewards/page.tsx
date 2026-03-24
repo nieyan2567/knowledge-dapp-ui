@@ -12,6 +12,7 @@ import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { BRANDING } from "@/lib/branding";
+import { reportClientError } from "@/lib/observability/client";
 import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt, asContentData } from "@/lib/web3-types";
 
@@ -43,6 +44,16 @@ type RewardSourceItem = {
 	accrualCount: number;
 	latestBlock: bigint;
 };
+
+function reportRewardsPageError(message: string, error: unknown) {
+	void reportClientError({
+		message,
+		source: "rewards.page",
+		severity: "error",
+		handled: true,
+		error,
+	});
+}
 
 function formatRewardDate(timestamp?: bigint) {
 	if (timestamp === undefined) {
@@ -237,7 +248,7 @@ export default function RewardsPage() {
 				)
 			);
 		} catch (error) {
-			console.error(error);
+			reportRewardsPageError("Failed to load reward activity", error);
 			toast.error("加载奖励记录失败");
 		} finally {
 			setLoadingRewardActivity(false);

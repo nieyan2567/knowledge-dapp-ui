@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect } from "react";
 
+import { reportClientError } from "@/lib/observability/client";
+
 export default function ErrorPage({
   error,
   reset,
@@ -11,7 +13,16 @@ export default function ErrorPage({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    void reportClientError({
+      message: "Next.js segment error boundary triggered",
+      source: "app.error",
+      severity: "error",
+      handled: false,
+      error,
+      context: {
+        digest: error.digest,
+      },
+    });
   }, [error]);
 
   return (

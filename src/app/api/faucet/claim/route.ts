@@ -24,6 +24,7 @@ import {
   markFaucetClaimed,
   releaseFaucetClaimLock,
 } from "@/lib/faucet/utils";
+import { captureServerException } from "@/lib/observability/server";
 
 export const runtime = "nodejs";
 
@@ -193,7 +194,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.error("Faucet transfer failed:", error);
+    await captureServerException("Faucet transfer failed", {
+      source: "api.faucet.claim",
+      severity: "error",
+      request: req,
+      error,
+    });
 
     return NextResponse.json(
       {

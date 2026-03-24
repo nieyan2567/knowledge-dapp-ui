@@ -22,6 +22,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { buildFaucetClaimMessage, type FaucetAuthChallenge } from "@/lib/faucet/message";
 import { useWalletReady } from "@/hooks/useWalletReady";
 import { BRANDING } from "@/lib/branding";
+import { reportClientError } from "@/lib/observability/client";
 
 type FaucetClaimResponse = {
   ok?: boolean;
@@ -54,6 +55,17 @@ function isUserRejectedError(error: unknown) {
     message.includes("rejected the request") ||
     message.includes("denied message signature")
   );
+}
+
+function reportFaucetPageError(message: string, error: unknown, context?: Record<string, unknown>) {
+  void reportClientError({
+    message,
+    source: "faucet.page",
+    severity: "error",
+    handled: true,
+    error,
+    context,
+  });
 }
 
 function ConnectAction() {
@@ -155,6 +167,14 @@ export default function FaucetPage() {
       const nonceData = (await nonceRes.json()) as FaucetAuthChallenge | FaucetNonceError;
 
       if (!nonceRes.ok || !("nonce" in nonceData)) {
+        reportFaucetPageError(
+          "Failed to create faucet auth challenge",
+          "error" in nonceData ? nonceData.error : undefined,
+          {
+          address,
+          status: nonceRes.status,
+          }
+        );
         toast.error(("error" in nonceData && nonceData.error) || "创建 Faucet 签名挑战失败");
         return;
       }
@@ -179,6 +199,10 @@ export default function FaucetPage() {
       const claimData = (await claimRes.json()) as FaucetClaimResponse;
 
       if (!claimRes.ok || !claimData.ok || !claimData.txHash) {
+        reportFaucetPageError("Faucet claim request failed", claimData.error, {
+          address,
+          status: claimRes.status,
+        });
         toast.error(claimData.error || "Faucet 发放失败，请稍后再试");
         return;
       }
@@ -193,6 +217,7 @@ export default function FaucetPage() {
       }
 
       toast.error(error instanceof Error ? error.message : "Faucet 请求失败");
+      reportFaucetPageError("Faucet request failed", error, { address });
     } finally {
       setLoading(false);
     }
