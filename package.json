@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest --configLoader native",
     "test:run": "vitest run --configLoader native",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "check": "npm run lint && npm run typecheck && npm run test:run"
   },
   "dependencies": {
@@ -29,6 +31,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

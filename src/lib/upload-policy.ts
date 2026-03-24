@@ -68,6 +68,10 @@ function getFileExtension(fileName: string) {
 }
 
 export function getUploadMaxFileSizeBytes() {
+  if (typeof window !== "undefined") {
+    return DEFAULT_UPLOAD_MAX_FILE_SIZE_BYTES;
+  }
+
   const value =
     getServerEnv().UPLOAD_MAX_FILE_SIZE_BYTES ||
     DEFAULT_UPLOAD_MAX_FILE_SIZE_BYTES;

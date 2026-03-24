@@ -341,6 +341,7 @@ export default function FaucetPage() {
 
               <button
                 type="button"
+                data-testid="faucet-claim-button"
                 onClick={handleClaim}
                 disabled={!isConnected || !isCorrectChain || loading}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"

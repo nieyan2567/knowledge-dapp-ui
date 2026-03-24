@@ -330,6 +330,7 @@ export default function GovernancePage() {
 							</div>
 
 							<button
+								data-testid="governance-propose-button"
 								onClick={handlePropose}
 								disabled={!parsedProposalInput}
 								className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"

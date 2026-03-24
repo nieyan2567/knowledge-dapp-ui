@@ -308,6 +308,7 @@ export default function StakePage() {
 						/>
 						<div className="flex flex-wrap gap-3">
 							<button
+								data-testid="stake-deposit-button"
 								onClick={handleDeposit}
 								className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
 							>
