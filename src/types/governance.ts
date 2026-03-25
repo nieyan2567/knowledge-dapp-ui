@@ -37,6 +37,7 @@ export interface ProposalActionSummary {
   functionName: string
   title: string
   description: string
+  details?: Array<{ label: string; value: string }>
   rawCalldata: HexString
 }
 

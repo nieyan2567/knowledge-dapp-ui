@@ -33,9 +33,20 @@ type ProposalCreatedLog = {
   transactionHash?: HexString | null;
 };
 
-export function parseProposalCreatedLog(
-  log: ProposalCreatedLog
-): ProposalItem {
+const ZERO_ROLE = `0x${"00".repeat(32)}` as HexString;
+const TIMELOCK_ROLE_LABELS: Record<string, string> = {
+  [ZERO_ROLE.toLowerCase()]: "DEFAULT_ADMIN_ROLE",
+  "0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1":
+    "PROPOSER_ROLE",
+  "0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63":
+    "EXECUTOR_ROLE",
+  "0xfd643c72710c63c0180259aba6b2d05451e3591a24e58b62239378085726f783":
+    "CANCELLER_ROLE",
+  "0x5f58e3a2316349923ce3780f8d587db2d72378aed66a8261c916544fa6846ca5":
+    "TIMELOCK_ADMIN_ROLE",
+};
+
+export function parseProposalCreatedLog(log: ProposalCreatedLog): ProposalItem {
   const args = log.args;
 
   if (
@@ -120,51 +131,34 @@ function isSameAddress(left: string, right: string) {
 }
 
 function getContractLabel(address: Address) {
-  if (isSameAddress(address, CONTRACTS.KnowledgeContent)) {
-    return "KnowledgeContent";
-  }
-
-  if (isSameAddress(address, CONTRACTS.TreasuryNative)) {
-    return "TreasuryNative";
-  }
-
-  if (isSameAddress(address, CONTRACTS.KnowledgeGovernor)) {
-    return "KnowledgeGovernor";
-  }
-
-  if (isSameAddress(address, CONTRACTS.TimelockController)) {
-    return "TimelockController";
-  }
-
-  if (isSameAddress(address, CONTRACTS.NativeVotes)) {
-    return "NativeVotes";
-  }
-
+  if (isSameAddress(address, CONTRACTS.KnowledgeContent)) return "KnowledgeContent";
+  if (isSameAddress(address, CONTRACTS.TreasuryNative)) return "TreasuryNative";
+  if (isSameAddress(address, CONTRACTS.KnowledgeGovernor)) return "KnowledgeGovernor";
+  if (isSameAddress(address, CONTRACTS.TimelockController)) return "TimelockController";
+  if (isSameAddress(address, CONTRACTS.NativeVotes)) return "NativeVotes";
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
 function formatGenericArgument(value: unknown): string {
-  if (typeof value === "bigint") {
-    return value.toString();
-  }
-
+  if (typeof value === "bigint") return value.toString();
   if (Array.isArray(value)) {
     return `[${value.map((item) => formatGenericArgument(item)).join(", ")}]`;
   }
-
-  if (typeof value === "boolean") {
-    return value ? "true" : "false";
-  }
-
+  if (typeof value === "boolean") return value ? "true" : "false";
   return String(value);
 }
 
-function appendValueSuffix(description: string, value: bigint) {
-  if (value === 0n) {
-    return description;
-  }
+function formatRoleLabel(role: string) {
+  return TIMELOCK_ROLE_LABELS[role.toLowerCase()] ?? role;
+}
 
+function appendValueSuffix(description: string, value: bigint) {
+  if (value === 0n) return description;
   return `${description}，并附带 ${formatEther(value)} ${BRANDING.nativeTokenSymbol}`;
+}
+
+function createSummary(input: ProposalActionSummary): ProposalActionSummary {
+  return input;
 }
 
 function summarizeDecodedAction(
@@ -180,96 +174,84 @@ function summarizeDecodedAction(
         abi: ABIS.KnowledgeContent,
         data: calldata,
       });
-      const decodedArgs = decoded.args ?? [];
+      const args = decoded.args ?? [];
 
       if (
         decoded.functionName === "setRewardRules" &&
-        decodedArgs.length >= 2 &&
-        typeof decodedArgs[0] === "bigint" &&
-        typeof decodedArgs[1] === "bigint"
+        typeof args[0] === "bigint" &&
+        typeof args[1] === "bigint"
       ) {
-        const [minVotesToReward, rewardPerVote] = decodedArgs;
-        return {
+        return createSummary({
           target,
           targetLabel,
           value,
           functionName: decoded.functionName,
           title: "更新奖励规则",
           description: appendValueSuffix(
-            `将最小获奖票数设为 ${minVotesToReward.toString()}，单票奖励设为 ${formatEther(rewardPerVote)} ${BRANDING.nativeTokenSymbol}`,
+            `将最小获奖票数设为 ${args[0].toString()}，单票奖励设为 ${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}`,
             value
           ),
+          details: [
+            { label: "最小获奖票数", value: args[0].toString() },
+            { label: "单票奖励", value: `${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}` },
+          ],
           rawCalldata: calldata,
-        };
+        });
       }
 
-      if (
-        decoded.functionName === "setTreasury" &&
-        decodedArgs.length >= 1 &&
-        typeof decodedArgs[0] === "string"
-      ) {
-        return {
+      if (decoded.functionName === "setTreasury" && typeof args[0] === "string") {
+        return createSummary({
           target,
           targetLabel,
           value,
           functionName: decoded.functionName,
           title: "更新 Treasury 地址",
-          description: appendValueSuffix(
-            `将内容合约的 Treasury 更新为 ${decodedArgs[0]}`,
-            value
-          ),
+          description: appendValueSuffix(`将内容合约的 Treasury 更新为 ${args[0]}`, value),
+          details: [{ label: "Treasury", value: args[0] }],
           rawCalldata: calldata,
-        };
+        });
       }
 
       if (
         decoded.functionName === "setAntiSybil" &&
-        decodedArgs.length >= 2 &&
-        typeof decodedArgs[0] === "string" &&
-        typeof decodedArgs[1] === "bigint"
+        typeof args[0] === "string" &&
+        typeof args[1] === "bigint"
       ) {
-        return {
+        return createSummary({
           target,
           targetLabel,
           value,
           functionName: decoded.functionName,
           title: "更新 Anti-Sybil 配置",
           description: appendValueSuffix(
-            `将 Votes 合约更新为 ${decodedArgs[0]}，最小质押门槛设为 ${formatEther(decodedArgs[1])} ${BRANDING.nativeTokenSymbol}`,
+            `将 Votes 合约更新为 ${args[0]}，最小质押门槛设为 ${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}`,
             value
           ),
+          details: [
+            { label: "Votes 合约", value: args[0] },
+            { label: "最小质押门槛", value: `${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}` },
+          ],
           rawCalldata: calldata,
-        };
+        });
       }
 
-      if (decoded.functionName === "pause") {
-        return {
+      if (decoded.functionName === "pause" || decoded.functionName === "unpause") {
+        const paused = decoded.functionName === "pause";
+        return createSummary({
           target,
           targetLabel,
           value,
           functionName: decoded.functionName,
-          title: "暂停内容模块",
+          title: paused ? "暂停内容模块" : "恢复内容模块",
           description: appendValueSuffix(
-            "暂停内容注册、投票和奖励相关操作",
+            paused
+              ? "暂停内容注册、投票和奖励相关操作"
+              : "恢复内容注册、投票和奖励相关操作",
             value
           ),
+          details: [{ label: "模块", value: "KnowledgeContent" }],
           rawCalldata: calldata,
-        };
-      }
-
-      if (decoded.functionName === "unpause") {
-        return {
-          target,
-          targetLabel,
-          value,
-          functionName: decoded.functionName,
-          title: "恢复内容模块",
-          description: appendValueSuffix(
-            "恢复内容注册、投票和奖励相关操作",
-            value
-          ),
-          rawCalldata: calldata,
-        };
+        });
       }
     }
 
@@ -278,77 +260,69 @@ function summarizeDecodedAction(
         abi: ABIS.TreasuryNative,
         data: calldata,
       });
-      const decodedArgs = decoded.args ?? [];
+      const args = decoded.args ?? [];
 
       if (
         decoded.functionName === "setBudget" &&
-        decodedArgs.length >= 2 &&
-        typeof decodedArgs[0] === "bigint" &&
-        typeof decodedArgs[1] === "bigint"
+        typeof args[0] === "bigint" &&
+        typeof args[1] === "bigint"
       ) {
-        const [epochDuration, epochBudget] = decodedArgs;
-        return {
+        return createSummary({
           target,
           targetLabel,
           value,
           functionName: decoded.functionName,
           title: "更新 Treasury 预算",
           description: appendValueSuffix(
-            `将周期时长设为 ${epochDuration.toString()} 秒，周期预算设为 ${formatEther(epochBudget)} ${BRANDING.nativeTokenSymbol}`,
+            `将周期时长设为 ${args[0].toString()} 秒，周期预算设为 ${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}`,
             value
           ),
+          details: [
+            { label: "周期时长", value: `${args[0].toString()} 秒` },
+            { label: "周期预算", value: `${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}` },
+          ],
           rawCalldata: calldata,
-        };
+        });
       }
 
       if (
         decoded.functionName === "setSpender" &&
-        decodedArgs.length >= 2 &&
-        typeof decodedArgs[0] === "string" &&
-        typeof decodedArgs[1] === "boolean"
+        typeof args[0] === "string" &&
+        typeof args[1] === "boolean"
       ) {
-        return {
+        return createSummary({
           target,
           targetLabel,
           value,
           functionName: decoded.functionName,
           title: "更新 Treasury Spender 权限",
           description: appendValueSuffix(
-            `${decodedArgs[1] ? "授予" : "撤销"} ${decodedArgs[0]} 的 spender 权限`,
+            `${args[1] ? "授予" : "撤销"} ${args[0]} 的 spender 权限`,
             value
           ),
+          details: [
+            { label: "Spender", value: args[0] },
+            { label: "权限", value: args[1] ? "允许" : "撤销" },
+          ],
           rawCalldata: calldata,
-        };
+        });
       }
 
-      if (decoded.functionName === "pause") {
-        return {
+      if (decoded.functionName === "pause" || decoded.functionName === "unpause") {
+        const paused = decoded.functionName === "pause";
+        return createSummary({
           target,
           targetLabel,
           value,
           functionName: decoded.functionName,
-          title: "暂停 Treasury",
+          title: paused ? "暂停 Treasury" : "恢复 Treasury",
           description: appendValueSuffix(
-            "暂停 Treasury 的敏感链上操作",
+            paused ? "暂停 Treasury 的敏感链上操作" : "恢复 Treasury 的敏感链上操作",
             value
           ),
+          details: [{ label: "模块", value: "TreasuryNative" }],
           rawCalldata: calldata,
-        };
-      }
-
-      if (decoded.functionName === "unpause") {
-        return {
-          target,
-          targetLabel,
-          value,
-          functionName: decoded.functionName,
-          title: "恢复 Treasury",
-          description: appendValueSuffix(
-            "恢复 Treasury 的敏感链上操作",
-            value
-          ),
-          rawCalldata: calldata,
-        };
+        });
       }
     }
 
@@ -357,101 +331,74 @@ function summarizeDecodedAction(
         abi: ABIS.KnowledgeGovernor,
         data: calldata,
       });
-      const decodedArgs = decoded.args ?? [];
+      const args = decoded.args ?? [];
 
-      if (
-        decoded.functionName === "setProposalThreshold" &&
-        decodedArgs.length >= 1 &&
-        typeof decodedArgs[0] === "bigint"
-      ) {
-        return {
+      if (decoded.functionName === "setProposalThreshold" && typeof args[0] === "bigint") {
+        return createSummary({
           target,
           targetLabel,
           value,
           functionName: decoded.functionName,
           title: "更新提案门槛",
           description: appendValueSuffix(
-            `将提案门槛更新为 ${formatEther(decodedArgs[0])} ${BRANDING.nativeTokenSymbol}`,
+            `将提案门槛更新为 ${formatEther(args[0])} ${BRANDING.nativeTokenSymbol}`,
             value
           ),
+          details: [{ label: "提案门槛", value: `${formatEther(args[0])} ${BRANDING.nativeTokenSymbol}` }],
           rawCalldata: calldata,
-        };
+        });
       }
 
-      if (
-        decoded.functionName === "setVotingDelay" &&
-        decodedArgs.length >= 1 &&
-        typeof decodedArgs[0] === "bigint"
-      ) {
-        return {
+      if (decoded.functionName === "setVotingDelay" && typeof args[0] === "bigint") {
+        return createSummary({
           target,
           targetLabel,
           value,
           functionName: decoded.functionName,
           title: "更新投票延迟",
-          description: appendValueSuffix(
-            `将投票延迟更新为 ${decodedArgs[0].toString()} 个区块`,
-            value
-          ),
+          description: appendValueSuffix(`将投票延迟更新为 ${args[0].toString()} 个区块`, value),
+          details: [{ label: "投票延迟", value: `${args[0].toString()} 个区块` }],
           rawCalldata: calldata,
-        };
+        });
       }
 
-      if (
-        decoded.functionName === "setVotingPeriod" &&
-        decodedArgs.length >= 1 &&
-        typeof decodedArgs[0] === "bigint"
-      ) {
-        return {
+      if (decoded.functionName === "setVotingPeriod" && typeof args[0] === "bigint") {
+        return createSummary({
           target,
           targetLabel,
           value,
           functionName: decoded.functionName,
           title: "更新投票周期",
-          description: appendValueSuffix(
-            `将投票周期更新为 ${decodedArgs[0].toString()} 个区块`,
-            value
-          ),
+          description: appendValueSuffix(`将投票周期更新为 ${args[0].toString()} 个区块`, value),
+          details: [{ label: "投票周期", value: `${args[0].toString()} 个区块` }],
           rawCalldata: calldata,
-        };
+        });
       }
 
-      if (
-        decoded.functionName === "updateQuorumNumerator" &&
-        decodedArgs.length >= 1 &&
-        typeof decodedArgs[0] === "bigint"
-      ) {
-        return {
+      if (decoded.functionName === "updateQuorumNumerator" && typeof args[0] === "bigint") {
+        return createSummary({
           target,
           targetLabel,
           value,
           functionName: decoded.functionName,
           title: "更新法定人数分子",
-          description: appendValueSuffix(
-            `将法定人数分子更新为 ${decodedArgs[0].toString()}`,
-            value
-          ),
+          description: appendValueSuffix(`将法定人数分子更新为 ${args[0].toString()}`, value),
+          details: [{ label: "法定人数分子", value: args[0].toString() }],
           rawCalldata: calldata,
-        };
+        });
       }
 
-      if (
-        decoded.functionName === "updateTimelock" &&
-        decodedArgs.length >= 1 &&
-        typeof decodedArgs[0] === "string"
-      ) {
-        return {
+      if (decoded.functionName === "updateTimelock" && typeof args[0] === "string") {
+        return createSummary({
           target,
           targetLabel,
           value,
           functionName: decoded.functionName,
           title: "更新 Governor Timelock",
-          description: appendValueSuffix(
-            `将 Governor 使用的 Timelock 更新为 ${decodedArgs[0]}`,
-            value
-          ),
+          description: appendValueSuffix(`将 Governor 使用的 Timelock 更新为 ${args[0]}`, value),
+          details: [{ label: "Timelock", value: args[0] }],
           rawCalldata: calldata,
-        };
+        });
       }
     }
 
@@ -460,25 +407,44 @@ function summarizeDecodedAction(
         abi: ABIS.TimelockController,
         data: calldata,
       });
-      const decodedArgs = decoded.args ?? [];
+      const args = decoded.args ?? [];
 
-      if (
-        decoded.functionName === "updateDelay" &&
-        decodedArgs.length >= 1 &&
-        typeof decodedArgs[0] === "bigint"
-      ) {
-        return {
+      if (decoded.functionName === "updateDelay" && typeof args[0] === "bigint") {
+        return createSummary({
           target,
           targetLabel,
           value,
           functionName: decoded.functionName,
           title: "更新 Timelock 延迟",
+          description: appendValueSuffix(`将 Timelock 最小延迟更新为 ${args[0].toString()} 秒`, value),
+          details: [{ label: "最小延迟", value: `${args[0].toString()} 秒` }],
+          rawCalldata: calldata,
+        });
+      }
+
+      if (
+        (decoded.functionName === "grantRole" || decoded.functionName === "revokeRole") &&
+        typeof args[0] === "string" &&
+        typeof args[1] === "string"
+      ) {
+        const granting = decoded.functionName === "grantRole";
+        return createSummary({
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: granting ? "授予 Timelock 角色" : "撤销 Timelock 角色",
           description: appendValueSuffix(
-            `将 Timelock 最小延迟更新为 ${decodedArgs[0].toString()} 秒`,
+            `${granting ? "授予" : "撤销"} ${args[1]} 的 ${formatRoleLabel(args[0])} 权限`,
             value
           ),
+          details: [
+            { label: "角色", value: formatRoleLabel(args[0]) },
+            { label: "账户", value: args[1] },
+            { label: "操作", value: granting ? "grantRole" : "revokeRole" },
+          ],
           rawCalldata: calldata,
-        };
+        });
       }
     }
 
@@ -498,37 +464,38 @@ function summarizeDecodedAction(
         abi,
         data: calldata,
       });
-      const decodedArgs = decoded.args ?? [];
+      const args = decoded.args ?? [];
 
-      return {
+      return createSummary({
         target,
         targetLabel,
         value,
         functionName: decoded.functionName,
         title: `调用 ${targetLabel}.${decoded.functionName}`,
         description: appendValueSuffix(
-          `参数: ${decodedArgs.map((arg) => formatGenericArgument(arg)).join(", ") || "无"}`,
+          `参数: ${args.map((arg) => formatGenericArgument(arg)).join(", ") || "无"}`,
           value
         ),
+        details: args.map((arg, index) => ({
+          label: `参数 ${index + 1}`,
+          value: formatGenericArgument(arg),
+        })),
         rawCalldata: calldata,
-      };
+      });
     }
   } catch {
-    // Fall through to raw calldata fallback.
+    // Fall through.
   }
 
-  return {
+  return createSummary({
     target,
     targetLabel,
     value,
     functionName: "unknown",
     title: `调用 ${targetLabel}`,
-    description: appendValueSuffix(
-      "暂时无法解码该提案动作，下面保留原始 calldata",
-      value
-    ),
+    description: appendValueSuffix("暂时无法解码该提案动作，下面保留原始 calldata", value),
     rawCalldata: calldata,
-  };
+  });
 }
 
 export function summarizeProposalActions(

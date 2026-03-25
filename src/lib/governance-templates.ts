@@ -1,4 +1,12 @@
-import { encodeFunctionData, formatEther, isAddress, parseEther } from "viem";
+import {
+  encodeFunctionData,
+  formatEther,
+  isAddress,
+  keccak256,
+  parseEther,
+  stringToBytes,
+  toHex,
+} from "viem";
 
 import { ABIS, CONTRACTS } from "@/contracts";
 import { BRANDING } from "@/lib/branding";
@@ -20,6 +28,29 @@ type TemplateCodec = {
   validate: (values: Record<string, string | boolean>) => ValidationResult;
   encode: (values: Record<string, string | boolean>) => GovernanceEncodedAction;
 };
+
+const TIMELOCK_ROLE_OPTIONS = [
+  {
+    label: "DEFAULT_ADMIN_ROLE",
+    value: `0x${"00".repeat(32)}`,
+  },
+  {
+    label: "PROPOSER_ROLE",
+    value: keccak256(toHex(stringToBytes("PROPOSER_ROLE"))),
+  },
+  {
+    label: "EXECUTOR_ROLE",
+    value: keccak256(toHex(stringToBytes("EXECUTOR_ROLE"))),
+  },
+  {
+    label: "CANCELLER_ROLE",
+    value: keccak256(toHex(stringToBytes("CANCELLER_ROLE"))),
+  },
+  {
+    label: "TIMELOCK_ADMIN_ROLE",
+    value: keccak256(toHex(stringToBytes("TIMELOCK_ADMIN_ROLE"))),
+  },
+] as const;
 
 function createDraftId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -83,6 +114,25 @@ function parseRequiredAddress(
   }
 
   return value as Address;
+}
+
+function parseRequiredSelect(
+  values: Record<string, string | boolean>,
+  key: string,
+  label: string,
+  allowedValues: readonly string[]
+): string | FailedValidation {
+  const value = readString(values, key);
+
+  if (!value) {
+    return fail(`请输入${label}`);
+  }
+
+  if (!allowedValues.includes(value)) {
+    return fail(`${label}不在允许范围内`);
+  }
+
+  return value;
 }
 
 function parseRequiredUint(
@@ -451,6 +501,66 @@ export const GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
       },
     ],
   },
+  {
+    id: "timelock.grantRole",
+    category: "timelock",
+    label: "Grant Timelock Role",
+    description: "向指定账户授予 Timelock 角色。",
+    riskLevel: "high",
+    target: CONTRACTS.TimelockController as Address,
+    functionName: "grantRole",
+    valueMode: "fixedZero",
+    fields: [
+      {
+        key: "role",
+        label: "角色",
+        type: "select",
+        required: true,
+        defaultValue: TIMELOCK_ROLE_OPTIONS[1].value,
+        options: TIMELOCK_ROLE_OPTIONS.map((option) => ({
+          label: option.label,
+          value: option.value,
+        })),
+      },
+      {
+        key: "account",
+        label: "账户地址",
+        type: "address",
+        required: true,
+        placeholder: CONTRACTS.KnowledgeGovernor,
+      },
+    ],
+  },
+  {
+    id: "timelock.revokeRole",
+    category: "timelock",
+    label: "Revoke Timelock Role",
+    description: "撤销指定账户的 Timelock 角色。",
+    riskLevel: "high",
+    target: CONTRACTS.TimelockController as Address,
+    functionName: "revokeRole",
+    valueMode: "fixedZero",
+    fields: [
+      {
+        key: "role",
+        label: "角色",
+        type: "select",
+        required: true,
+        defaultValue: TIMELOCK_ROLE_OPTIONS[1].value,
+        options: TIMELOCK_ROLE_OPTIONS.map((option) => ({
+          label: option.label,
+          value: option.value,
+        })),
+      },
+      {
+        key: "account",
+        label: "账户地址",
+        type: "address",
+        required: true,
+        placeholder: CONTRACTS.KnowledgeGovernor,
+      },
+    ],
+  },
 ];
 
 const templateCodecs: Record<string, TemplateCodec> = {
@@ -790,6 +900,88 @@ const templateCodecs: Record<string, TemplateCodec> = {
         args: [delaySeconds],
         title: "更新 Timelock 延迟",
         description: `将 Timelock 最小延迟更新为 ${delaySeconds.toString()} 秒`,
+        riskLevel: "high",
+      });
+    },
+  },
+  "timelock.grantRole": {
+    validate(values) {
+      const role = parseRequiredSelect(
+        values,
+        "role",
+        "角色",
+        TIMELOCK_ROLE_OPTIONS.map((option) => option.value)
+      );
+      if (isFailed(role)) return role;
+
+      const account = parseRequiredAddress(values, "account", "账户地址");
+      return isFailed(account) ? account : ok();
+    },
+    encode(values) {
+      const role = parseRequiredSelect(
+        values,
+        "role",
+        "角色",
+        TIMELOCK_ROLE_OPTIONS.map((option) => option.value)
+      );
+      const account = parseRequiredAddress(values, "account", "账户地址");
+
+      if (isFailed(role) || isFailed(account)) {
+        throw new Error("Invalid timelock grant role draft");
+      }
+
+      const roleLabel =
+        TIMELOCK_ROLE_OPTIONS.find((option) => option.value === role)?.label ?? role;
+
+      return buildEncodedAction({
+        templateId: "timelock.grantRole",
+        target: CONTRACTS.TimelockController as Address,
+        abi: ABIS.TimelockController,
+        functionName: "grantRole",
+        args: [role, account],
+        title: "授予 Timelock 角色",
+        description: `向 ${account} 授予 ${roleLabel}`,
+        riskLevel: "high",
+      });
+    },
+  },
+  "timelock.revokeRole": {
+    validate(values) {
+      const role = parseRequiredSelect(
+        values,
+        "role",
+        "角色",
+        TIMELOCK_ROLE_OPTIONS.map((option) => option.value)
+      );
+      if (isFailed(role)) return role;
+
+      const account = parseRequiredAddress(values, "account", "账户地址");
+      return isFailed(account) ? account : ok();
+    },
+    encode(values) {
+      const role = parseRequiredSelect(
+        values,
+        "role",
+        "角色",
+        TIMELOCK_ROLE_OPTIONS.map((option) => option.value)
+      );
+      const account = parseRequiredAddress(values, "account", "账户地址");
+
+      if (isFailed(role) || isFailed(account)) {
+        throw new Error("Invalid timelock revoke role draft");
+      }
+
+      const roleLabel =
+        TIMELOCK_ROLE_OPTIONS.find((option) => option.value === role)?.label ?? role;
+
+      return buildEncodedAction({
+        templateId: "timelock.revokeRole",
+        target: CONTRACTS.TimelockController as Address,
+        abi: ABIS.TimelockController,
+        functionName: "revokeRole",
+        args: [role, account],
+        title: "撤销 Timelock 角色",
+        description: `撤销 ${account} 的 ${roleLabel}`,
         riskLevel: "high",
       });
     },

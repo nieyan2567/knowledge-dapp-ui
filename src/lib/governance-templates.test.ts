@@ -72,4 +72,25 @@ describe("governance-templates", () => {
     expect(encoded.target).toBe(CONTRACTS.TimelockController);
     expect(encoded.description).toContain("7200");
   });
+
+  it("encodes timelock grant role proposals", () => {
+    const draft = createGovernanceDraftAction("timelock.grantRole");
+    draft.values.account = CONTRACTS.KnowledgeGovernor;
+
+    const encoded = encodeGovernanceActionDraft(draft);
+
+    expect(encoded.templateId).toBe("timelock.grantRole");
+    expect(encoded.target).toBe(CONTRACTS.TimelockController);
+    expect(encoded.description).toContain("PROPOSER_ROLE");
+  });
+
+  it("validates timelock role selections", () => {
+    const draft = createGovernanceDraftAction("timelock.revokeRole");
+    draft.values.role = "0x1234";
+
+    expect(validateGovernanceActionDraft(draft)).toEqual({
+      ok: false,
+      error: "角色不在允许范围内",
+    });
+  });
 });
