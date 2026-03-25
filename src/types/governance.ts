@@ -39,3 +39,58 @@ export interface ProposalActionSummary {
   description: string
   rawCalldata: HexString
 }
+
+export type GovernanceTemplateCategory =
+  | "content"
+  | "treasury"
+  | "governor"
+  | "timelock"
+
+export type GovernanceRiskLevel = "low" | "medium" | "high"
+
+export type GovernanceFieldType =
+  | "string"
+  | "address"
+  | "uint256"
+  | "tokenAmount"
+  | "boolean"
+  | "select"
+
+export interface GovernanceTemplateField {
+  key: string
+  label: string
+  type: GovernanceFieldType
+  required: boolean
+  description?: string
+  placeholder?: string
+  defaultValue?: string | boolean
+  options?: Array<{ label: string; value: string }>
+}
+
+export interface GovernanceTemplateDefinition {
+  id: string
+  category: GovernanceTemplateCategory
+  label: string
+  description: string
+  riskLevel: GovernanceRiskLevel
+  target: Address
+  functionName: string
+  valueMode: "fixedZero" | "optionalNativeValue"
+  fields: GovernanceTemplateField[]
+}
+
+export interface GovernanceDraftAction {
+  id: string
+  templateId: string
+  values: Record<string, string | boolean>
+}
+
+export interface GovernanceEncodedAction {
+  templateId: string
+  target: Address
+  value: bigint
+  calldata: HexString
+  title: string
+  description: string
+  riskLevel: GovernanceRiskLevel
+}

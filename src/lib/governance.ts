@@ -1,10 +1,10 @@
 import {
-	decodeFunctionData,
-	formatEther,
-	keccak256,
-	parseAbiItem,
-	stringToBytes,
-	toHex,
+  decodeFunctionData,
+  formatEther,
+  keccak256,
+  parseAbiItem,
+  stringToBytes,
+  toHex,
 } from "viem";
 
 import { ABIS, CONTRACTS } from "@/contracts";
@@ -13,297 +13,532 @@ import type { Address, HexString } from "@/types/contracts";
 import type { ProposalActionSummary, ProposalItem } from "@/types/governance";
 
 export const proposalCreatedEvent = parseAbiItem(
-	"event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)"
+  "event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)"
 );
 
 type ProposalCreatedArgs = {
-	proposalId?: bigint;
-	proposer?: Address;
-	targets?: readonly Address[];
-	values?: readonly bigint[];
-	calldatas?: readonly HexString[];
-	voteStart?: bigint;
-	voteEnd?: bigint;
-	description?: string;
+  proposalId?: bigint;
+  proposer?: Address;
+  targets?: readonly Address[];
+  values?: readonly bigint[];
+  calldatas?: readonly HexString[];
+  voteStart?: bigint;
+  voteEnd?: bigint;
+  description?: string;
 };
 
 type ProposalCreatedLog = {
-	args: ProposalCreatedArgs;
-	blockNumber?: bigint | null;
-	transactionHash?: HexString | null;
+  args: ProposalCreatedArgs;
+  blockNumber?: bigint | null;
+  transactionHash?: HexString | null;
 };
 
 export function parseProposalCreatedLog(
-	log: ProposalCreatedLog
+  log: ProposalCreatedLog
 ): ProposalItem {
-	const args = log.args;
+  const args = log.args;
 
-	if (
-		args.proposalId === undefined ||
-		args.proposer === undefined ||
-		args.targets === undefined ||
-		args.values === undefined ||
-		args.calldatas === undefined ||
-		args.voteStart === undefined ||
-		args.voteEnd === undefined ||
-		args.description === undefined
-	) {
-		throw new Error("Incomplete ProposalCreated log");
-	}
+  if (
+    args.proposalId === undefined ||
+    args.proposer === undefined ||
+    args.targets === undefined ||
+    args.values === undefined ||
+    args.calldatas === undefined ||
+    args.voteStart === undefined ||
+    args.voteEnd === undefined ||
+    args.description === undefined
+  ) {
+    throw new Error("Incomplete ProposalCreated log");
+  }
 
-	return {
-		proposalId: args.proposalId,
-		proposer: args.proposer,
-		targets: args.targets,
-		values: args.values,
-		calldatas: args.calldatas,
-		voteStart: args.voteStart,
-		voteEnd: args.voteEnd,
-		description: args.description,
-		descriptionHash: keccak256(toHex(stringToBytes(args.description))),
-		blockNumber: log.blockNumber ?? 0n,
-		transactionHash: log.transactionHash ?? undefined,
-	};
+  return {
+    proposalId: args.proposalId,
+    proposer: args.proposer,
+    targets: args.targets,
+    values: args.values,
+    calldatas: args.calldatas,
+    voteStart: args.voteStart,
+    voteEnd: args.voteEnd,
+    description: args.description,
+    descriptionHash: keccak256(toHex(stringToBytes(args.description))),
+    blockNumber: log.blockNumber ?? 0n,
+    transactionHash: log.transactionHash ?? undefined,
+  };
 }
 
 export function governanceStateLabel(state?: bigint) {
-	switch (Number(state ?? -1)) {
-		case 0:
-			return "待开始";
-		case 1:
-			return "投票中";
-		case 2:
-			return "已取消";
-		case 3:
-			return "未通过";
-		case 4:
-			return "已通过";
-		case 5:
-			return "已排队";
-		case 6:
-			return "已过期";
-		case 7:
-			return "已执行";
-		default:
-			return "未知状态";
-	}
+  switch (Number(state ?? -1)) {
+    case 0:
+      return "待开始";
+    case 1:
+      return "投票中";
+    case 2:
+      return "已取消";
+    case 3:
+      return "未通过";
+    case 4:
+      return "已通过";
+    case 5:
+      return "已排队";
+    case 6:
+      return "已过期";
+    case 7:
+      return "已执行";
+    default:
+      return "未知状态";
+  }
 }
 
 export function governanceStateBadgeClass(state?: bigint) {
-	switch (Number(state ?? -1)) {
-		case 0:
-			return "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300";
-		case 1:
-			return "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300";
-		case 4:
-			return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
-		case 5:
-			return "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300";
-		case 7:
-			return "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200";
-		case 2:
-		case 3:
-		case 6:
-			return "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300";
-		default:
-			return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
-	}
+  switch (Number(state ?? -1)) {
+    case 0:
+      return "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300";
+    case 1:
+      return "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300";
+    case 4:
+      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
+    case 5:
+      return "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300";
+    case 7:
+      return "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200";
+    case 2:
+    case 3:
+    case 6:
+      return "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300";
+    default:
+      return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+  }
 }
 
 export function formatProposalBlockRange(start?: bigint, end?: bigint) {
-	if (start === undefined || end === undefined) return "-";
-	return `${start.toString()} → ${end.toString()}`;
+  if (start === undefined || end === undefined) return "-";
+  return `${start.toString()} -> ${end.toString()}`;
 }
 
 function isSameAddress(left: string, right: string) {
-	return left.toLowerCase() === right.toLowerCase();
+  return left.toLowerCase() === right.toLowerCase();
 }
 
 function getContractLabel(address: Address) {
-	if (isSameAddress(address, CONTRACTS.KnowledgeContent)) {
-		return "KnowledgeContent";
-	}
+  if (isSameAddress(address, CONTRACTS.KnowledgeContent)) {
+    return "KnowledgeContent";
+  }
 
-	if (isSameAddress(address, CONTRACTS.TreasuryNative)) {
-		return "TreasuryNative";
-	}
+  if (isSameAddress(address, CONTRACTS.TreasuryNative)) {
+    return "TreasuryNative";
+  }
 
-	if (isSameAddress(address, CONTRACTS.KnowledgeGovernor)) {
-		return "KnowledgeGovernor";
-	}
+  if (isSameAddress(address, CONTRACTS.KnowledgeGovernor)) {
+    return "KnowledgeGovernor";
+  }
 
-	if (isSameAddress(address, CONTRACTS.TimelockController)) {
-		return "TimelockController";
-	}
+  if (isSameAddress(address, CONTRACTS.TimelockController)) {
+    return "TimelockController";
+  }
 
-	if (isSameAddress(address, CONTRACTS.NativeVotes)) {
-		return "NativeVotes";
-	}
+  if (isSameAddress(address, CONTRACTS.NativeVotes)) {
+    return "NativeVotes";
+  }
 
-	return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
 function formatGenericArgument(value: unknown): string {
-	if (typeof value === "bigint") {
-		return value.toString();
-	}
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
 
-	if (Array.isArray(value)) {
-		return `[${value.map((item) => formatGenericArgument(item)).join(", ")}]`;
-	}
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => formatGenericArgument(item)).join(", ")}]`;
+  }
 
-	return String(value);
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+
+  return String(value);
 }
 
 function appendValueSuffix(description: string, value: bigint) {
-	if (value === 0n) {
-		return description;
-	}
+  if (value === 0n) {
+    return description;
+  }
 
-	return `${description}，并附带 ${formatEther(value)} ${BRANDING.nativeTokenSymbol}`;
+  return `${description}，并附带 ${formatEther(value)} ${BRANDING.nativeTokenSymbol}`;
 }
 
 function summarizeDecodedAction(
-	target: Address,
-	value: bigint,
-	calldata: HexString
+  target: Address,
+  value: bigint,
+  calldata: HexString
 ): ProposalActionSummary {
-	const targetLabel = getContractLabel(target);
+  const targetLabel = getContractLabel(target);
 
-	try {
-		if (isSameAddress(target, CONTRACTS.KnowledgeContent)) {
-			const decoded = decodeFunctionData({
-				abi: ABIS.KnowledgeContent,
-				data: calldata,
-			});
-			const decodedArgs = decoded.args ?? [];
+  try {
+    if (isSameAddress(target, CONTRACTS.KnowledgeContent)) {
+      const decoded = decodeFunctionData({
+        abi: ABIS.KnowledgeContent,
+        data: calldata,
+      });
+      const decodedArgs = decoded.args ?? [];
 
-			if (
-				decoded.functionName === "setRewardRules" &&
-				decodedArgs.length >= 2 &&
-				typeof decodedArgs[0] === "bigint" &&
-				typeof decodedArgs[1] === "bigint"
-			) {
-				const [minVotesToReward, rewardPerVote] = decodedArgs;
-				return {
-					target,
-					targetLabel,
-					value,
-					functionName: decoded.functionName,
-					title: "更新奖励规则",
-					description: appendValueSuffix(
-						`将最小获奖票数设为 ${minVotesToReward.toString()}，单票奖励设为 ${formatEther(
-							rewardPerVote
-						)} ${BRANDING.nativeTokenSymbol}`,
-						value
-					),
-					rawCalldata: calldata,
-				};
-			}
+      if (
+        decoded.functionName === "setRewardRules" &&
+        decodedArgs.length >= 2 &&
+        typeof decodedArgs[0] === "bigint" &&
+        typeof decodedArgs[1] === "bigint"
+      ) {
+        const [minVotesToReward, rewardPerVote] = decodedArgs;
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新奖励规则",
+          description: appendValueSuffix(
+            `将最小获奖票数设为 ${minVotesToReward.toString()}，单票奖励设为 ${formatEther(rewardPerVote)} ${BRANDING.nativeTokenSymbol}`,
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
 
-			if (
-				decoded.functionName === "setTreasury" &&
-				decodedArgs.length >= 1 &&
-				typeof decodedArgs[0] === "string"
-			) {
-				return {
-					target,
-					targetLabel,
-					value,
-					functionName: decoded.functionName,
-					title: "更新 Treasury 地址",
-					description: appendValueSuffix(
-						`将 Treasury 更新为 ${decodedArgs[0]}`,
-						value
-					),
-					rawCalldata: calldata,
-				};
-			}
-		}
+      if (
+        decoded.functionName === "setTreasury" &&
+        decodedArgs.length >= 1 &&
+        typeof decodedArgs[0] === "string"
+      ) {
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新 Treasury 地址",
+          description: appendValueSuffix(
+            `将内容合约的 Treasury 更新为 ${decodedArgs[0]}`,
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
 
-		if (isSameAddress(target, CONTRACTS.TreasuryNative)) {
-			const decoded = decodeFunctionData({
-				abi: ABIS.TreasuryNative,
-				data: calldata,
-			});
-			const decodedArgs = decoded.args ?? [];
+      if (
+        decoded.functionName === "setAntiSybil" &&
+        decodedArgs.length >= 2 &&
+        typeof decodedArgs[0] === "string" &&
+        typeof decodedArgs[1] === "bigint"
+      ) {
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新 Anti-Sybil 配置",
+          description: appendValueSuffix(
+            `将 Votes 合约更新为 ${decodedArgs[0]}，最小质押门槛设为 ${formatEther(decodedArgs[1])} ${BRANDING.nativeTokenSymbol}`,
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
 
-			if (
-				decoded.functionName === "setBudget" &&
-				decodedArgs.length >= 2 &&
-				typeof decodedArgs[0] === "bigint" &&
-				typeof decodedArgs[1] === "bigint"
-			) {
-				const [epochDuration, epochBudget] = decodedArgs;
-				return {
-					target,
-					targetLabel,
-					value,
-					functionName: decoded.functionName,
-					title: "更新 Treasury 预算",
-					description: appendValueSuffix(
-						`将周期时长设为 ${epochDuration.toString()} 秒，周期预算设为 ${formatEther(
-							epochBudget
-						)} ${BRANDING.nativeTokenSymbol}`,
-						value
-					),
-					rawCalldata: calldata,
-				};
-			}
-		}
+      if (decoded.functionName === "pause") {
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "暂停内容模块",
+          description: appendValueSuffix(
+            "暂停内容注册、投票和奖励相关操作",
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
 
-		const abi =
-			isSameAddress(target, CONTRACTS.KnowledgeContent)
-				? ABIS.KnowledgeContent
-				: isSameAddress(target, CONTRACTS.TreasuryNative)
-					? ABIS.TreasuryNative
-					: isSameAddress(target, CONTRACTS.KnowledgeGovernor)
-						? ABIS.KnowledgeGovernor
-						: null;
+      if (decoded.functionName === "unpause") {
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "恢复内容模块",
+          description: appendValueSuffix(
+            "恢复内容注册、投票和奖励相关操作",
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
+    }
 
-		if (abi) {
-			const decoded = decodeFunctionData({
-				abi,
-				data: calldata,
-			});
-			const decodedArgs = decoded.args ?? [];
+    if (isSameAddress(target, CONTRACTS.TreasuryNative)) {
+      const decoded = decodeFunctionData({
+        abi: ABIS.TreasuryNative,
+        data: calldata,
+      });
+      const decodedArgs = decoded.args ?? [];
 
-			return {
-				target,
-				targetLabel,
-				value,
-				functionName: decoded.functionName,
-				title: `调用 ${targetLabel}.${decoded.functionName}`,
-				description: appendValueSuffix(
-					`参数：${decodedArgs.map((arg) => formatGenericArgument(arg)).join(", ") || "无"}`,
-					value
-				),
-				rawCalldata: calldata,
-			};
-		}
-	} catch {
-		// Fall through to raw calldata fallback.
-	}
+      if (
+        decoded.functionName === "setBudget" &&
+        decodedArgs.length >= 2 &&
+        typeof decodedArgs[0] === "bigint" &&
+        typeof decodedArgs[1] === "bigint"
+      ) {
+        const [epochDuration, epochBudget] = decodedArgs;
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新 Treasury 预算",
+          description: appendValueSuffix(
+            `将周期时长设为 ${epochDuration.toString()} 秒，周期预算设为 ${formatEther(epochBudget)} ${BRANDING.nativeTokenSymbol}`,
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
 
-	return {
-		target,
-		targetLabel,
-		value,
-		functionName: "unknown",
-		title: `调用 ${targetLabel}`,
-		description: appendValueSuffix("暂时无法解码该提案动作，下面保留原始 calldata", value),
-		rawCalldata: calldata,
-	};
+      if (
+        decoded.functionName === "setSpender" &&
+        decodedArgs.length >= 2 &&
+        typeof decodedArgs[0] === "string" &&
+        typeof decodedArgs[1] === "boolean"
+      ) {
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新 Treasury Spender 权限",
+          description: appendValueSuffix(
+            `${decodedArgs[1] ? "授予" : "撤销"} ${decodedArgs[0]} 的 spender 权限`,
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
+
+      if (decoded.functionName === "pause") {
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "暂停 Treasury",
+          description: appendValueSuffix(
+            "暂停 Treasury 的敏感链上操作",
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
+
+      if (decoded.functionName === "unpause") {
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "恢复 Treasury",
+          description: appendValueSuffix(
+            "恢复 Treasury 的敏感链上操作",
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
+    }
+
+    if (isSameAddress(target, CONTRACTS.KnowledgeGovernor)) {
+      const decoded = decodeFunctionData({
+        abi: ABIS.KnowledgeGovernor,
+        data: calldata,
+      });
+      const decodedArgs = decoded.args ?? [];
+
+      if (
+        decoded.functionName === "setProposalThreshold" &&
+        decodedArgs.length >= 1 &&
+        typeof decodedArgs[0] === "bigint"
+      ) {
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新提案门槛",
+          description: appendValueSuffix(
+            `将提案门槛更新为 ${formatEther(decodedArgs[0])} ${BRANDING.nativeTokenSymbol}`,
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
+
+      if (
+        decoded.functionName === "setVotingDelay" &&
+        decodedArgs.length >= 1 &&
+        typeof decodedArgs[0] === "bigint"
+      ) {
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新投票延迟",
+          description: appendValueSuffix(
+            `将投票延迟更新为 ${decodedArgs[0].toString()} 个区块`,
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
+
+      if (
+        decoded.functionName === "setVotingPeriod" &&
+        decodedArgs.length >= 1 &&
+        typeof decodedArgs[0] === "bigint"
+      ) {
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新投票周期",
+          description: appendValueSuffix(
+            `将投票周期更新为 ${decodedArgs[0].toString()} 个区块`,
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
+
+      if (
+        decoded.functionName === "updateQuorumNumerator" &&
+        decodedArgs.length >= 1 &&
+        typeof decodedArgs[0] === "bigint"
+      ) {
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新法定人数分子",
+          description: appendValueSuffix(
+            `将法定人数分子更新为 ${decodedArgs[0].toString()}`,
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
+
+      if (
+        decoded.functionName === "updateTimelock" &&
+        decodedArgs.length >= 1 &&
+        typeof decodedArgs[0] === "string"
+      ) {
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新 Governor Timelock",
+          description: appendValueSuffix(
+            `将 Governor 使用的 Timelock 更新为 ${decodedArgs[0]}`,
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
+    }
+
+    if (isSameAddress(target, CONTRACTS.TimelockController)) {
+      const decoded = decodeFunctionData({
+        abi: ABIS.TimelockController,
+        data: calldata,
+      });
+      const decodedArgs = decoded.args ?? [];
+
+      if (
+        decoded.functionName === "updateDelay" &&
+        decodedArgs.length >= 1 &&
+        typeof decodedArgs[0] === "bigint"
+      ) {
+        return {
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新 Timelock 延迟",
+          description: appendValueSuffix(
+            `将 Timelock 最小延迟更新为 ${decodedArgs[0].toString()} 秒`,
+            value
+          ),
+          rawCalldata: calldata,
+        };
+      }
+    }
+
+    const abi =
+      isSameAddress(target, CONTRACTS.KnowledgeContent)
+        ? ABIS.KnowledgeContent
+        : isSameAddress(target, CONTRACTS.TreasuryNative)
+          ? ABIS.TreasuryNative
+          : isSameAddress(target, CONTRACTS.KnowledgeGovernor)
+            ? ABIS.KnowledgeGovernor
+            : isSameAddress(target, CONTRACTS.TimelockController)
+              ? ABIS.TimelockController
+              : null;
+
+    if (abi) {
+      const decoded = decodeFunctionData({
+        abi,
+        data: calldata,
+      });
+      const decodedArgs = decoded.args ?? [];
+
+      return {
+        target,
+        targetLabel,
+        value,
+        functionName: decoded.functionName,
+        title: `调用 ${targetLabel}.${decoded.functionName}`,
+        description: appendValueSuffix(
+          `参数: ${decodedArgs.map((arg) => formatGenericArgument(arg)).join(", ") || "无"}`,
+          value
+        ),
+        rawCalldata: calldata,
+      };
+    }
+  } catch {
+    // Fall through to raw calldata fallback.
+  }
+
+  return {
+    target,
+    targetLabel,
+    value,
+    functionName: "unknown",
+    title: `调用 ${targetLabel}`,
+    description: appendValueSuffix(
+      "暂时无法解码该提案动作，下面保留原始 calldata",
+      value
+    ),
+    rawCalldata: calldata,
+  };
 }
 
 export function summarizeProposalActions(
-	proposal: Pick<ProposalItem, "targets" | "values" | "calldatas">
+  proposal: Pick<ProposalItem, "targets" | "values" | "calldatas">
 ): ProposalActionSummary[] {
-	return proposal.targets.map((target, index) =>
-		summarizeDecodedAction(
-			target,
-			proposal.values[index] ?? 0n,
-			proposal.calldatas[index] ?? "0x"
-		)
-	);
+  return proposal.targets.map((target, index) =>
+    summarizeDecodedAction(
+      target,
+      proposal.values[index] ?? 0n,
+      proposal.calldatas[index] ?? "0x"
+    )
+  );
 }
