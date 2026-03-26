@@ -20,18 +20,28 @@ describe("governance-templates", () => {
     });
   });
 
-  it("lists only templates without address inputs", () => {
+  it("lists only non-address templates and excludes pause actions", () => {
     const templates = getGovernanceTemplates();
 
-    expect(templates.length).toBeGreaterThanOrEqual(6);
+    expect(templates.length).toBeGreaterThanOrEqual(5);
     expect(getGovernanceTemplateById("governor.setVotingPeriod")?.functionName).toBe(
       "setVotingPeriod"
     );
     expect(getGovernanceTemplateById("content.setTreasury")).toBeNull();
     expect(getGovernanceTemplateById("timelock.grantRole")).toBeNull();
+    expect(getGovernanceTemplateById("content.pause")).toBeNull();
+    expect(getGovernanceTemplateById("content.unpause")).toBeNull();
+    expect(getGovernanceTemplateById("treasury.pause")).toBeNull();
+    expect(getGovernanceTemplateById("treasury.unpause")).toBeNull();
     expect(
       templates.every((template) =>
         template.fields.every((field) => field.type !== "address")
+      )
+    ).toBe(true);
+    expect(
+      templates.every(
+        (template) =>
+          template.functionName !== "pause" && template.functionName !== "unpause"
       )
     ).toBe(true);
   });

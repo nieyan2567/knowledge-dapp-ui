@@ -564,7 +564,15 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
 ];
 
 function isTemplateAvailable(template: GovernanceTemplateDefinition) {
-  return !template.fields.some((field) => field.type === "address");
+  if (template.fields.some((field) => field.type === "address")) {
+    return false;
+  }
+
+  if (template.functionName === "pause" || template.functionName === "unpause") {
+    return false;
+  }
+
+  return true;
 }
 
 export const GOVERNANCE_TEMPLATES = ALL_GOVERNANCE_TEMPLATES.filter(
