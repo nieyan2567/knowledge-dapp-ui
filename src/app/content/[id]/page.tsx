@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { toast } from "sonner";
+import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import {
   ArrowLeft,
   BookOpen,
@@ -20,17 +20,42 @@ import {
 
 import { AddressBadge } from "@/components/address-badge";
 import { CopyField } from "@/components/copy-field";
+import { FileDrop } from "@/components/file-drop";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
+import { useUploadAuth } from "@/hooks/useUploadAuth";
 import { getIpfsFileUrl } from "@/lib/ipfs";
-import { writeTxToast } from "@/lib/tx-toast";
+import { reportClientError } from "@/lib/observability/client";
+import { txToast, writeTxToast } from "@/lib/tx-toast";
+import {
+  formatUploadFileSize,
+  getUploadMaxFileSizeBytes,
+  validateUploadFile,
+} from "@/lib/upload-policy";
 import { asContentData, asContentVersion } from "@/lib/web3-types";
 import type { ContentVersionData } from "@/types/content";
 
 function formatDate(timestamp: bigint) {
-  return new Date(Number(timestamp) * 1000).toLocaleString();
+  return new Date(Number(timestamp) * 1000).toLocaleString("zh-CN", {
+    hour12: false,
+  });
+}
+
+function reportContentDetailError(
+  message: string,
+  error: unknown,
+  context?: Record<string, unknown>
+) {
+  void reportClientError({
+    message,
+    source: "content.detail",
+    severity: "error",
+    handled: true,
+    error,
+    context,
+  });
 }
 
 export default function ContentDetailPage() {
@@ -39,10 +64,14 @@ export default function ContentDetailPage() {
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const refreshAfterTx = useRefreshOnTxConfirmed();
+  const { ensureUploadAuth, isAuthenticating } = useUploadAuth();
 
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editCid, setEditCid] = useState("");
+  const [versionFile, setVersionFile] = useState<File | null>(null);
+  const [uploadedVersionUrl, setUploadedVersionUrl] = useState("");
+  const [uploadingVersionFile, setUploadingVersionFile] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [loadingVersions, setLoadingVersions] = useState(false);
@@ -54,6 +83,11 @@ export default function ContentDetailPage() {
     if (!/^\d+$/.test(rawId)) return null;
     return BigInt(rawId);
   }, [rawId]);
+
+  const uploadMaxFileSizeText = useMemo(
+    () => formatUploadFileSize(getUploadMaxFileSizeBytes()),
+    []
+  );
 
   const {
     data: contentData,
@@ -120,7 +154,10 @@ export default function ContentDetailPage() {
           .sort((left, right) => Number(right.version - left.version));
 
         setVersions(parsed);
-      } catch {
+      } catch (error) {
+        reportContentDetailError("Failed to load content version history", error, {
+          contentId: contentId.toString(),
+        });
         toast.error("加载内容版本历史失败");
       } finally {
         setLoadingVersions(false);
@@ -141,7 +178,15 @@ export default function ContentDetailPage() {
     setEditTitle(content.title);
     setEditDescription(content.description);
     setEditCid(content.ipfsHash);
-  }, [content]);
+    setVersionFile(null);
+    setUploadedVersionUrl("");
+  }, [
+    content?.id,
+    content?.title,
+    content?.description,
+    content?.ipfsHash,
+    content?.latestVersion,
+  ]);
 
   useEffect(() => {
     void loadVersions();
@@ -179,18 +224,94 @@ export default function ContentDetailPage() {
     );
   }
 
-  const previewUrl = getIpfsFileUrl(content.ipfsHash);
-  const isAuthor = !!address && content.author.toLowerCase() === address.toLowerCase();
-  const canEditContent =
-    isAuthor && !content.deleted && content.voteCount === 0n && !content.rewardAccrued;
-  const canDeleteContent = isAuthor && !content.deleted;
+  const contentRecord = content;
+  const previewUrl = getIpfsFileUrl(contentRecord.ipfsHash);
+  const isAuthor =
+    !!address && contentRecord.author.toLowerCase() === address.toLowerCase();
+  const canEditContent = isAuthor && !contentRecord.deleted;
+  const canDeleteContent = isAuthor && !contentRecord.deleted;
 
-  async function handleVote() {
+  function handleVersionFileChange(selectedFile: File) {
+    const uploadValidation = validateUploadFile(selectedFile);
+
+    if (!uploadValidation.ok) {
+      toast.error(uploadValidation.error);
+      return;
+    }
+
+    setVersionFile(selectedFile);
+  }
+
+  async function handleUploadVersionFile() {
     if (!content) {
       toast.error("内容暂不可用");
       return;
     }
 
+    if (!versionFile) {
+      toast.error("请先选择新版本文件");
+      return;
+    }
+
+    const uploadValidation = validateUploadFile(versionFile);
+    if (!uploadValidation.ok) {
+      toast.error(uploadValidation.error);
+      return;
+    }
+
+    const isAuthorized = await ensureUploadAuth();
+
+    if (!isAuthorized) {
+      return;
+    }
+
+    setUploadingVersionFile(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", versionFile);
+
+      const data = await txToast(
+        (async () => {
+          const response = await fetch("/api/ipfs/upload", {
+            method: "POST",
+            body: formData,
+            credentials: "same-origin",
+          });
+
+          const result = (await response.json()) as {
+            cid?: string;
+            url?: string;
+            error?: string;
+          };
+
+          if (!response.ok || !result.cid || !result.url) {
+            throw new Error(result.error || "新版本文件上传失败");
+          }
+
+          return {
+            cid: result.cid,
+            url: result.url,
+          };
+        })(),
+        "正在上传新版本文件到 IPFS...",
+        "新版本文件上传成功",
+        "新版本文件上传失败"
+      );
+
+      setEditCid(data.cid);
+      setUploadedVersionUrl(data.url);
+    } catch (error) {
+      reportContentDetailError("Failed to upload replacement content file", error, {
+        contentId: content.id.toString(),
+        fileName: versionFile.name,
+      });
+    } finally {
+      setUploadingVersionFile(false);
+    }
+  }
+
+  async function handleVote() {
     if (!address) {
       toast.error("请先连接钱包");
       return;
@@ -203,7 +324,7 @@ export default function ContentDetailPage() {
         address: CONTRACTS.KnowledgeContent as `0x${string}`,
         abi: ABIS.KnowledgeContent,
         functionName: "vote",
-        args: [content.id],
+        args: [contentRecord.id],
         account: address,
       },
       loading: "正在提交投票...",
@@ -216,11 +337,6 @@ export default function ContentDetailPage() {
   }
 
   async function handleAccrueReward() {
-    if (!content) {
-      toast.error("内容暂不可用");
-      return;
-    }
-
     if (!address) {
       toast.error("请先连接钱包");
       return;
@@ -233,7 +349,7 @@ export default function ContentDetailPage() {
         address: CONTRACTS.KnowledgeContent as `0x${string}`,
         abi: ABIS.KnowledgeContent,
         functionName: "distributeReward",
-        args: [content.id],
+        args: [contentRecord.id],
         account: address,
       },
       loading: "正在提交奖励记账...",
@@ -246,23 +362,23 @@ export default function ContentDetailPage() {
   }
 
   async function handleUpdateContent() {
-    if (!content) {
-      toast.error("内容暂不可用");
-      return;
-    }
-
     if (!address) {
       toast.error("请先连接钱包");
       return;
     }
 
     if (!canEditContent) {
-      toast.error("当前内容状态不允许编辑");
+      toast.error("当前内容状态不允许创建新版本");
       return;
     }
 
-    if (!editCid.trim() || !editTitle.trim()) {
-      toast.error("CID 和标题不能为空");
+    if (!editTitle.trim()) {
+      toast.error("请输入内容标题");
+      return;
+    }
+
+    if (!editCid.trim()) {
+      toast.error("请先上传新文件或填写新的 CID");
       return;
     }
 
@@ -276,27 +392,30 @@ export default function ContentDetailPage() {
           address: CONTRACTS.KnowledgeContent as `0x${string}`,
           abi: ABIS.KnowledgeContent,
           functionName: "updateContent",
-          args: [content.id, editCid.trim(), editTitle.trim(), editDescription.trim()],
+          args: [
+            contentRecord.id,
+            editCid.trim(),
+            editTitle.trim(),
+            editDescription.trim(),
+          ],
           account: address,
         },
-        loading: "正在提交内容更新...",
-        success: "内容更新交易已提交",
-        fail: "内容更新失败",
+        loading: "正在提交新版本...",
+        success: "新版本交易已提交",
+        fail: "创建新版本失败",
       });
 
       if (!hash) return;
+
       await refreshAfterTx(hash, refreshDetail, ["content", "dashboard"]);
+      setVersionFile(null);
+      setUploadedVersionUrl("");
     } finally {
       setSavingEdit(false);
     }
   }
 
   async function handleDeleteContent() {
-    if (!content) {
-      toast.error("内容暂不可用");
-      return;
-    }
-
     if (!address) {
       toast.error("请先连接钱包");
       return;
@@ -317,7 +436,7 @@ export default function ContentDetailPage() {
           address: CONTRACTS.KnowledgeContent as `0x${string}`,
           abi: ABIS.KnowledgeContent,
           functionName: "deleteContent",
-          args: [content.id],
+          args: [contentRecord.id],
           account: address,
         },
         loading: "正在提交删除交易...",
@@ -355,16 +474,16 @@ export default function ContentDetailPage() {
       </div>
 
       <PageHeader
-        eyebrow={`内容 #${content.id.toString()}`}
-        title={content.title}
-        description={content.description || "暂无描述"}
+        eyebrow={`内容 #${contentRecord.id.toString()}`}
+        title={contentRecord.title}
+        description={contentRecord.description || "暂无描述"}
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
           <SectionCard
-            title="Current File"
-            description="最新版本快照指向当前链上记录的 CID。"
+            title="当前文件"
+            description="当前快照指向链上记录中的最新 CID。"
           >
             <a
               href={previewUrl}
@@ -382,7 +501,7 @@ export default function ContentDetailPage() {
                     打开当前文件
                   </div>
                   <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    当前激活的 CID 对应版本 v{content.latestVersion.toString()}。
+                    当前激活版本为 v{contentRecord.latestVersion.toString()}
                   </div>
                 </div>
 
@@ -395,81 +514,42 @@ export default function ContentDetailPage() {
           </SectionCard>
 
           <SectionCard
-            title="Content Snapshot"
-            description="当前内容记录已包含快照字段和版本元数据。"
+            title="内容快照"
+            description="当前内容记录包含最新快照和版本元数据。"
           >
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  作者
-                </div>
+              <InfoCard label="作者">
                 <div className="flex items-center gap-2 text-sm text-slate-900 dark:text-slate-100">
                   <User className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                  <AddressBadge address={content.author} />
+                  <AddressBadge address={contentRecord.author} />
                 </div>
-              </div>
+              </InfoCard>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  创建时间
-                </div>
-                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                  {formatDate(content.timestamp)}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  最新版本
-                </div>
-                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                  v{content.latestVersion.toString()} / {versionCount.toString()} stored
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  最后更新时间
-                </div>
-                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                  {formatDate(content.lastUpdatedAt)}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  票数
-                </div>
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
+              <InfoCard label="创建时间">{formatDate(contentRecord.timestamp)}</InfoCard>
+              <InfoCard label="最新版本">
+                v{contentRecord.latestVersion.toString()} / {versionCount.toString()} 个版本
+              </InfoCard>
+              <InfoCard label="最后更新时间">
+                {formatDate(contentRecord.lastUpdatedAt)}
+              </InfoCard>
+              <InfoCard label="票数">
+                <div className="flex items-center gap-2">
                   <Heart className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                  {content.voteCount.toString()}
+                  {contentRecord.voteCount.toString()}
                 </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  奖励状态
-                </div>
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
+              </InfoCard>
+              <InfoCard label="奖励状态">
+                <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                  {content.rewardAccrued ? "已记账" : "待记账"}
+                  {contentRecord.rewardAccrued ? "已记账" : "未记账"}
                 </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  内容状态
-                </div>
-                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                  {content.deleted ? "已删除" : "正常"}
-                </div>
-              </div>
+              </InfoCard>
             </div>
           </SectionCard>
 
           <SectionCard
-            title="Version History"
-            description="较早的 CID 快照会继续保留 pin，并作为不可变版本记录在链上。"
+            title="版本历史"
+            description="历史 CID 会继续保留并作为链上版本记录展示。"
           >
             {loadingVersions ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
@@ -482,7 +562,8 @@ export default function ContentDetailPage() {
             ) : (
               <div className="space-y-4">
                 {versions.map((version) => {
-                  const isCurrentVersion = version.version === content.latestVersion;
+                  const isCurrentVersion =
+                    version.version === contentRecord.latestVersion;
                   const versionUrl = getIpfsFileUrl(version.ipfsHash);
 
                   return (
@@ -515,7 +596,7 @@ export default function ContentDetailPage() {
                         <div>标题：{version.title}</div>
                         <div>描述：{version.description || "暂无描述"}</div>
                         <div className="break-all text-xs text-slate-500 dark:text-slate-400">
-                          CID: {version.ipfsHash}
+                          CID：{version.ipfsHash}
                         </div>
                       </div>
 
@@ -540,13 +621,13 @@ export default function ContentDetailPage() {
 
         <div className="space-y-6">
           <SectionCard
-            title="Content Actions"
-            description="只有在内容处于正常状态时，才可继续投票和奖励记账。"
+            title="内容操作"
+            description="内容未删除时可以继续投票和记账。"
           >
             <div className="space-y-3">
               <button
                 onClick={handleVote}
-                disabled={content.deleted}
+                disabled={contentRecord.deleted}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
               >
                 <Heart className="h-4 w-4" />
@@ -555,7 +636,7 @@ export default function ContentDetailPage() {
 
               <button
                 onClick={handleAccrueReward}
-                disabled={content.deleted}
+                disabled={contentRecord.deleted}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <Coins className="h-4 w-4" />
@@ -564,16 +645,15 @@ export default function ContentDetailPage() {
             </div>
           </SectionCard>
 
-          {isAuthor && (
-            <SectionCard
-              title="Author Actions"
-              description="更新内容会创建新的链上版本，同时保留旧 CID 作为历史版本。"
-            >
-              <div className="space-y-3">
+          <SectionCard
+            title="新版本编辑"
+            description="更新内容会创建一个新的链上版本，并保留旧 CID 作为历史版本。"
+          >
+              <div className="space-y-4">
                 <input
                   value={editTitle}
                   onChange={(event) => setEditTitle(event.target.value)}
-                  disabled={!canEditContent || savingEdit}
+                  disabled={savingEdit || uploadingVersionFile}
                   placeholder="内容标题"
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
                 />
@@ -581,34 +661,67 @@ export default function ContentDetailPage() {
                 <textarea
                   value={editDescription}
                   onChange={(event) => setEditDescription(event.target.value)}
-                  disabled={!canEditContent || savingEdit}
+                  disabled={savingEdit || uploadingVersionFile}
                   placeholder="内容描述"
                   rows={4}
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
                 />
 
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                  <div className="mb-3 text-sm font-medium text-slate-900 dark:text-slate-100">
+                    上传新版本文件
+                  </div>
+                  <FileDrop file={versionFile} onChange={handleVersionFileChange} />
+                  <div className="mt-3 text-xs leading-6 text-slate-500 dark:text-slate-400">
+                    单文件大小上限：{uploadMaxFileSizeText}。上传成功后会自动把新 CID 回填到下方输入框。
+                  </div>
+                  <button
+                    onClick={handleUploadVersionFile}
+                    disabled={
+                      !versionFile ||
+                      savingEdit ||
+                      uploadingVersionFile ||
+                      isAuthenticating
+                    }
+                    className="mt-3 w-full rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    {isAuthenticating
+                      ? "正在验证上传身份..."
+                      : uploadingVersionFile
+                        ? "正在上传新版本文件..."
+                        : "上传新版本文件"}
+                  </button>
+                </div>
+
                 <input
                   value={editCid}
                   onChange={(event) => setEditCid(event.target.value)}
-                  disabled={!canEditContent || savingEdit}
+                  disabled={savingEdit || uploadingVersionFile}
                   placeholder="新的 IPFS CID"
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
                 />
 
+                <CopyField label="当前 CID" value={contentRecord.ipfsHash} />
+                {uploadedVersionUrl ? (
+                  <CopyField label="新版本网关地址" value={uploadedVersionUrl} />
+                ) : null}
+
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
                   {canEditContent
-                    ? "请先上传新文件，再提交替换后的 CID。旧 CID 会继续保留 pin，并显示在版本历史中。"
-                    : "内容删除后、获得投票后，或进入奖励流程后，将不再允许编辑。"}
+                    ? "你现在可以直接修改标题和描述，也可以先上传一个新的文件生成新 CID，再提交链上更新。是否允许创建新版本，最终由合约当前内容策略决定。"
+                    : isAuthor
+                      ? "当前内容状态可能已被合约策略限制，表单仍可编辑，但真正提交时会按链上规则校验。"
+                      : "你可以先准备标题、描述和新 CID；只有作者地址才能真正提交新版本。"}
                 </div>
 
                 <div className="flex flex-wrap gap-3">
                   <button
                     onClick={handleUpdateContent}
-                    disabled={!canEditContent || savingEdit}
+                    disabled={savingEdit || uploadingVersionFile}
                     className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
                   >
                     <PencilLine className="h-4 w-4" />
-                    {savingEdit ? "正在更新..." : "创建新版本"}
+                    {savingEdit ? "正在创建新版本..." : "创建新版本"}
                   </button>
 
                   <button
@@ -622,10 +735,9 @@ export default function ContentDetailPage() {
                 </div>
               </div>
             </SectionCard>
-          )}
 
           <SectionCard
-            title="Current Metadata"
+            title="当前元数据"
             description="当前内容记录只指向最新快照。"
           >
             <div className="space-y-3">
@@ -635,21 +747,39 @@ export default function ContentDetailPage() {
           </SectionCard>
 
           <SectionCard
-            title="Record Summary"
-            description="当前内容记录的简要摘要。"
+            title="记录摘要"
+            description="当前内容记录的简要概览。"
           >
             <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
               <div className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                <span>内容 ID：{content.id.toString()}</span>
+                <span>内容 ID：{contentRecord.id.toString()}</span>
               </div>
-              <div>标题：{content.title}</div>
-              <div>描述：{content.description || "暂无描述"}</div>
-              <div>最新版本：v{content.latestVersion.toString()}</div>
+              <div>标题：{contentRecord.title}</div>
+              <div>描述：{contentRecord.description || "暂无描述"}</div>
+              <div>最新版本：v{contentRecord.latestVersion.toString()}</div>
+              <div>状态：{contentRecord.deleted ? "已删除" : "正常"}</div>
             </div>
           </SectionCard>
         </div>
       </div>
     </main>
+  );
+}
+
+function InfoCard({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {label}
+      </div>
+      <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{children}</div>
+    </div>
   );
 }
