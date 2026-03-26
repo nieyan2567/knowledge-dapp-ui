@@ -20,22 +20,27 @@ describe("governance-templates", () => {
     });
   });
 
-  it("lists only non-address templates and excludes pause actions", () => {
+  it("lists only supported proposal actions", () => {
     const templates = getGovernanceTemplates();
 
-    expect(templates.length).toBeGreaterThanOrEqual(5);
+    expect(templates.length).toBe(9);
     expect(getGovernanceTemplateById("governor.setVotingPeriod")?.functionName).toBe(
       "setVotingPeriod"
     );
     expect(getGovernanceTemplateById("content.setTreasury")).toBeNull();
-    expect(getGovernanceTemplateById("timelock.grantRole")).toBeNull();
+    expect(getGovernanceTemplateById("content.setAntiSybil")).toBeNull();
     expect(getGovernanceTemplateById("content.pause")).toBeNull();
-    expect(getGovernanceTemplateById("content.unpause")).toBeNull();
-    expect(getGovernanceTemplateById("treasury.pause")).toBeNull();
-    expect(getGovernanceTemplateById("treasury.unpause")).toBeNull();
+    expect(getGovernanceTemplateById("treasury.setSpender")).toBeNull();
+    expect(getGovernanceTemplateById("governor.updateTimelock")).toBeNull();
+    expect(getGovernanceTemplateById("timelock.grantRole")).toBeNull();
+  });
+
+  it("does not expose address-based or pause actions", () => {
+    const templates = getGovernanceTemplates();
+
     expect(
       templates.every((template) =>
-        template.fields.every((field) => field.type !== "address")
+        template.fields.every((field) => field.type !== "address" && field.type !== "select")
       )
     ).toBe(true);
     expect(
@@ -61,7 +66,7 @@ describe("governance-templates", () => {
     expect(encoded.target).toBe(CONTRACTS.KnowledgeContent);
     expect(encoded.value).toBe(0n);
     expect(encoded.calldata.startsWith("0x")).toBe(true);
-    expect(encoded.description.length).toBeGreaterThan(0);
+    expect(encoded.description).toContain("单票奖励");
   });
 
   it("encodes content policy proposals", () => {

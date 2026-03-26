@@ -45,7 +45,7 @@ describe("governance summaries", () => {
       epochBudget: "250",
     });
 
-    expect(summary?.title).toContain("Treasury");
+    expect(summary?.title).toContain("金库");
     expect(summary?.description).toContain("3600");
     expect(summary?.details?.[0]?.value).toContain("3600");
   });
@@ -88,7 +88,7 @@ describe("governance summaries", () => {
       delaySeconds: "900",
     });
 
-    expect(summary?.title).toContain("Timelock");
+    expect(summary?.title).toContain("时间锁");
     expect(summary?.description).toContain("900");
     expect(summary?.details?.[0]?.value).toContain("900");
   });

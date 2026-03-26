@@ -1,12 +1,4 @@
-import {
-  encodeFunctionData,
-  formatEther,
-  isAddress,
-  keccak256,
-  parseEther,
-  stringToBytes,
-  toHex,
-} from "viem";
+import { encodeFunctionData, formatEther, parseEther } from "viem";
 
 import { ABIS, CONTRACTS } from "@/contracts";
 import { BRANDING } from "@/lib/branding";
@@ -28,29 +20,6 @@ type TemplateCodec = {
   validate: (values: Record<string, string | boolean>) => ValidationResult;
   encode: (values: Record<string, string | boolean>) => GovernanceEncodedAction;
 };
-
-const TIMELOCK_ROLE_OPTIONS = [
-  {
-    label: "DEFAULT_ADMIN_ROLE",
-    value: `0x${"00".repeat(32)}`,
-  },
-  {
-    label: "PROPOSER_ROLE",
-    value: keccak256(toHex(stringToBytes("PROPOSER_ROLE"))),
-  },
-  {
-    label: "EXECUTOR_ROLE",
-    value: keccak256(toHex(stringToBytes("EXECUTOR_ROLE"))),
-  },
-  {
-    label: "CANCELLER_ROLE",
-    value: keccak256(toHex(stringToBytes("CANCELLER_ROLE"))),
-  },
-  {
-    label: "TIMELOCK_ADMIN_ROLE",
-    value: keccak256(toHex(stringToBytes("TIMELOCK_ADMIN_ROLE"))),
-  },
-] as const;
 
 function createDraftId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -96,43 +65,6 @@ function readBoolean(
   }
 
   return value === "true";
-}
-
-function parseRequiredAddress(
-  values: Record<string, string | boolean>,
-  key: string,
-  label: string
-): Address | FailedValidation {
-  const value = readString(values, key);
-
-  if (!value) {
-    return fail(`请输入${label}`);
-  }
-
-  if (!isAddress(value)) {
-    return fail(`${label}不是有效地址`);
-  }
-
-  return value as Address;
-}
-
-function parseRequiredSelect(
-  values: Record<string, string | boolean>,
-  key: string,
-  label: string,
-  allowedValues: readonly string[]
-): string | FailedValidation {
-  const value = readString(values, key);
-
-  if (!value) {
-    return fail(`请输入${label}`);
-  }
-
-  if (!allowedValues.includes(value)) {
-    return fail(`${label}不在允许范围内`);
-  }
-
-  return value;
 }
 
 function parseRequiredUint(
@@ -205,7 +137,7 @@ function buildEncodedAction(input: {
   };
 }
 
-const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
+const GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "content.setRewardRules",
     category: "content",
@@ -270,76 +202,6 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     ],
   },
   {
-    id: "content.setTreasury",
-    category: "content",
-    label: "更新金库地址",
-    description: "更新内容合约绑定的金库地址。",
-    riskLevel: "medium",
-    target: CONTRACTS.KnowledgeContent as Address,
-    functionName: "setTreasury",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "treasury",
-        label: "金库地址",
-        type: "address",
-        required: true,
-        placeholder: CONTRACTS.TreasuryNative,
-        defaultValue: CONTRACTS.TreasuryNative,
-      },
-    ],
-  },
-  {
-    id: "content.setAntiSybil",
-    category: "content",
-    label: "更新防女巫配置",
-    description: "更新投票反女巫配置。",
-    riskLevel: "medium",
-    target: CONTRACTS.KnowledgeContent as Address,
-    functionName: "setAntiSybil",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "votesContract",
-        label: "投票合约地址",
-        type: "address",
-        required: true,
-        placeholder: CONTRACTS.NativeVotes,
-        defaultValue: CONTRACTS.NativeVotes,
-      },
-      {
-        key: "minStakeToVote",
-        label: "最小质押门槛",
-        type: "tokenAmount",
-        required: true,
-        placeholder: "例如 1",
-        defaultValue: "1",
-      },
-    ],
-  },
-  {
-    id: "content.pause",
-    category: "content",
-    label: "暂停内容模块",
-    description: "暂停内容注册和投票。",
-    riskLevel: "high",
-    target: CONTRACTS.KnowledgeContent as Address,
-    functionName: "pause",
-    valueMode: "fixedZero",
-    fields: [],
-  },
-  {
-    id: "content.unpause",
-    category: "content",
-    label: "恢复内容模块",
-    description: "恢复内容注册和投票。",
-    riskLevel: "medium",
-    target: CONTRACTS.KnowledgeContent as Address,
-    functionName: "unpause",
-    valueMode: "fixedZero",
-    fields: [],
-  },
-  {
     id: "treasury.setBudget",
     category: "treasury",
     label: "更新金库预算",
@@ -351,7 +213,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     fields: [
       {
         key: "epochDuration",
-        label: "周期时长(秒)",
+        label: "周期时长（秒）",
         type: "uint256",
         required: true,
         placeholder: "例如 604800",
@@ -366,55 +228,6 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
         defaultValue: "100",
       },
     ],
-  },
-  {
-    id: "treasury.setSpender",
-    category: "treasury",
-    label: "更新金库记账权限",
-    description: "更新可记账账户权限。",
-    riskLevel: "medium",
-    target: CONTRACTS.TreasuryNative as Address,
-    functionName: "setSpender",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "spender",
-        label: "记账账户地址",
-        type: "address",
-        required: true,
-        placeholder: CONTRACTS.KnowledgeContent,
-        defaultValue: CONTRACTS.KnowledgeContent,
-      },
-      {
-        key: "allowed",
-        label: "是否允许",
-        type: "boolean",
-        required: true,
-        defaultValue: true,
-      },
-    ],
-  },
-  {
-    id: "treasury.pause",
-    category: "treasury",
-    label: "暂停金库",
-    description: "暂停金库敏感操作。",
-    riskLevel: "high",
-    target: CONTRACTS.TreasuryNative as Address,
-    functionName: "pause",
-    valueMode: "fixedZero",
-    fields: [],
-  },
-  {
-    id: "treasury.unpause",
-    category: "treasury",
-    label: "恢复金库",
-    description: "恢复金库敏感操作。",
-    riskLevel: "medium",
-    target: CONTRACTS.TreasuryNative as Address,
-    functionName: "unpause",
-    valueMode: "fixedZero",
-    fields: [],
   },
   {
     id: "governor.setProposalThreshold",
@@ -448,7 +261,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     fields: [
       {
         key: "votingDelay",
-        label: "投票延迟(区块)",
+        label: "投票延迟（区块）",
         type: "uint256",
         required: true,
         placeholder: "例如 1",
@@ -468,7 +281,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     fields: [
       {
         key: "votingPeriod",
-        label: "投票周期(区块)",
+        label: "投票周期（区块）",
         type: "uint256",
         required: true,
         placeholder: "例如 10",
@@ -517,26 +330,6 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     ],
   },
   {
-    id: "governor.updateTimelock",
-    category: "governor",
-    label: "更新时间锁绑定",
-    description: "更新治理合约绑定的时间锁。",
-    riskLevel: "high",
-    target: CONTRACTS.KnowledgeGovernor as Address,
-    functionName: "updateTimelock",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "timelock",
-        label: "时间锁地址",
-        type: "address",
-        required: true,
-        placeholder: CONTRACTS.TimelockController,
-        defaultValue: CONTRACTS.TimelockController,
-      },
-    ],
-  },
-  {
     id: "timelock.updateDelay",
     category: "timelock",
     label: "更新时间锁延迟",
@@ -548,7 +341,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     fields: [
       {
         key: "delaySeconds",
-        label: "最小延迟(秒)",
+        label: "最小延迟（秒）",
         type: "uint256",
         required: true,
         placeholder: "例如 3600",
@@ -556,101 +349,41 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
       },
     ],
   },
-  {
-    id: "timelock.grantRole",
-    category: "timelock",
-    label: "授予时间锁角色",
-    description: "向指定账户授予时间锁角色。",
-    riskLevel: "high",
-    target: CONTRACTS.TimelockController as Address,
-    functionName: "grantRole",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "role",
-        label: "角色",
-        type: "select",
-        required: true,
-        defaultValue: TIMELOCK_ROLE_OPTIONS[1].value,
-        options: TIMELOCK_ROLE_OPTIONS.map((option) => ({
-          label: option.label,
-          value: option.value,
-        })),
-      },
-      {
-        key: "account",
-        label: "账户地址",
-        type: "address",
-        required: true,
-        placeholder: CONTRACTS.KnowledgeGovernor,
-      },
-    ],
-  },
-  {
-    id: "timelock.revokeRole",
-    category: "timelock",
-    label: "撤销时间锁角色",
-    description: "撤销指定账户的时间锁角色。",
-    riskLevel: "high",
-    target: CONTRACTS.TimelockController as Address,
-    functionName: "revokeRole",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "role",
-        label: "角色",
-        type: "select",
-        required: true,
-        defaultValue: TIMELOCK_ROLE_OPTIONS[1].value,
-        options: TIMELOCK_ROLE_OPTIONS.map((option) => ({
-          label: option.label,
-          value: option.value,
-        })),
-      },
-      {
-        key: "account",
-        label: "账户地址",
-        type: "address",
-        required: true,
-        placeholder: CONTRACTS.KnowledgeGovernor,
-      },
-    ],
-  },
 ];
-
-function isTemplateAvailable(template: GovernanceTemplateDefinition) {
-  if (template.fields.some((field) => field.type === "address")) {
-    return false;
-  }
-
-  if (template.functionName === "pause" || template.functionName === "unpause") {
-    return false;
-  }
-
-  return true;
-}
-
-export const GOVERNANCE_TEMPLATES = ALL_GOVERNANCE_TEMPLATES.filter(
-  isTemplateAvailable
-);
 
 const templateCodecs: Record<string, TemplateCodec> = {
   "content.setRewardRules": {
     validate(values) {
-      const minVotesToReward = parseRequiredUint(values, "minVotesToReward", "最小获奖票数");
+      const minVotesToReward = parseRequiredUint(
+        values,
+        "minVotesToReward",
+        "最小获奖票数"
+      );
       if (isFailed(minVotesToReward)) return minVotesToReward;
 
-      const rewardPerVote = parseRequiredTokenAmount(values, "rewardPerVote", "单票奖励");
+      const rewardPerVote = parseRequiredTokenAmount(
+        values,
+        "rewardPerVote",
+        "单票奖励"
+      );
       if (isFailed(rewardPerVote)) return rewardPerVote;
 
       return ok();
     },
     encode(values) {
-      const minVotesToReward = parseRequiredUint(values, "minVotesToReward", "最小获奖票数");
-      const rewardPerVote = parseRequiredTokenAmount(values, "rewardPerVote", "单票奖励");
+      const minVotesToReward = parseRequiredUint(
+        values,
+        "minVotesToReward",
+        "最小获奖票数"
+      );
+      const rewardPerVote = parseRequiredTokenAmount(
+        values,
+        "rewardPerVote",
+        "单票奖励"
+      );
 
       if (isFailed(minVotesToReward) || isFailed(rewardPerVote)) {
-        throw new Error("Invalid reward rules draft");
+        throw new Error("无效的奖励规则提案");
       }
 
       return buildEncodedAction({
@@ -667,7 +400,11 @@ const templateCodecs: Record<string, TemplateCodec> = {
   },
   "content.setContentPolicy": {
     validate(values) {
-      const editLockVotes = parseRequiredUint(values, "editLockVotes", "编辑锁定票数");
+      const editLockVotes = parseRequiredUint(
+        values,
+        "editLockVotes",
+        "编辑锁定票数"
+      );
       if (isFailed(editLockVotes)) return editLockVotes;
 
       const maxVersionsPerContent = parseRequiredUint(
@@ -680,7 +417,11 @@ const templateCodecs: Record<string, TemplateCodec> = {
       return ok();
     },
     encode(values) {
-      const editLockVotes = parseRequiredUint(values, "editLockVotes", "编辑锁定票数");
+      const editLockVotes = parseRequiredUint(
+        values,
+        "editLockVotes",
+        "编辑锁定票数"
+      );
       const maxVersionsPerContent = parseRequiredUint(
         values,
         "maxVersionsPerContent",
@@ -705,91 +446,6 @@ const templateCodecs: Record<string, TemplateCodec> = {
       });
     },
   },
-  "content.setTreasury": {
-    validate(values) {
-      const treasury = parseRequiredAddress(values, "treasury", "金库地址");
-      return isFailed(treasury) ? treasury : ok();
-    },
-    encode(values) {
-      const treasury = parseRequiredAddress(values, "treasury", "金库地址");
-      if (isFailed(treasury)) {
-        throw new Error("Invalid treasury address");
-      }
-
-      return buildEncodedAction({
-        templateId: "content.setTreasury",
-        target: CONTRACTS.KnowledgeContent as Address,
-        abi: ABIS.KnowledgeContent,
-        functionName: "setTreasury",
-        args: [treasury],
-        title: "更新金库地址",
-        description: `将内容合约绑定的金库更新为 ${treasury}`,
-        riskLevel: "medium",
-      });
-    },
-  },
-  "content.setAntiSybil": {
-    validate(values) {
-      const votesContract = parseRequiredAddress(values, "votesContract", "Votes 合约地址");
-      if (isFailed(votesContract)) return votesContract;
-
-      const minStakeToVote = parseRequiredTokenAmount(values, "minStakeToVote", "最小质押门槛");
-      if (isFailed(minStakeToVote)) return minStakeToVote;
-
-      return ok();
-    },
-    encode(values) {
-      const votesContract = parseRequiredAddress(values, "votesContract", "Votes 合约地址");
-      const minStakeToVote = parseRequiredTokenAmount(values, "minStakeToVote", "最小质押门槛");
-
-      if (isFailed(votesContract) || isFailed(minStakeToVote)) {
-        throw new Error("Invalid anti-sybil draft");
-      }
-
-      return buildEncodedAction({
-        templateId: "content.setAntiSybil",
-        target: CONTRACTS.KnowledgeContent as Address,
-        abi: ABIS.KnowledgeContent,
-        functionName: "setAntiSybil",
-        args: [votesContract, minStakeToVote],
-        title: "更新防女巫配置",
-        description: `将 Votes 合约设为 ${votesContract}，最小质押门槛设为 ${formatEther(minStakeToVote)} ${BRANDING.nativeTokenSymbol}`,
-        riskLevel: "medium",
-      });
-    },
-  },
-  "content.pause": {
-    validate() {
-      return ok();
-    },
-    encode() {
-      return buildEncodedAction({
-        templateId: "content.pause",
-        target: CONTRACTS.KnowledgeContent as Address,
-        abi: ABIS.KnowledgeContent,
-        functionName: "pause",
-        title: "暂停内容模块",
-        description: "暂停内容注册、投票和奖励相关操作。",
-        riskLevel: "high",
-      });
-    },
-  },
-  "content.unpause": {
-    validate() {
-      return ok();
-    },
-    encode() {
-      return buildEncodedAction({
-        templateId: "content.unpause",
-        target: CONTRACTS.KnowledgeContent as Address,
-        abi: ABIS.KnowledgeContent,
-        functionName: "unpause",
-        title: "恢复内容模块",
-        description: "恢复内容注册、投票和奖励相关操作。",
-        riskLevel: "medium",
-      });
-    },
-  },
   "treasury.setBudget": {
     validate(values) {
       const epochDuration = parseRequiredUint(values, "epochDuration", "周期时长");
@@ -805,7 +461,7 @@ const templateCodecs: Record<string, TemplateCodec> = {
       const epochBudget = parseRequiredTokenAmount(values, "epochBudget", "周期预算");
 
       if (isFailed(epochDuration) || isFailed(epochBudget)) {
-        throw new Error("Invalid treasury budget draft");
+        throw new Error("无效的金库预算提案");
       }
 
       return buildEncodedAction({
@@ -820,72 +476,23 @@ const templateCodecs: Record<string, TemplateCodec> = {
       });
     },
   },
-  "treasury.setSpender": {
-    validate(values) {
-      const spender = parseRequiredAddress(values, "spender", "记账账户地址");
-      return isFailed(spender) ? spender : ok();
-    },
-    encode(values) {
-      const spender = parseRequiredAddress(values, "spender", "记账账户地址");
-      if (isFailed(spender)) {
-        throw new Error("Invalid treasury spender draft");
-      }
-
-      const allowed = readBoolean(values, "allowed");
-
-      return buildEncodedAction({
-        templateId: "treasury.setSpender",
-        target: CONTRACTS.TreasuryNative as Address,
-        abi: ABIS.TreasuryNative,
-        functionName: "setSpender",
-        args: [spender, allowed],
-        title: "更新金库记账权限",
-        description: `${allowed ? "授予" : "撤销"} ${spender} 的记账权限`,
-        riskLevel: "medium",
-      });
-    },
-  },
-  "treasury.pause": {
-    validate() {
-      return ok();
-    },
-    encode() {
-      return buildEncodedAction({
-        templateId: "treasury.pause",
-        target: CONTRACTS.TreasuryNative as Address,
-        abi: ABIS.TreasuryNative,
-        functionName: "pause",
-        title: "暂停金库",
-        description: "暂停金库的敏感链上操作。",
-        riskLevel: "high",
-      });
-    },
-  },
-  "treasury.unpause": {
-    validate() {
-      return ok();
-    },
-    encode() {
-      return buildEncodedAction({
-        templateId: "treasury.unpause",
-        target: CONTRACTS.TreasuryNative as Address,
-        abi: ABIS.TreasuryNative,
-        functionName: "unpause",
-        title: "恢复金库",
-        description: "恢复金库的敏感链上操作。",
-        riskLevel: "medium",
-      });
-    },
-  },
   "governor.setProposalThreshold": {
     validate(values) {
-      const proposalThreshold = parseRequiredTokenAmount(values, "proposalThreshold", "提案门槛");
+      const proposalThreshold = parseRequiredTokenAmount(
+        values,
+        "proposalThreshold",
+        "提案门槛"
+      );
       return isFailed(proposalThreshold) ? proposalThreshold : ok();
     },
     encode(values) {
-      const proposalThreshold = parseRequiredTokenAmount(values, "proposalThreshold", "提案门槛");
+      const proposalThreshold = parseRequiredTokenAmount(
+        values,
+        "proposalThreshold",
+        "提案门槛"
+      );
       if (isFailed(proposalThreshold)) {
-        throw new Error("Invalid proposal threshold draft");
+        throw new Error("无效的提案门槛提案");
       }
 
       return buildEncodedAction({
@@ -908,7 +515,7 @@ const templateCodecs: Record<string, TemplateCodec> = {
     encode(values) {
       const votingDelay = parseRequiredUint(values, "votingDelay", "投票延迟");
       if (isFailed(votingDelay)) {
-        throw new Error("Invalid voting delay draft");
+        throw new Error("无效的投票延迟提案");
       }
 
       return buildEncodedAction({
@@ -931,7 +538,7 @@ const templateCodecs: Record<string, TemplateCodec> = {
     encode(values) {
       const votingPeriod = parseRequiredUint(values, "votingPeriod", "投票周期");
       if (isFailed(votingPeriod)) {
-        throw new Error("Invalid voting period draft");
+        throw new Error("无效的投票周期提案");
       }
 
       return buildEncodedAction({
@@ -979,13 +586,21 @@ const templateCodecs: Record<string, TemplateCodec> = {
   },
   "governor.updateQuorumNumerator": {
     validate(values) {
-      const quorumNumerator = parseRequiredUint(values, "quorumNumerator", "法定人数分子");
+      const quorumNumerator = parseRequiredUint(
+        values,
+        "quorumNumerator",
+        "法定人数分子"
+      );
       return isFailed(quorumNumerator) ? quorumNumerator : ok();
     },
     encode(values) {
-      const quorumNumerator = parseRequiredUint(values, "quorumNumerator", "法定人数分子");
+      const quorumNumerator = parseRequiredUint(
+        values,
+        "quorumNumerator",
+        "法定人数分子"
+      );
       if (isFailed(quorumNumerator)) {
-        throw new Error("Invalid quorum numerator draft");
+        throw new Error("无效的法定人数分子提案");
       }
 
       return buildEncodedAction({
@@ -1000,29 +615,6 @@ const templateCodecs: Record<string, TemplateCodec> = {
       });
     },
   },
-  "governor.updateTimelock": {
-    validate(values) {
-      const timelock = parseRequiredAddress(values, "timelock", "时间锁地址");
-      return isFailed(timelock) ? timelock : ok();
-    },
-    encode(values) {
-      const timelock = parseRequiredAddress(values, "timelock", "时间锁地址");
-      if (isFailed(timelock)) {
-        throw new Error("Invalid timelock draft");
-      }
-
-      return buildEncodedAction({
-        templateId: "governor.updateTimelock",
-        target: CONTRACTS.KnowledgeGovernor as Address,
-        abi: ABIS.KnowledgeGovernor,
-        functionName: "updateTimelock",
-        args: [timelock],
-        title: "更新时间锁绑定",
-        description: `将治理合约绑定的时间锁更新为 ${timelock}`,
-        riskLevel: "high",
-      });
-    },
-  },
   "timelock.updateDelay": {
     validate(values) {
       const delaySeconds = parseRequiredUint(values, "delaySeconds", "最小延迟");
@@ -1031,7 +623,7 @@ const templateCodecs: Record<string, TemplateCodec> = {
     encode(values) {
       const delaySeconds = parseRequiredUint(values, "delaySeconds", "最小延迟");
       if (isFailed(delaySeconds)) {
-        throw new Error("Invalid timelock delay draft");
+        throw new Error("无效的时间锁延迟提案");
       }
 
       return buildEncodedAction({
@@ -1042,88 +634,6 @@ const templateCodecs: Record<string, TemplateCodec> = {
         args: [delaySeconds],
         title: "更新时间锁延迟",
         description: `将时间锁最小延迟更新为 ${delaySeconds.toString()} 秒`,
-        riskLevel: "high",
-      });
-    },
-  },
-  "timelock.grantRole": {
-    validate(values) {
-      const role = parseRequiredSelect(
-        values,
-        "role",
-        "角色",
-        TIMELOCK_ROLE_OPTIONS.map((option) => option.value)
-      );
-      if (isFailed(role)) return role;
-
-      const account = parseRequiredAddress(values, "account", "账户地址");
-      return isFailed(account) ? account : ok();
-    },
-    encode(values) {
-      const role = parseRequiredSelect(
-        values,
-        "role",
-        "角色",
-        TIMELOCK_ROLE_OPTIONS.map((option) => option.value)
-      );
-      const account = parseRequiredAddress(values, "account", "账户地址");
-
-      if (isFailed(role) || isFailed(account)) {
-        throw new Error("Invalid timelock grant role draft");
-      }
-
-      const roleLabel =
-        TIMELOCK_ROLE_OPTIONS.find((option) => option.value === role)?.label ?? role;
-
-      return buildEncodedAction({
-        templateId: "timelock.grantRole",
-        target: CONTRACTS.TimelockController as Address,
-        abi: ABIS.TimelockController,
-        functionName: "grantRole",
-        args: [role, account],
-        title: "授予时间锁角色",
-        description: `向 ${account} 授予 ${roleLabel}`,
-        riskLevel: "high",
-      });
-    },
-  },
-  "timelock.revokeRole": {
-    validate(values) {
-      const role = parseRequiredSelect(
-        values,
-        "role",
-        "角色",
-        TIMELOCK_ROLE_OPTIONS.map((option) => option.value)
-      );
-      if (isFailed(role)) return role;
-
-      const account = parseRequiredAddress(values, "account", "账户地址");
-      return isFailed(account) ? account : ok();
-    },
-    encode(values) {
-      const role = parseRequiredSelect(
-        values,
-        "role",
-        "角色",
-        TIMELOCK_ROLE_OPTIONS.map((option) => option.value)
-      );
-      const account = parseRequiredAddress(values, "account", "账户地址");
-
-      if (isFailed(role) || isFailed(account)) {
-        throw new Error("Invalid timelock revoke role draft");
-      }
-
-      const roleLabel =
-        TIMELOCK_ROLE_OPTIONS.find((option) => option.value === role)?.label ?? role;
-
-      return buildEncodedAction({
-        templateId: "timelock.revokeRole",
-        target: CONTRACTS.TimelockController as Address,
-        abi: ABIS.TimelockController,
-        functionName: "revokeRole",
-        args: [role, account],
-        title: "撤销时间锁角色",
-        description: `撤销 ${account} 的 ${roleLabel}`,
         riskLevel: "high",
       });
     },

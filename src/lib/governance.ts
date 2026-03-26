@@ -33,19 +33,6 @@ type ProposalCreatedLog = {
   transactionHash?: HexString | null;
 };
 
-const ZERO_ROLE = `0x${"00".repeat(32)}` as HexString;
-const TIMELOCK_ROLE_LABELS: Record<string, string> = {
-  [ZERO_ROLE.toLowerCase()]: "DEFAULT_ADMIN_ROLE",
-  "0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1":
-    "PROPOSER_ROLE",
-  "0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63":
-    "EXECUTOR_ROLE",
-  "0xfd643c72710c63c0180259aba6b2d05451e3591a24e58b62239378085726f783":
-    "CANCELLER_ROLE",
-  "0x5f58e3a2316349923ce3780f8d587db2d72378aed66a8261c916544fa6846ca5":
-    "TIMELOCK_ADMIN_ROLE",
-};
-
 export function parseProposalCreatedLog(log: ProposalCreatedLog): ProposalItem {
   const args = log.args;
 
@@ -148,10 +135,6 @@ function formatGenericArgument(value: unknown): string {
   return String(value);
 }
 
-function formatRoleLabel(role: string) {
-  return TIMELOCK_ROLE_LABELS[role.toLowerCase()] ?? role;
-}
-
 function appendValueSuffix(description: string, value: bigint) {
   if (value === 0n) return description;
   return `${description}，并附带 ${formatEther(value)} ${BRANDING.nativeTokenSymbol}`;
@@ -220,67 +203,9 @@ function summarizeDecodedAction(
           ),
           details: [
             { label: "编辑锁定票数", value: args[0].toString() },
-            { label: "投票后允许删除", value: args[1] ? "是" : "否" },
+            { label: "投票后允许删除", value: args[1] ? "允许" : "禁止" },
             { label: "最大版本数", value: args[2].toString() },
           ],
-          rawCalldata: calldata,
-        });
-      }
-
-      if (decoded.functionName === "setTreasury" && typeof args[0] === "string") {
-        return createSummary({
-          target,
-          targetLabel,
-          value,
-          functionName: decoded.functionName,
-          title: "更新金库地址",
-          description: appendValueSuffix(`将内容合约绑定的金库更新为 ${args[0]}`, value),
-          details: [{ label: "金库地址", value: args[0] }],
-          rawCalldata: calldata,
-        });
-      }
-
-      if (
-        decoded.functionName === "setAntiSybil" &&
-        typeof args[0] === "string" &&
-        typeof args[1] === "bigint"
-      ) {
-        return createSummary({
-          target,
-          targetLabel,
-          value,
-          functionName: decoded.functionName,
-          title: "更新防女巫配置",
-          description: appendValueSuffix(
-            `将 Votes 合约更新为 ${args[0]}，最小质押门槛设为 ${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}`,
-            value
-          ),
-          details: [
-            { label: "Votes 合约", value: args[0] },
-            {
-              label: "最小质押门槛",
-              value: `${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}`,
-            },
-          ],
-          rawCalldata: calldata,
-        });
-      }
-
-      if (decoded.functionName === "pause" || decoded.functionName === "unpause") {
-        const paused = decoded.functionName === "pause";
-        return createSummary({
-          target,
-          targetLabel,
-          value,
-          functionName: decoded.functionName,
-          title: paused ? "暂停内容模块" : "恢复内容模块",
-          description: appendValueSuffix(
-            paused
-              ? "暂停内容注册、投票和奖励相关操作"
-              : "恢复内容注册、投票和奖励相关操作",
-            value
-          ),
-          details: [{ label: "模块", value: "KnowledgeContent" }],
           rawCalldata: calldata,
         });
       }
@@ -315,46 +240,6 @@ function summarizeDecodedAction(
               value: `${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}`,
             },
           ],
-          rawCalldata: calldata,
-        });
-      }
-
-      if (
-        decoded.functionName === "setSpender" &&
-        typeof args[0] === "string" &&
-        typeof args[1] === "boolean"
-      ) {
-        return createSummary({
-          target,
-          targetLabel,
-          value,
-          functionName: decoded.functionName,
-          title: "更新金库记账权限",
-          description: appendValueSuffix(
-            `${args[1] ? "授予" : "撤销"} ${args[0]} 的记账权限`,
-            value
-          ),
-          details: [
-            { label: "记账账户地址", value: args[0] },
-            { label: "权限状态", value: args[1] ? "允许" : "撤销" },
-          ],
-          rawCalldata: calldata,
-        });
-      }
-
-      if (decoded.functionName === "pause" || decoded.functionName === "unpause") {
-        const paused = decoded.functionName === "pause";
-        return createSummary({
-          target,
-          targetLabel,
-          value,
-          functionName: decoded.functionName,
-          title: paused ? "暂停金库" : "恢复金库",
-          description: appendValueSuffix(
-            paused ? "暂停金库的敏感链上操作" : "恢复金库的敏感链上操作",
-            value
-          ),
-          details: [{ label: "模块", value: "TreasuryNative" }],
           rawCalldata: calldata,
         });
       }
@@ -434,7 +319,12 @@ function summarizeDecodedAction(
             `将延迟法定人数延长期更新为 ${args[0].toString()} 个区块`,
             value
           ),
-          details: [{ label: "延迟法定人数延长期", value: `${args[0].toString()} 个区块` }],
+          details: [
+            {
+              label: "延迟法定人数延长期",
+              value: `${args[0].toString()} 个区块`,
+            },
+          ],
           rawCalldata: calldata,
         });
       }
@@ -448,19 +338,6 @@ function summarizeDecodedAction(
           title: "更新法定人数分子",
           description: appendValueSuffix(`将法定人数分子更新为 ${args[0].toString()}`, value),
           details: [{ label: "法定人数分子", value: args[0].toString() }],
-          rawCalldata: calldata,
-        });
-      }
-
-      if (decoded.functionName === "updateTimelock" && typeof args[0] === "string") {
-        return createSummary({
-          target,
-          targetLabel,
-          value,
-          functionName: decoded.functionName,
-          title: "更新时间锁绑定",
-          description: appendValueSuffix(`将治理合约绑定的时间锁更新为 ${args[0]}`, value),
-          details: [{ label: "时间锁地址", value: args[0] }],
           rawCalldata: calldata,
         });
       }
@@ -485,31 +362,6 @@ function summarizeDecodedAction(
             value
           ),
           details: [{ label: "最小延迟", value: `${args[0].toString()} 秒` }],
-          rawCalldata: calldata,
-        });
-      }
-
-      if (
-        (decoded.functionName === "grantRole" || decoded.functionName === "revokeRole") &&
-        typeof args[0] === "string" &&
-        typeof args[1] === "string"
-      ) {
-        const granting = decoded.functionName === "grantRole";
-        return createSummary({
-          target,
-          targetLabel,
-          value,
-          functionName: decoded.functionName,
-          title: granting ? "授予时间锁角色" : "撤销时间锁角色",
-          description: appendValueSuffix(
-            `${granting ? "授予" : "撤销"} ${args[1]} 的 ${formatRoleLabel(args[0])} 权限`,
-            value
-          ),
-          details: [
-            { label: "角色", value: formatRoleLabel(args[0]) },
-            { label: "账户", value: args[1] },
-            { label: "操作", value: granting ? "授予角色" : "撤销角色" },
-          ],
           rawCalldata: calldata,
         });
       }
