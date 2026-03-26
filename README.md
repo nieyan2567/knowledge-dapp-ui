@@ -83,6 +83,7 @@ src/
       auth/                   # 上传鉴权
       faucet/                 # Faucet nonce / claim
       ipfs/upload/            # 本地 IPFS 上传
+      system/rebalance/       # RevenueVault 结算触发接口
   components/                 # 通用 UI 组件
   contracts/                  # ABI 与部署地址
   hooks/                      # Wagmi / 刷新 / 上传鉴权 hooks
@@ -160,6 +161,7 @@ npm run start
 ### Faucet
 
 - `FAUCET_PRIVATE_KEY`：Faucet 发放账户私钥
+- `REBALANCE_API_TOKEN`：服务端 `POST /api/system/rebalance` 接口的 Bearer Token
 - `FAUCET_AMOUNT`：每次领取的启动资金数量
 - `FAUCET_MIN_BALANCE`：钱包余额达到该阈值后不再允许领取
 - `FAUCET_COOLDOWN_HOURS`：领取冷却时间

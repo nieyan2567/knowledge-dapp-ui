@@ -22,6 +22,7 @@ import {
   getRequestUserAgent,
   isFaucetError,
   markFaucetClaimed,
+  rebalanceRevenueVault,
   releaseFaucetClaimLock,
 } from "@/lib/faucet/utils";
 import { captureServerException } from "@/lib/observability/server";
@@ -92,6 +93,8 @@ export async function POST(req: NextRequest) {
     }
 
     await enforceFaucetRateLimit("claim", address, ip);
+
+    await rebalanceRevenueVault();
 
     const eligibility = await checkFaucetClaimEligibility(address, ip);
 

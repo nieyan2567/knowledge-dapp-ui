@@ -23,6 +23,7 @@ const originalEnv = {
   OBS_ALERT_DEDUP_WINDOW_SECONDS: process.env["OBS_ALERT_DEDUP_WINDOW_SECONDS"],
   OBS_CLIENT_ERROR_SAMPLE_RATE: process.env["OBS_CLIENT_ERROR_SAMPLE_RATE"],
   FAUCET_PRIVATE_KEY: process.env["FAUCET_PRIVATE_KEY"],
+  REBALANCE_API_TOKEN: process.env["REBALANCE_API_TOKEN"],
 };
 
 function restoreEnvValue(name: keyof typeof originalEnv, value: string | undefined) {
@@ -52,6 +53,7 @@ function applyValidServerEnv() {
   mutableEnv.OBS_ALERT_DEDUP_WINDOW_SECONDS = "300";
   mutableEnv.OBS_CLIENT_ERROR_SAMPLE_RATE = "1";
   mutableEnv.FAUCET_PRIVATE_KEY = `0x${"1".repeat(64)}`;
+  mutableEnv.REBALANCE_API_TOKEN = "rebalance-secret";
 }
 
 afterEach(() => {
@@ -81,6 +83,7 @@ afterEach(() => {
     originalEnv.OBS_CLIENT_ERROR_SAMPLE_RATE
   );
   restoreEnvValue("FAUCET_PRIVATE_KEY", originalEnv.FAUCET_PRIVATE_KEY);
+  restoreEnvValue("REBALANCE_API_TOKEN", originalEnv.REBALANCE_API_TOKEN);
 });
 
 describe("env", () => {
@@ -135,5 +138,12 @@ describe("env", () => {
     mutableEnv.FAUCET_PRIVATE_KEY = "not-a-private-key";
 
     expect(() => getServerEnv()).toThrow(/FAUCET_PRIVATE_KEY/i);
+  });
+
+  it("treats blank rebalance api token as undefined", () => {
+    applyValidServerEnv();
+    mutableEnv.REBALANCE_API_TOKEN = "";
+
+    expect(getServerEnv().REBALANCE_API_TOKEN).toBeUndefined();
   });
 });

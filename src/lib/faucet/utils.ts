@@ -2,9 +2,17 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
-import { createPublicClient, createWalletClient, formatEther, http, parseEther } from "viem";
+import {
+  createPublicClient,
+  createWalletClient,
+  encodeFunctionData,
+  formatEther,
+  http,
+  parseEther,
+} from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
+import { ABIS, CONTRACTS } from "@/contracts";
 import { knowledgeChain } from "@/lib/chains";
 import { getServerEnv } from "@/lib/env";
 import { getRedis } from "@/lib/redis";
@@ -232,6 +240,33 @@ export async function getFaucetClients() {
   };
 
   return faucetClients;
+}
+
+export async function rebalanceRevenueVault() {
+  const { account, publicClient, walletClient } = await getFaucetClients();
+  const revenueVaultAddress = CONTRACTS.RevenueVault as `0x${string}` | undefined;
+
+  if (!revenueVaultAddress) {
+    return null;
+  }
+
+  const code = await publicClient.getCode({ address: revenueVaultAddress });
+  if (!code || code === "0x") {
+    return null;
+  }
+
+  const txHash = await walletClient.sendTransaction({
+    account,
+    to: revenueVaultAddress,
+    data: encodeFunctionData({
+      abi: ABIS.RevenueVault,
+      functionName: "rebalance",
+    }),
+    chain: knowledgeChain,
+  });
+
+  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  return txHash;
 }
 
 export async function getCooldownRemainingSeconds(

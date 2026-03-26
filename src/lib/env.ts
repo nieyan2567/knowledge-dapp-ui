@@ -102,6 +102,10 @@ const serverEnvSchema = publicEnvSchema
         .regex(/^0x[0-9a-fA-F]+$/, "Must be a 0x-prefixed hex string")
         .optional()
     ),
+    REBALANCE_API_TOKEN: z.preprocess(
+      emptyStringToUndefined,
+      z.string().trim().min(1).optional()
+    ),
     FAUCET_AMOUNT: positiveNumberStringWithDefault("2"),
     FAUCET_MIN_BALANCE: positiveNumberStringWithDefault("1"),
     FAUCET_COOLDOWN_HOURS: positiveIntWithDefault(24),
@@ -194,6 +198,7 @@ function getServerEnvSource() {
       process.env.OBS_ALERT_DEDUP_WINDOW_SECONDS,
     OBS_CLIENT_ERROR_SAMPLE_RATE: process.env.OBS_CLIENT_ERROR_SAMPLE_RATE,
     FAUCET_PRIVATE_KEY: process.env.FAUCET_PRIVATE_KEY,
+    REBALANCE_API_TOKEN: process.env.REBALANCE_API_TOKEN,
     FAUCET_AMOUNT: process.env.FAUCET_AMOUNT,
     FAUCET_MIN_BALANCE: process.env.FAUCET_MIN_BALANCE,
     FAUCET_COOLDOWN_HOURS: process.env.FAUCET_COOLDOWN_HOURS,

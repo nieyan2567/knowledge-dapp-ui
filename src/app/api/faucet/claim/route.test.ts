@@ -17,6 +17,7 @@ import {
   getRequestIp,
   getRequestUserAgent,
   markFaucetClaimed,
+  rebalanceRevenueVault,
 } from "@/lib/faucet/utils";
 import { verifyMessage } from "viem";
 
@@ -42,6 +43,7 @@ vi.mock("@/lib/faucet/utils", () => ({
   getRequestUserAgent: vi.fn(),
   isFaucetError: vi.fn(() => false),
   markFaucetClaimed: vi.fn(),
+  rebalanceRevenueVault: vi.fn(),
   releaseFaucetClaimLock: vi.fn(),
 }));
 
@@ -91,6 +93,7 @@ describe("POST /api/faucet/claim", () => {
     vi.mocked(getFaucetAmount).mockReturnValue(2n);
     vi.mocked(getFaucetMinBalance).mockReturnValue(1n);
     vi.mocked(formatFaucetAmount).mockReturnValue("2 KC");
+    vi.mocked(rebalanceRevenueVault).mockResolvedValue("0xrebalance");
     vi.mocked(getFaucetClients).mockResolvedValue(
       {
         account: { address: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
@@ -181,6 +184,7 @@ describe("POST /api/faucet/claim", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(rebalanceRevenueVault).toHaveBeenCalledTimes(1);
     expect(markFaucetClaimed).toHaveBeenCalledTimes(1);
     const claimedRecord = vi.mocked(markFaucetClaimed).mock.calls[0]?.[0];
     expect(claimedRecord).toMatchObject({
