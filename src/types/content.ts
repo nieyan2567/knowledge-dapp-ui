@@ -10,6 +10,16 @@ export interface ContentData {
   timestamp: bigint
   rewardAccrued: boolean
   deleted: boolean
+  latestVersion: bigint
+  lastUpdatedAt: bigint
+}
+
+export interface ContentVersionData {
+  version: bigint
+  ipfsHash: string
+  title: string
+  description: string
+  timestamp: bigint
 }
 
 export type ContentCardData = ContentData

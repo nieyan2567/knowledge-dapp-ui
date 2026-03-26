@@ -2,483 +2,654 @@
 
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { toast } from "sonner";
 import {
-	ArrowLeft,
-	BookOpen,
-	CheckCircle2,
-	Coins,
-	ExternalLink,
-	FileText,
-	Heart,
-	PencilLine,
-	Trash2,
-	User,
+  ArrowLeft,
+  BookOpen,
+  CheckCircle2,
+  Coins,
+  ExternalLink,
+  FileText,
+  Heart,
+  PencilLine,
+  Trash2,
+  User,
 } from "lucide-react";
 
+import { AddressBadge } from "@/components/address-badge";
+import { CopyField } from "@/components/copy-field";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
-import { CopyField } from "@/components/copy-field";
-import { AddressBadge } from "@/components/address-badge";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { getIpfsFileUrl } from "@/lib/ipfs";
 import { writeTxToast } from "@/lib/tx-toast";
-import { asContentData } from "@/lib/web3-types";
+import { asContentData, asContentVersion } from "@/lib/web3-types";
+import type { ContentVersionData } from "@/types/content";
 
 function formatDate(timestamp: bigint) {
-	return new Date(Number(timestamp) * 1000).toLocaleString();
+  return new Date(Number(timestamp) * 1000).toLocaleString();
 }
 
 export default function ContentDetailPage() {
-	const params = useParams();
-	const { address } = useAccount();
-	const publicClient = usePublicClient();
-	const { writeContractAsync } = useWriteContract();
-	const refreshAfterTx = useRefreshOnTxConfirmed();
-	const [editTitle, setEditTitle] = useState("");
-	const [editDescription, setEditDescription] = useState("");
-	const [editCid, setEditCid] = useState("");
-	const [savingEdit, setSavingEdit] = useState(false);
-	const [deleting, setDeleting] = useState(false);
+  const params = useParams();
+  const { address } = useAccount();
+  const publicClient = usePublicClient();
+  const { writeContractAsync } = useWriteContract();
+  const refreshAfterTx = useRefreshOnTxConfirmed();
 
-	const rawId = params?.id;
-	const contentId = useMemo(() => {
-		if (typeof rawId !== "string") return null;
-		if (!/^\d+$/.test(rawId)) return null;
-		return BigInt(rawId);
-	}, [rawId]);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editCid, setEditCid] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [versions, setVersions] = useState<ContentVersionData[]>([]);
 
-	const { data: contentData, isLoading, refetch: refetchContent } = useReadContract({
-		address: CONTRACTS.KnowledgeContent as `0x${string}`,
-		abi: ABIS.KnowledgeContent,
-		functionName: "contents",
-		args: contentId ? [contentId] : undefined,
-		query: {
-			enabled: !!contentId,
-		},
-	});
+  const rawId = params?.id;
+  const contentId = useMemo(() => {
+    if (typeof rawId !== "string") return null;
+    if (!/^\d+$/.test(rawId)) return null;
+    return BigInt(rawId);
+  }, [rawId]);
 
-	const content = asContentData(contentData);
+  const {
+    data: contentData,
+    isLoading,
+    refetch: refetchContent,
+  } = useReadContract({
+    address: CONTRACTS.KnowledgeContent as `0x${string}`,
+    abi: ABIS.KnowledgeContent,
+    functionName: "contents",
+    args: contentId ? [contentId] : undefined,
+    query: {
+      enabled: !!contentId,
+    },
+  });
 
-	useEffect(() => {
-		if (!content) return;
-		setEditTitle(content.title);
-		setEditDescription(content.description);
-		setEditCid(content.ipfsHash);
-	}, [content]);
+  const {
+    data: versionCountData,
+    refetch: refetchVersionCount,
+  } = useReadContract({
+    address: CONTRACTS.KnowledgeContent as `0x${string}`,
+    abi: ABIS.KnowledgeContent,
+    functionName: "contentVersionCount",
+    args: contentId ? [contentId] : undefined,
+    query: {
+      enabled: !!contentId,
+    },
+  });
 
-	if (!contentId) {
-		notFound();
-	}
+  const content = asContentData(contentData);
+  const versionCount = typeof versionCountData === "bigint" ? versionCountData : 0n;
 
-	if (isLoading) {
-		return (
-			<main className="mx-auto max-w-7xl px-6 py-10">
-				<div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-					正在加载内容详情...
-				</div>
-			</main>
-		);
-	}
+  const loadVersions = useCallback(
+    async (countOverride?: bigint) => {
+      if (!publicClient || !contentId) {
+        setVersions([]);
+        return;
+      }
 
-	if (!content) {
-		return (
-			<main className="mx-auto max-w-7xl px-6 py-10 space-y-6">
-				<Link
-					href="/content"
-					className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-				>
-					<ArrowLeft className="h-4 w-4" />
-					返回内容列表
-				</Link>
+      const total = Number(countOverride ?? versionCount);
 
-				<div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-					未找到该内容，可能内容 ID 不存在。
-				</div>
-			</main>
-		);
-	}
+      if (total <= 0) {
+        setVersions([]);
+        return;
+      }
 
-	const previewUrl = getIpfsFileUrl(content.ipfsHash);
-	const isAuthor =
-		!!address && content.author.toLowerCase() === address.toLowerCase();
-	const canEditContent =
-		isAuthor && !content.deleted && content.voteCount === 0n && !content.rewardAccrued;
-	const canDeleteContent = isAuthor && !content.deleted;
+      setLoadingVersions(true);
 
-	async function handleVote() {
-		if (!content) {
-			toast.error("内容数据加载失败");
-			return;
-		}
+      try {
+        const versionIds = Array.from({ length: total }, (_, index) => BigInt(index + 1));
+        const results = await Promise.all(
+          versionIds.map((version) =>
+            publicClient.readContract({
+              address: CONTRACTS.KnowledgeContent as `0x${string}`,
+              abi: ABIS.KnowledgeContent,
+              functionName: "getContentVersion",
+              args: [contentId, version],
+            })
+          )
+        );
 
-		if (!address) {
-			toast.error("请先连接钱包");
-			return;
-		}
+        const parsed = results
+          .map((item, index) => asContentVersion(item, versionIds[index]))
+          .filter((item): item is ContentVersionData => !!item)
+          .sort((left, right) => Number(right.version - left.version));
 
-		const hash = await writeTxToast({
-			publicClient,
-			writeContractAsync,
-			request: {
-				address: CONTRACTS.KnowledgeContent as `0x${string}`,
-				abi: ABIS.KnowledgeContent,
-				functionName: "vote",
-				args: [content.id],
-				account: address,
-			},
-			loading: "正在提交投票...",
-			success: "投票交易已提交",
-			fail: "投票失败",
-		});
-		if (!hash) return;
-		await refreshAfterTx(hash, refetchContent, ["content", "dashboard"]);
-	}
+        setVersions(parsed);
+      } catch {
+        toast.error("Failed to load content versions");
+      } finally {
+        setLoadingVersions(false);
+      }
+    },
+    [contentId, publicClient, versionCount]
+  );
 
-	async function handleAccrueReward() {
-		if (!content) {
-			toast.error("内容数据加载失败");
-			return;
-		}
+  const refreshDetail = useCallback(async () => {
+    const [, versionResult] = await Promise.all([refetchContent(), refetchVersionCount()]);
+    await loadVersions(
+      typeof versionResult.data === "bigint" ? versionResult.data : undefined
+    );
+  }, [loadVersions, refetchContent, refetchVersionCount]);
 
-		if (!address) {
-			toast.error("请先连接钱包");
-			return;
-		}
+  useEffect(() => {
+    if (!content) return;
+    setEditTitle(content.title);
+    setEditDescription(content.description);
+    setEditCid(content.ipfsHash);
+  }, [content]);
 
-		const hash = await writeTxToast({
-			publicClient,
-			writeContractAsync,
-			request: {
-				address: CONTRACTS.KnowledgeContent as `0x${string}`,
-				abi: ABIS.KnowledgeContent,
-				functionName: "distributeReward",
-				args: [content.id],
-				account: address,
-			},
-			loading: "正在提交奖励记账交易...",
-			success: "奖励记账交易已提交",
-			fail: "奖励记账失败",
-		});
-		if (!hash) return;
-		await refreshAfterTx(hash, refetchContent, ["content", "rewards", "dashboard", "system"]);
-	}
+  useEffect(() => {
+    void loadVersions();
+  }, [loadVersions]);
 
-	async function handleUpdateContent() {
-		if (!content) {
-			toast.error("内容数据加载失败");
-			return;
-		}
+  if (!contentId) {
+    notFound();
+  }
 
-		if (!address) {
-			toast.error("请先连接钱包");
-			return;
-		}
+  if (isLoading) {
+    return (
+      <main className="mx-auto max-w-7xl px-6 py-10">
+        <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+          Loading content details...
+        </div>
+      </main>
+    );
+  }
 
-		if (!canEditContent) {
-			toast.error("当前内容状态不允许编辑");
-			return;
-		}
+  if (!content) {
+    return (
+      <main className="mx-auto max-w-7xl space-y-6 px-6 py-10">
+        <Link
+          href="/content"
+          className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to content list
+        </Link>
 
-		if (!editCid.trim() || !editTitle.trim()) {
-			toast.error("CID 和标题不能为空");
-			return;
-		}
+        <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+          Content not found.
+        </div>
+      </main>
+    );
+  }
 
-		setSavingEdit(true);
-		try {
-			const hash = await writeTxToast({
-				publicClient,
-				writeContractAsync,
-				request: {
-					address: CONTRACTS.KnowledgeContent as `0x${string}`,
-					abi: ABIS.KnowledgeContent,
-					functionName: "updateContent",
-					args: [content.id, editCid.trim(), editTitle.trim(), editDescription.trim()],
-					account: address,
-				},
-				loading: "正在提交内容更新交易...",
-				success: "内容更新交易已提交",
-				fail: "内容更新失败",
-			});
-			if (!hash) return;
-			await refreshAfterTx(hash, refetchContent, ["content", "dashboard"]);
-		} finally {
-			setSavingEdit(false);
-		}
-	}
+  const previewUrl = getIpfsFileUrl(content.ipfsHash);
+  const isAuthor = !!address && content.author.toLowerCase() === address.toLowerCase();
+  const canEditContent =
+    isAuthor && !content.deleted && content.voteCount === 0n && !content.rewardAccrued;
+  const canDeleteContent = isAuthor && !content.deleted;
 
-	async function handleDeleteContent() {
-		if (!content) {
-			toast.error("内容数据加载失败");
-			return;
-		}
+  async function handleVote() {
+    if (!content) {
+      toast.error("Content is unavailable");
+      return;
+    }
 
-		if (!address) {
-			toast.error("请先连接钱包");
-			return;
-		}
+    if (!address) {
+      toast.error("Connect your wallet first");
+      return;
+    }
 
-		if (!canDeleteContent) {
-			toast.error("当前内容状态不允许删除");
-			return;
-		}
+    const hash = await writeTxToast({
+      publicClient,
+      writeContractAsync,
+      request: {
+        address: CONTRACTS.KnowledgeContent as `0x${string}`,
+        abi: ABIS.KnowledgeContent,
+        functionName: "vote",
+        args: [content.id],
+        account: address,
+      },
+      loading: "Submitting vote...",
+      success: "Vote submitted",
+      fail: "Vote failed",
+    });
 
-		setDeleting(true);
-		try {
-			const hash = await writeTxToast({
-				publicClient,
-				writeContractAsync,
-				request: {
-					address: CONTRACTS.KnowledgeContent as `0x${string}`,
-					abi: ABIS.KnowledgeContent,
-					functionName: "deleteContent",
-					args: [content.id],
-					account: address,
-				},
-				loading: "正在提交删除交易...",
-				success: "删除交易已提交",
-				fail: "删除失败",
-			});
-			if (!hash) return;
-			await refreshAfterTx(hash, refetchContent, ["content", "dashboard"]);
-		} finally {
-			setDeleting(false);
-		}
-	}
+    if (!hash) return;
+    await refreshAfterTx(hash, refreshDetail, ["content", "dashboard"]);
+  }
 
-	return (
-		<main className="mx-auto max-w-7xl px-6 py-10 space-y-8">
-			<div className="flex items-center justify-between gap-4">
-				<Link
-					href="/content"
-					className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-				>
-					<ArrowLeft className="h-4 w-4" />
-					返回内容列表
-				</Link>
+  async function handleAccrueReward() {
+    if (!content) {
+      toast.error("Content is unavailable");
+      return;
+    }
 
-				<a
-					href={previewUrl}
-					target="_blank"
-					rel="noreferrer"
-					className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-				>
-					查看 IPFS 原文件
-					<ExternalLink className="h-4 w-4" />
-				</a>
-			</div>
+    if (!address) {
+      toast.error("Connect your wallet first");
+      return;
+    }
 
-			<PageHeader
-				eyebrow={`内容 #${content.id.toString()}`}
-				title={content.title}
-				description={content.description || "暂无内容描述。"}
-			/>
+    const hash = await writeTxToast({
+      publicClient,
+      writeContractAsync,
+      request: {
+        address: CONTRACTS.KnowledgeContent as `0x${string}`,
+        abi: ABIS.KnowledgeContent,
+        functionName: "distributeReward",
+        args: [content.id],
+        account: address,
+      },
+      loading: "Submitting reward accrual...",
+      success: "Reward accrual submitted",
+      fail: "Reward accrual failed",
+    });
 
-			<div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-				{/* Left */}
-				<div className="space-y-6">
-					<SectionCard
-						title="文件预览"
-						description="点击下方区域可在本地 IPFS Gateway 中打开原始文件。"
-					>
-						<a
-							href={previewUrl}
-							target="_blank"
-							rel="noreferrer"
-							className="group block rounded-3xl border border-slate-200 bg-slate-50 p-8 transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:hover:border-slate-700 dark:hover:bg-slate-800"
-						>
-							<div className="flex flex-col items-center justify-center gap-4 text-center">
-								<div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">
-									<FileText className="h-8 w-8" />
-								</div>
+    if (!hash) return;
+    await refreshAfterTx(hash, refreshDetail, ["content", "rewards", "dashboard", "system"]);
+  }
 
-								<div>
-									<div className="text-base font-semibold text-slate-950 dark:text-slate-100">
-										打开 IPFS 文件
-									</div>
-									<div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-										通过本地 Gateway 访问该内容文件
-									</div>
-								</div>
+  async function handleUpdateContent() {
+    if (!content) {
+      toast.error("Content is unavailable");
+      return;
+    }
 
-								<div className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 group-hover:text-blue-700 dark:text-blue-400 dark:group-hover:text-blue-300">
-									打开文件
-									<ExternalLink className="h-4 w-4" />
-								</div>
-							</div>
-						</a>
-					</SectionCard>
+    if (!address) {
+      toast.error("Connect your wallet first");
+      return;
+    }
 
-					<SectionCard
-						title="内容信息"
-						description="链上登记的基础信息和内容元数据。"
-					>
-				<div className="grid gap-4 md:grid-cols-2">
-							<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-								<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-									作者
-								</div>
-								<div className="flex items-center gap-2 text-sm text-slate-900 dark:text-slate-100">
-									<User className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-									<AddressBadge address={content.author} />
-								</div>
-							</div>
+    if (!canEditContent) {
+      toast.error("Current content state does not allow editing");
+      return;
+    }
 
-							<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-								<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-									上传时间
-								</div>
-								<div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-									{formatDate(content.timestamp)}
-								</div>
-							</div>
+    if (!editCid.trim() || !editTitle.trim()) {
+      toast.error("CID and title are required");
+      return;
+    }
 
-							<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-								<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-									投票数
-								</div>
-								<div className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
-									<Heart className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-									{content.voteCount.toString()}
-								</div>
-							</div>
+    setSavingEdit(true);
 
-							<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-								<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-									奖励状态
-								</div>
-								<div className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
-									<CheckCircle2 className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-									{content.rewardAccrued ? "已记账" : "未记账"}
-								</div>
-							</div>
+    try {
+      const hash = await writeTxToast({
+        publicClient,
+        writeContractAsync,
+        request: {
+          address: CONTRACTS.KnowledgeContent as `0x${string}`,
+          abi: ABIS.KnowledgeContent,
+          functionName: "updateContent",
+          args: [content.id, editCid.trim(), editTitle.trim(), editDescription.trim()],
+          account: address,
+        },
+        loading: "Submitting content update...",
+        success: "Content update submitted",
+        fail: "Content update failed",
+      });
 
-							<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-								<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-									内容状态
-								</div>
-								<div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-									{content.deleted ? "已删除" : "正常"}
-								</div>
-							</div>
-						</div>
-					</SectionCard>
-				</div>
+      if (!hash) return;
+      await refreshAfterTx(hash, refreshDetail, ["content", "dashboard"]);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
 
-				{/* Right */}
-				<div className="space-y-6">
-					<SectionCard
-						title="内容操作"
-						description="对当前内容进行社区投票或触发奖励记账。"
-					>
-						<div className="space-y-3">
-							<button
-								onClick={handleVote}
-								disabled={content.deleted}
-								className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-							>
-								<Heart className="h-4 w-4" />
-								投票
-							</button>
+  async function handleDeleteContent() {
+    if (!content) {
+      toast.error("Content is unavailable");
+      return;
+    }
 
-							<button
-								onClick={handleAccrueReward}
-								disabled={content.deleted}
-								className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-							>
-								<Coins className="h-4 w-4" />
-								奖励记账
-							</button>
-						</div>
-					</SectionCard>
+    if (!address) {
+      toast.error("Connect your wallet first");
+      return;
+    }
 
-					{isAuthor && (
-						<SectionCard
-							title="作者操作"
-							description="内容尚未获得投票且未进入奖励流程时，作者可以更新内容元数据或删除内容。修改文件时请先上传新文件并填写新的 CID。"
-						>
-							<div className="space-y-3">
-								<input
-									value={editTitle}
-									onChange={(event) => setEditTitle(event.target.value)}
-									disabled={!canEditContent || savingEdit}
-									placeholder="内容标题"
-									className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
-								/>
-								<textarea
-									value={editDescription}
-									onChange={(event) => setEditDescription(event.target.value)}
-									disabled={!canEditContent || savingEdit}
-									placeholder="内容描述"
-									rows={4}
-									className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
-								/>
-								<input
-									value={editCid}
-									onChange={(event) => setEditCid(event.target.value)}
-									disabled={!canEditContent || savingEdit}
-									placeholder="新的 IPFS CID"
-									className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
-								/>
+    if (!canDeleteContent) {
+      toast.error("Current content state does not allow deletion");
+      return;
+    }
 
-								<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
-									{canEditContent
-										? "当前内容可编辑。若替换文件，请先上传新文件到 IPFS，再把新的 CID 填到这里。"
-										: "当前内容已获得投票、已删除或已进入奖励流程，编辑入口已锁定。"}
-								</div>
+    setDeleting(true);
 
-								<div className="flex flex-wrap gap-3">
-									<button
-										onClick={handleUpdateContent}
-										disabled={!canEditContent || savingEdit}
-										className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-									>
-										<PencilLine className="h-4 w-4" />
-										{savingEdit ? "正在更新..." : "更新内容"}
-									</button>
+    try {
+      const hash = await writeTxToast({
+        publicClient,
+        writeContractAsync,
+        request: {
+          address: CONTRACTS.KnowledgeContent as `0x${string}`,
+          abi: ABIS.KnowledgeContent,
+          functionName: "deleteContent",
+          args: [content.id],
+          account: address,
+        },
+        loading: "Submitting content deletion...",
+        success: "Content deletion submitted",
+        fail: "Content deletion failed",
+      });
 
-									<button
-										onClick={handleDeleteContent}
-										disabled={!canDeleteContent || deleting}
-										className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-rose-300 px-5 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/30"
-									>
-										<Trash2 className="h-4 w-4" />
-										{deleting ? "正在删除..." : "删除内容"}
-									</button>
-								</div>
-							</div>
-						</SectionCard>
-					)}
+      if (!hash) return;
+      await refreshAfterTx(hash, refreshDetail, ["content", "dashboard"]);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
-					<SectionCard
-						title="链上元数据"
-						description="内容 CID 和本地网关访问地址。"
-					>
-						<div className="space-y-3">
-							<CopyField label="CID" value={content.ipfsHash} />
-							<CopyField label="本地网关地址" value={previewUrl} />
-						</div>
-					</SectionCard>
+  return (
+    <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
+      <div className="flex items-center justify-between gap-4">
+        <Link
+          href="/content"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to content list
+        </Link>
 
-					<SectionCard
-						title="记录摘要"
-						description="这条内容在平台中的基础记录摘要。"
-					>
-						<div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
-							<div className="flex items-center gap-2">
-								<BookOpen className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-								<span>内容 ID: {content.id.toString()}</span>
-							</div>
-							<div>标题：{content.title}</div>
-							<div>描述：{content.description || "暂无描述"}</div>
-						</div>
-					</SectionCard>
-				</div>
-			</div>
-		</main>
-	);
+        <a
+          href={previewUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          Open current IPFS file
+          <ExternalLink className="h-4 w-4" />
+        </a>
+      </div>
+
+      <PageHeader
+        eyebrow={`Content #${content.id.toString()}`}
+        title={content.title}
+        description={content.description || "No description"}
+      />
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-6">
+          <SectionCard
+            title="Current File"
+            description="The latest version snapshot points to the current CID stored on-chain."
+          >
+            <a
+              href={previewUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="group block rounded-3xl border border-slate-200 bg-slate-50 p-8 transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:hover:border-slate-700 dark:hover:bg-slate-800"
+            >
+              <div className="flex flex-col items-center justify-center gap-4 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">
+                  <FileText className="h-8 w-8" />
+                </div>
+
+                <div>
+                  <div className="text-base font-semibold text-slate-950 dark:text-slate-100">
+                    Open current file
+                  </div>
+                  <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Version v{content.latestVersion.toString()} stored at the active CID.
+                  </div>
+                </div>
+
+                <div className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 group-hover:text-blue-700 dark:text-blue-400 dark:group-hover:text-blue-300">
+                  Open file
+                  <ExternalLink className="h-4 w-4" />
+                </div>
+              </div>
+            </a>
+          </SectionCard>
+
+          <SectionCard
+            title="Content Snapshot"
+            description="The current content record now includes snapshot fields and version metadata."
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Author
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-900 dark:text-slate-100">
+                  <User className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                  <AddressBadge address={content.author} />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Created At
+                </div>
+                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                  {formatDate(content.timestamp)}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Latest Version
+                </div>
+                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                  v{content.latestVersion.toString()} / {versionCount.toString()} stored
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Last Updated
+                </div>
+                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                  {formatDate(content.lastUpdatedAt)}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Votes
+                </div>
+                <div className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
+                  <Heart className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                  {content.voteCount.toString()}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Reward Status
+                </div>
+                <div className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
+                  <CheckCircle2 className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                  {content.rewardAccrued ? "Accrued" : "Pending"}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Content Status
+                </div>
+                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                  {content.deleted ? "Deleted" : "Active"}
+                </div>
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Version History"
+            description="Older CID snapshots stay pinned and indexed on-chain as immutable versions."
+          >
+            {loadingVersions ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
+                Loading version history...
+              </div>
+            ) : versions.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
+                No versions found.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {versions.map((version) => {
+                  const isCurrentVersion = version.version === content.latestVersion;
+                  const versionUrl = getIpfsFileUrl(version.ipfsHash);
+
+                  return (
+                    <div
+                      key={version.version.toString()}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/50"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
+                            Version v{version.version.toString()}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            Stored at {formatDate(version.timestamp)}
+                          </div>
+                        </div>
+
+                        <div
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${
+                            isCurrentVersion
+                              ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
+                              : "bg-white text-slate-600 dark:bg-slate-900 dark:text-slate-300"
+                          }`}
+                        >
+                          {isCurrentVersion ? "Current" : "Historical"}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                        <div>Title: {version.title}</div>
+                        <div>Description: {version.description || "No description"}</div>
+                        <div className="break-all text-xs text-slate-500 dark:text-slate-400">
+                          CID: {version.ipfsHash}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <a
+                          href={versionUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                          Open file
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </SectionCard>
+        </div>
+
+        <div className="space-y-6">
+          <SectionCard
+            title="Content Actions"
+            description="Voting and reward accrual stay available only while the content remains active."
+          >
+            <div className="space-y-3">
+              <button
+                onClick={handleVote}
+                disabled={content.deleted}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+              >
+                <Heart className="h-4 w-4" />
+                Vote
+              </button>
+
+              <button
+                onClick={handleAccrueReward}
+                disabled={content.deleted}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <Coins className="h-4 w-4" />
+                Accrue reward
+              </button>
+            </div>
+          </SectionCard>
+
+          {isAuthor && (
+            <SectionCard
+              title="Author Actions"
+              description="Updating content creates a new on-chain version and keeps earlier CIDs available in history."
+            >
+              <div className="space-y-3">
+                <input
+                  value={editTitle}
+                  onChange={(event) => setEditTitle(event.target.value)}
+                  disabled={!canEditContent || savingEdit}
+                  placeholder="Content title"
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
+                />
+
+                <textarea
+                  value={editDescription}
+                  onChange={(event) => setEditDescription(event.target.value)}
+                  disabled={!canEditContent || savingEdit}
+                  placeholder="Content description"
+                  rows={4}
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
+                />
+
+                <input
+                  value={editCid}
+                  onChange={(event) => setEditCid(event.target.value)}
+                  disabled={!canEditContent || savingEdit}
+                  placeholder="New IPFS CID"
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
+                />
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
+                  {canEditContent
+                    ? "Upload the new file first, then submit the replacement CID. The old CID remains pinned and will stay visible in version history."
+                    : "Editing is locked after deletion, after any vote, or once rewards have entered the accrual flow."}
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={handleUpdateContent}
+                    disabled={!canEditContent || savingEdit}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+                  >
+                    <PencilLine className="h-4 w-4" />
+                    {savingEdit ? "Updating..." : "Create new version"}
+                  </button>
+
+                  <button
+                    onClick={handleDeleteContent}
+                    disabled={!canDeleteContent || deleting}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-rose-300 px-5 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/30"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {deleting ? "Deleting..." : "Soft delete"}
+                  </button>
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
+          <SectionCard
+            title="Current Metadata"
+            description="The active content record points to the latest snapshot only."
+          >
+            <div className="space-y-3">
+              <CopyField label="Current CID" value={content.ipfsHash} />
+              <CopyField label="Gateway URL" value={previewUrl} />
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Record Summary"
+            description="Quick summary of the current content record."
+          >
+            <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                <span>Content ID: {content.id.toString()}</span>
+              </div>
+              <div>Title: {content.title}</div>
+              <div>Description: {content.description || "No description"}</div>
+              <div>Latest version: v{content.latestVersion.toString()}</div>
+            </div>
+          </SectionCard>
+        </div>
+      </div>
+    </main>
+  );
 }

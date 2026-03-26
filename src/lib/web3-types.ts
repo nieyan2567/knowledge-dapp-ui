@@ -1,5 +1,5 @@
 import type { Address, HexString } from "@/types/contracts";
-import type { ContentData } from "@/types/content";
+import type { ContentData, ContentVersionData } from "@/types/content";
 import type { ProposalVotes } from "@/types/governance";
 
 export function asBigInt(value: unknown): bigint | undefined {
@@ -49,7 +49,7 @@ export function asProposalVotes(
 }
 
 export function asContentData(value: unknown): ContentData | undefined {
-  if (!Array.isArray(value) || value.length < 9) return undefined;
+  if (!Array.isArray(value) || value.length < 11) return undefined;
 
   const [
     id,
@@ -61,6 +61,8 @@ export function asContentData(value: unknown): ContentData | undefined {
     timestamp,
     rewardAccrued,
     deleted,
+    latestVersion,
+    lastUpdatedAt,
   ] = value as readonly unknown[];
 
   if (
@@ -72,7 +74,9 @@ export function asContentData(value: unknown): ContentData | undefined {
     typeof voteCount !== "bigint" ||
     typeof timestamp !== "bigint" ||
     typeof rewardAccrued !== "boolean" ||
-    typeof deleted !== "boolean"
+    typeof deleted !== "boolean" ||
+    typeof latestVersion !== "bigint" ||
+    typeof lastUpdatedAt !== "bigint"
   ) {
     return undefined;
   }
@@ -87,5 +91,33 @@ export function asContentData(value: unknown): ContentData | undefined {
     timestamp,
     rewardAccrued,
     deleted,
+    latestVersion,
+    lastUpdatedAt,
+  };
+}
+
+export function asContentVersion(
+  value: unknown,
+  version: bigint
+): ContentVersionData | undefined {
+  if (!Array.isArray(value) || value.length < 4) return undefined;
+
+  const [ipfsHash, title, description, timestamp] = value as readonly unknown[];
+
+  if (
+    typeof ipfsHash !== "string" ||
+    typeof title !== "string" ||
+    typeof description !== "string" ||
+    typeof timestamp !== "bigint"
+  ) {
+    return undefined;
+  }
+
+  return {
+    version,
+    ipfsHash,
+    title,
+    description,
+    timestamp,
   };
 }
