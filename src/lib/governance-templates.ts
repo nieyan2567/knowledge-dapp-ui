@@ -205,7 +205,7 @@ function buildEncodedAction(input: {
   };
 }
 
-export const GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
+const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "content.setRewardRules",
     category: "content",
@@ -562,6 +562,14 @@ export const GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     ],
   },
 ];
+
+function isTemplateAvailable(template: GovernanceTemplateDefinition) {
+  return !template.fields.some((field) => field.type === "address");
+}
+
+export const GOVERNANCE_TEMPLATES = ALL_GOVERNANCE_TEMPLATES.filter(
+  isTemplateAvailable
+);
 
 const templateCodecs: Record<string, TemplateCodec> = {
   "content.setRewardRules": {

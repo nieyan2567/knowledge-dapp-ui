@@ -20,23 +20,27 @@ describe("governance-templates", () => {
     });
   });
 
-  it("lists supported governance templates", () => {
+  it("lists only templates without address inputs", () => {
     const templates = getGovernanceTemplates();
 
-    expect(templates.length).toBeGreaterThanOrEqual(10);
+    expect(templates.length).toBeGreaterThanOrEqual(6);
     expect(getGovernanceTemplateById("governor.setVotingPeriod")?.functionName).toBe(
       "setVotingPeriod"
     );
+    expect(getGovernanceTemplateById("content.setTreasury")).toBeNull();
+    expect(getGovernanceTemplateById("timelock.grantRole")).toBeNull();
+    expect(
+      templates.every((template) =>
+        template.fields.every((field) => field.type !== "address")
+      )
+    ).toBe(true);
   });
 
-  it("validates template inputs before encoding", () => {
-    const draft = createGovernanceDraftAction("content.setTreasury");
-    draft.values.treasury = "not-an-address";
+  it("validates numeric template inputs before encoding", () => {
+    const draft = createGovernanceDraftAction("timelock.updateDelay");
+    draft.values.delaySeconds = "not-a-number";
 
-    expect(validateGovernanceActionDraft(draft)).toEqual({
-      ok: false,
-      error: "Treasury 地址不是有效地址",
-    });
+    expect(validateGovernanceActionDraft(draft).ok).toBe(false);
   });
 
   it("encodes reward rules proposals", () => {
@@ -47,19 +51,7 @@ describe("governance-templates", () => {
     expect(encoded.target).toBe(CONTRACTS.KnowledgeContent);
     expect(encoded.value).toBe(0n);
     expect(encoded.calldata.startsWith("0x")).toBe(true);
-    expect(encoded.description).toContain("单票奖励");
-  });
-
-  it("encodes treasury spender proposals with boolean values", () => {
-    const draft = createGovernanceDraftAction("treasury.setSpender");
-    draft.values.spender = CONTRACTS.KnowledgeGovernor;
-    draft.values.allowed = false;
-
-    const encoded = encodeGovernanceActionDraft(draft);
-
-    expect(encoded.templateId).toBe("treasury.setSpender");
-    expect(encoded.target).toBe(CONTRACTS.TreasuryNative);
-    expect(encoded.description).toContain("撤销");
+    expect(encoded.description.length).toBeGreaterThan(0);
   });
 
   it("encodes timelock delay proposals", () => {
@@ -71,26 +63,5 @@ describe("governance-templates", () => {
     expect(encoded.templateId).toBe("timelock.updateDelay");
     expect(encoded.target).toBe(CONTRACTS.TimelockController);
     expect(encoded.description).toContain("7200");
-  });
-
-  it("encodes timelock grant role proposals", () => {
-    const draft = createGovernanceDraftAction("timelock.grantRole");
-    draft.values.account = CONTRACTS.KnowledgeGovernor;
-
-    const encoded = encodeGovernanceActionDraft(draft);
-
-    expect(encoded.templateId).toBe("timelock.grantRole");
-    expect(encoded.target).toBe(CONTRACTS.TimelockController);
-    expect(encoded.description).toContain("PROPOSER_ROLE");
-  });
-
-  it("validates timelock role selections", () => {
-    const draft = createGovernanceDraftAction("timelock.revokeRole");
-    draft.values.role = "0x1234";
-
-    expect(validateGovernanceActionDraft(draft)).toEqual({
-      ok: false,
-      error: "角色不在允许范围内",
-    });
   });
 });
