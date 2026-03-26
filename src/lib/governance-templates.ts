@@ -708,11 +708,11 @@ export function getRiskBadgeClass(riskLevel: GovernanceRiskLevel) {
 export function getRiskLabel(riskLevel: GovernanceRiskLevel) {
   switch (riskLevel) {
     case "low":
-      return "低风险";
+      return "low";
     case "medium":
-      return "中风险";
+      return "medium";
     case "high":
-      return "高风险";
+      return "high";
     default:
       return riskLevel;
   }
