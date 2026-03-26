@@ -49,7 +49,7 @@ export function asProposalVotes(
 }
 
 export function asContentData(value: unknown): ContentData | undefined {
-  if (!Array.isArray(value) || value.length < 8) return undefined;
+  if (!Array.isArray(value) || value.length < 9) return undefined;
 
   const [
     id,
@@ -60,6 +60,7 @@ export function asContentData(value: unknown): ContentData | undefined {
     voteCount,
     timestamp,
     rewardAccrued,
+    deleted,
   ] = value as readonly unknown[];
 
   if (
@@ -70,7 +71,8 @@ export function asContentData(value: unknown): ContentData | undefined {
     typeof description !== "string" ||
     typeof voteCount !== "bigint" ||
     typeof timestamp !== "bigint" ||
-    typeof rewardAccrued !== "boolean"
+    typeof rewardAccrued !== "boolean" ||
+    typeof deleted !== "boolean"
   ) {
     return undefined;
   }
@@ -84,5 +86,6 @@ export function asContentData(value: unknown): ContentData | undefined {
     voteCount,
     timestamp,
     rewardAccrued,
+    deleted,
   };
 }

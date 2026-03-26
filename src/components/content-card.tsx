@@ -114,6 +114,7 @@ export function ContentCard({
 				<div>票数: {content.voteCount.toString()}</div>
 				<div>时间: {new Date(Number(content.timestamp) * 1000).toLocaleString()}</div>
 				<div>奖励状态: {content.rewardAccrued ? "已记账" : "未记账"}</div>
+				<div>内容状态: {content.deleted ? "已删除" : "正常"}</div>
 
 				<div className="break-all text-xs text-slate-500 dark:text-slate-400" title={content.ipfsHash}>
 					CID: {content.ipfsHash}
@@ -136,6 +137,7 @@ export function ContentCard({
 			<div className="mt-5 flex flex-wrap gap-3">
 				<button
 					onClick={handleVote}
+					disabled={content.deleted}
 					className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
 				>
 					<Heart className="h-4 w-4" />
@@ -144,6 +146,7 @@ export function ContentCard({
 
 				<button
 					onClick={handleDistributeReward}
+					disabled={content.deleted}
 					className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 				>
 					<Coins className="h-4 w-4" />

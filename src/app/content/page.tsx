@@ -30,7 +30,7 @@ import { asContentData } from "@/lib/web3-types";
 function parseContentResults(results: readonly unknown[]): ContentCardData[] {
   return results
     .map((item) => asContentData(item))
-		.filter((item): item is ContentCardData => !!item)
+		.filter((item): item is ContentCardData => !!item && !item.deleted)
     .reverse();
 }
 

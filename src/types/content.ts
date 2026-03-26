@@ -9,6 +9,7 @@ export interface ContentData {
   voteCount: bigint
   timestamp: bigint
   rewardAccrued: boolean
+  deleted: boolean
 }
 
 export type ContentCardData = ContentData

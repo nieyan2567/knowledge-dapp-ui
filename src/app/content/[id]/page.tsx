@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { toast } from "sonner";
 import {
@@ -13,6 +13,8 @@ import {
 	ExternalLink,
 	FileText,
 	Heart,
+	PencilLine,
+	Trash2,
 	User,
 } from "lucide-react";
 
@@ -36,6 +38,11 @@ export default function ContentDetailPage() {
 	const publicClient = usePublicClient();
 	const { writeContractAsync } = useWriteContract();
 	const refreshAfterTx = useRefreshOnTxConfirmed();
+	const [editTitle, setEditTitle] = useState("");
+	const [editDescription, setEditDescription] = useState("");
+	const [editCid, setEditCid] = useState("");
+	const [savingEdit, setSavingEdit] = useState(false);
+	const [deleting, setDeleting] = useState(false);
 
 	const rawId = params?.id;
 	const contentId = useMemo(() => {
@@ -54,6 +61,15 @@ export default function ContentDetailPage() {
 		},
 	});
 
+	const content = asContentData(contentData);
+
+	useEffect(() => {
+		if (!content) return;
+		setEditTitle(content.title);
+		setEditDescription(content.description);
+		setEditCid(content.ipfsHash);
+	}, [content]);
+
 	if (!contentId) {
 		notFound();
 	}
@@ -67,8 +83,6 @@ export default function ContentDetailPage() {
 			</main>
 		);
 	}
-
-	const content = asContentData(contentData);
 
 	if (!content) {
 		return (
@@ -89,6 +103,11 @@ export default function ContentDetailPage() {
 	}
 
 	const previewUrl = getIpfsFileUrl(content.ipfsHash);
+	const isAuthor =
+		!!address && content.author.toLowerCase() === address.toLowerCase();
+	const canEditContent =
+		isAuthor && !content.deleted && content.voteCount === 0n && !content.rewardAccrued;
+	const canDeleteContent = isAuthor && !content.deleted;
 
 	async function handleVote() {
 		if (!content) {
@@ -146,6 +165,89 @@ export default function ContentDetailPage() {
 		});
 		if (!hash) return;
 		await refreshAfterTx(hash, refetchContent, ["content", "rewards", "dashboard", "system"]);
+	}
+
+	async function handleUpdateContent() {
+		if (!content) {
+			toast.error("内容数据加载失败");
+			return;
+		}
+
+		if (!address) {
+			toast.error("请先连接钱包");
+			return;
+		}
+
+		if (!canEditContent) {
+			toast.error("当前内容状态不允许编辑");
+			return;
+		}
+
+		if (!editCid.trim() || !editTitle.trim()) {
+			toast.error("CID 和标题不能为空");
+			return;
+		}
+
+		setSavingEdit(true);
+		try {
+			const hash = await writeTxToast({
+				publicClient,
+				writeContractAsync,
+				request: {
+					address: CONTRACTS.KnowledgeContent as `0x${string}`,
+					abi: ABIS.KnowledgeContent,
+					functionName: "updateContent",
+					args: [content.id, editCid.trim(), editTitle.trim(), editDescription.trim()],
+					account: address,
+				},
+				loading: "正在提交内容更新交易...",
+				success: "内容更新交易已提交",
+				fail: "内容更新失败",
+			});
+			if (!hash) return;
+			await refreshAfterTx(hash, refetchContent, ["content", "dashboard"]);
+		} finally {
+			setSavingEdit(false);
+		}
+	}
+
+	async function handleDeleteContent() {
+		if (!content) {
+			toast.error("内容数据加载失败");
+			return;
+		}
+
+		if (!address) {
+			toast.error("请先连接钱包");
+			return;
+		}
+
+		if (!canDeleteContent) {
+			toast.error("当前内容状态不允许删除");
+			return;
+		}
+
+		setDeleting(true);
+		try {
+			const hash = await writeTxToast({
+				publicClient,
+				writeContractAsync,
+				request: {
+					address: CONTRACTS.KnowledgeContent as `0x${string}`,
+					abi: ABIS.KnowledgeContent,
+					functionName: "deleteContent",
+					args: [content.id],
+					account: address,
+				},
+				loading: "正在提交删除交易...",
+				success: "删除交易已提交",
+				fail: "删除失败",
+			});
+			if (!hash) return;
+			await refreshAfterTx(hash, refetchContent, ["content", "dashboard"]);
+		} finally {
+			setDeleting(false);
+		}
 	}
 
 	return (
@@ -215,7 +317,7 @@ export default function ContentDetailPage() {
 						title="内容信息"
 						description="链上登记的基础信息和内容元数据。"
 					>
-						<div className="grid gap-4 md:grid-cols-2">
+				<div className="grid gap-4 md:grid-cols-2">
 							<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
 								<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
 									作者
@@ -254,6 +356,15 @@ export default function ContentDetailPage() {
 									{content.rewardAccrued ? "已记账" : "未记账"}
 								</div>
 							</div>
+
+							<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+								<div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+									内容状态
+								</div>
+								<div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+									{content.deleted ? "已删除" : "正常"}
+								</div>
+							</div>
 						</div>
 					</SectionCard>
 				</div>
@@ -267,6 +378,7 @@ export default function ContentDetailPage() {
 						<div className="space-y-3">
 							<button
 								onClick={handleVote}
+								disabled={content.deleted}
 								className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
 							>
 								<Heart className="h-4 w-4" />
@@ -275,6 +387,7 @@ export default function ContentDetailPage() {
 
 							<button
 								onClick={handleAccrueReward}
+								disabled={content.deleted}
 								className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 							>
 								<Coins className="h-4 w-4" />
@@ -282,6 +395,64 @@ export default function ContentDetailPage() {
 							</button>
 						</div>
 					</SectionCard>
+
+					{isAuthor && (
+						<SectionCard
+							title="作者操作"
+							description="内容尚未获得投票且未进入奖励流程时，作者可以更新内容元数据或删除内容。修改文件时请先上传新文件并填写新的 CID。"
+						>
+							<div className="space-y-3">
+								<input
+									value={editTitle}
+									onChange={(event) => setEditTitle(event.target.value)}
+									disabled={!canEditContent || savingEdit}
+									placeholder="内容标题"
+									className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
+								/>
+								<textarea
+									value={editDescription}
+									onChange={(event) => setEditDescription(event.target.value)}
+									disabled={!canEditContent || savingEdit}
+									placeholder="内容描述"
+									rows={4}
+									className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
+								/>
+								<input
+									value={editCid}
+									onChange={(event) => setEditCid(event.target.value)}
+									disabled={!canEditContent || savingEdit}
+									placeholder="新的 IPFS CID"
+									className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
+								/>
+
+								<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
+									{canEditContent
+										? "当前内容可编辑。若替换文件，请先上传新文件到 IPFS，再把新的 CID 填到这里。"
+										: "当前内容已获得投票、已删除或已进入奖励流程，编辑入口已锁定。"}
+								</div>
+
+								<div className="flex flex-wrap gap-3">
+									<button
+										onClick={handleUpdateContent}
+										disabled={!canEditContent || savingEdit}
+										className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+									>
+										<PencilLine className="h-4 w-4" />
+										{savingEdit ? "正在更新..." : "更新内容"}
+									</button>
+
+									<button
+										onClick={handleDeleteContent}
+										disabled={!canDeleteContent || deleting}
+										className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-rose-300 px-5 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/30"
+									>
+										<Trash2 className="h-4 w-4" />
+										{deleting ? "正在删除..." : "删除内容"}
+									</button>
+								</div>
+							</div>
+						</SectionCard>
+					)}
 
 					<SectionCard
 						title="链上元数据"
