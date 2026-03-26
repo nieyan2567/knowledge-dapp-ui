@@ -13,6 +13,7 @@ import {
 	ExternalLink,
 	LayoutDashboard,
 	Shield,
+	UserRound,
 	Vote,
 	Wallet,
 } from "lucide-react";
@@ -32,6 +33,7 @@ const dangerButtonClass =
 
 const internalNavItems = [
 	{ href: "/", label: "Dashboard", icon: LayoutDashboard },
+	{ href: "/profile", label: "Profile", icon: UserRound },
 	{ href: "/faucet", label: "Faucet", icon: Droplets },
 	{ href: "/stake", label: "Stake", icon: Wallet },
 	{ href: "/content", label: "Content", icon: BookOpen },
@@ -134,68 +136,70 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 						) : null}
 					</div>
 
-					{/* Internal Nav */}
-					<nav className="space-y-1 px-3 py-4">
-						{internalNavItems.map((item) => {
-							const Icon = item.icon;
-							const active = pathname === item.href;
+					<div className="min-h-0 flex-1 overflow-y-auto">
+						{/* Internal Nav */}
+						<nav className="space-y-1 px-3 py-4">
+							{internalNavItems.map((item) => {
+								const Icon = item.icon;
+								const active = pathname === item.href;
 
-							return (
-								<Link
-									key={item.href}
-									href={item.href}
-									className={clsx(
-										"group flex items-center rounded-2xl px-3 py-3 text-sm font-medium transition-all duration-300",
-										active
-											? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
-											: "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white",
-										collapsed ? "justify-center" : "gap-3"
-									)}
-									title={collapsed ? item.label : undefined}
-								>
-									<Icon className="h-5 w-5 shrink-0" />
-									<span
+								return (
+									<Link
+										key={item.href}
+										href={item.href}
 										className={clsx(
-											"overflow-hidden whitespace-nowrap transition-all duration-300",
-											collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+											"group flex items-center rounded-2xl px-3 py-3 text-sm font-medium transition-all duration-300",
+											active
+												? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
+												: "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white",
+											collapsed ? "justify-center" : "gap-3"
 										)}
+										title={collapsed ? item.label : undefined}
 									>
-										{item.label}
-									</span>
-								</Link>
-							);
-						})}
-					</nav>
+										<Icon className="h-5 w-5 shrink-0" />
+										<span
+											className={clsx(
+												"overflow-hidden whitespace-nowrap transition-all duration-300",
+												collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+											)}
+										>
+											{item.label}
+										</span>
+									</Link>
+								);
+							})}
+						</nav>
 
-					{/* External Nav */}
-					<div className="px-3 py-2">
-						{externalNavItems.map((item) => {
-							const Icon = item.icon;
+						{/* External Nav */}
+						<div className="px-3 py-2">
+							{externalNavItems.map((item) => {
+								const Icon = item.icon;
 
-							return (
-								<a
-									key={item.href}
-									href={item.href}
-									target="_blank"
-									rel="noreferrer"
-									className={clsx(
-										"group flex items-center rounded-2xl px-3 py-3 text-sm font-medium text-slate-600 transition-all duration-300 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white",
-										collapsed ? "justify-center" : "gap-3"
-									)}
-									title={collapsed ? item.label : undefined}
-								>
-									<Icon className="h-5 w-5 shrink-0" />
-									<span
+								return (
+									<a
+										key={item.href}
+										href={item.href}
+										target="_blank"
+										rel="noreferrer"
 										className={clsx(
-											"overflow-hidden whitespace-nowrap transition-all duration-300",
-											collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+											"group flex items-center rounded-2xl px-3 py-3 text-sm font-medium text-slate-600 transition-all duration-300 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white",
+											collapsed ? "justify-center" : "gap-3"
 										)}
+										title={collapsed ? item.label : undefined}
 									>
-										{item.label}
-									</span>
-								</a>
-							);
-						})}
+										<Icon className="h-5 w-5 shrink-0" />
+										<span
+											className={clsx(
+												"overflow-hidden whitespace-nowrap transition-all duration-300",
+												collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+											)}
+										>
+											{item.label}
+										</span>
+									</a>
+								);
+							})}
+						</div>
 					</div>
 
 					{/* Footer */}
