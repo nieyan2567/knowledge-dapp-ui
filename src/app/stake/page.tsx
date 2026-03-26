@@ -229,7 +229,7 @@ export default function StakePage() {
 			<PageHeader
 				eyebrow="Staking · Voting Power"
 				title="Stake & Voting Power"
-				description="用户先质押原生币，再激活投票权，才能参与内容投票和 DAO 治理。退出质押时需要先申请，再等待冷却期结束。"
+				description="用户需要先质押原生币并激活投票权，才能参与内容投票和 DAO 治理。退出质押时需要先发起申请，再等待冷却期结束。"
 			/>
 
 			<section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

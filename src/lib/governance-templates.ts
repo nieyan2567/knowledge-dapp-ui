@@ -209,7 +209,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "content.setRewardRules",
     category: "content",
-    label: "Reward Rules",
+    label: "更新奖励规则",
     description: "更新内容奖励规则。",
     riskLevel: "low",
     target: CONTRACTS.KnowledgeContent as Address,
@@ -235,10 +235,45 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     ],
   },
   {
+    id: "content.setContentPolicy",
+    category: "content",
+    label: "更新内容策略",
+    description: "更新内容编辑锁定、删除策略和版本上限。",
+    riskLevel: "medium",
+    target: CONTRACTS.KnowledgeContent as Address,
+    functionName: "setContentPolicy",
+    valueMode: "fixedZero",
+    fields: [
+      {
+        key: "editLockVotes",
+        label: "编辑锁定票数",
+        type: "uint256",
+        required: true,
+        placeholder: "例如 1",
+        defaultValue: "1",
+      },
+      {
+        key: "allowDeleteAfterVote",
+        label: "投票后允许删除",
+        type: "boolean",
+        required: true,
+        defaultValue: false,
+      },
+      {
+        key: "maxVersionsPerContent",
+        label: "单内容最大版本数",
+        type: "uint256",
+        required: true,
+        placeholder: "例如 20",
+        defaultValue: "20",
+      },
+    ],
+  },
+  {
     id: "content.setTreasury",
     category: "content",
-    label: "Set Treasury",
-    description: "更新内容合约的 Treasury 地址。",
+    label: "更新金库地址",
+    description: "更新内容合约绑定的金库地址。",
     riskLevel: "medium",
     target: CONTRACTS.KnowledgeContent as Address,
     functionName: "setTreasury",
@@ -246,7 +281,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     fields: [
       {
         key: "treasury",
-        label: "Treasury 地址",
+        label: "金库地址",
         type: "address",
         required: true,
         placeholder: CONTRACTS.TreasuryNative,
@@ -257,7 +292,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "content.setAntiSybil",
     category: "content",
-    label: "Set Anti-Sybil",
+    label: "更新防女巫配置",
     description: "更新投票反女巫配置。",
     riskLevel: "medium",
     target: CONTRACTS.KnowledgeContent as Address,
@@ -266,7 +301,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     fields: [
       {
         key: "votesContract",
-        label: "Votes 合约地址",
+        label: "投票合约地址",
         type: "address",
         required: true,
         placeholder: CONTRACTS.NativeVotes,
@@ -285,7 +320,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "content.pause",
     category: "content",
-    label: "Pause Content",
+    label: "暂停内容模块",
     description: "暂停内容注册和投票。",
     riskLevel: "high",
     target: CONTRACTS.KnowledgeContent as Address,
@@ -296,7 +331,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "content.unpause",
     category: "content",
-    label: "Unpause Content",
+    label: "恢复内容模块",
     description: "恢复内容注册和投票。",
     riskLevel: "medium",
     target: CONTRACTS.KnowledgeContent as Address,
@@ -307,8 +342,8 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "treasury.setBudget",
     category: "treasury",
-    label: "Set Treasury Budget",
-    description: "更新 Treasury 周期和预算。",
+    label: "更新金库预算",
+    description: "更新金库周期和预算。",
     riskLevel: "medium",
     target: CONTRACTS.TreasuryNative as Address,
     functionName: "setBudget",
@@ -335,8 +370,8 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "treasury.setSpender",
     category: "treasury",
-    label: "Set Treasury Spender",
-    description: "更新可记账的 spender 权限。",
+    label: "更新金库记账权限",
+    description: "更新可记账账户权限。",
     riskLevel: "medium",
     target: CONTRACTS.TreasuryNative as Address,
     functionName: "setSpender",
@@ -344,7 +379,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     fields: [
       {
         key: "spender",
-        label: "Spender 地址",
+        label: "记账账户地址",
         type: "address",
         required: true,
         placeholder: CONTRACTS.KnowledgeContent,
@@ -362,8 +397,8 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "treasury.pause",
     category: "treasury",
-    label: "Pause Treasury",
-    description: "暂停 Treasury 敏感操作。",
+    label: "暂停金库",
+    description: "暂停金库敏感操作。",
     riskLevel: "high",
     target: CONTRACTS.TreasuryNative as Address,
     functionName: "pause",
@@ -373,8 +408,8 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "treasury.unpause",
     category: "treasury",
-    label: "Unpause Treasury",
-    description: "恢复 Treasury 敏感操作。",
+    label: "恢复金库",
+    description: "恢复金库敏感操作。",
     riskLevel: "medium",
     target: CONTRACTS.TreasuryNative as Address,
     functionName: "unpause",
@@ -384,7 +419,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "governor.setProposalThreshold",
     category: "governor",
-    label: "Set Proposal Threshold",
+    label: "更新提案门槛",
     description: "更新提案门槛。",
     riskLevel: "medium",
     target: CONTRACTS.KnowledgeGovernor as Address,
@@ -404,7 +439,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "governor.setVotingDelay",
     category: "governor",
-    label: "Set Voting Delay",
+    label: "更新投票延迟",
     description: "更新提案创建后的投票延迟。",
     riskLevel: "low",
     target: CONTRACTS.KnowledgeGovernor as Address,
@@ -424,7 +459,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "governor.setVotingPeriod",
     category: "governor",
-    label: "Set Voting Period",
+    label: "更新投票周期",
     description: "更新投票持续周期。",
     riskLevel: "low",
     target: CONTRACTS.KnowledgeGovernor as Address,
@@ -442,9 +477,29 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     ],
   },
   {
+    id: "governor.setLateQuorumVoteExtension",
+    category: "governor",
+    label: "更新延迟法定人数延长期",
+    description: "更新在法定人数较晚达成时追加的投票延长期。",
+    riskLevel: "medium",
+    target: CONTRACTS.KnowledgeGovernor as Address,
+    functionName: "setLateQuorumVoteExtension",
+    valueMode: "fixedZero",
+    fields: [
+      {
+        key: "lateQuorumVoteExtension",
+        label: "延迟法定人数延长期（区块）",
+        type: "uint256",
+        required: true,
+        placeholder: "例如 20",
+        defaultValue: "20",
+      },
+    ],
+  },
+  {
     id: "governor.updateQuorumNumerator",
     category: "governor",
-    label: "Update Quorum Numerator",
+    label: "更新法定人数分子",
     description: "更新法定人数分子。",
     riskLevel: "medium",
     target: CONTRACTS.KnowledgeGovernor as Address,
@@ -464,8 +519,8 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "governor.updateTimelock",
     category: "governor",
-    label: "Update Timelock",
-    description: "更新 Governor 使用的 Timelock。",
+    label: "更新时间锁绑定",
+    description: "更新治理合约绑定的时间锁。",
     riskLevel: "high",
     target: CONTRACTS.KnowledgeGovernor as Address,
     functionName: "updateTimelock",
@@ -473,7 +528,7 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     fields: [
       {
         key: "timelock",
-        label: "Timelock 地址",
+        label: "时间锁地址",
         type: "address",
         required: true,
         placeholder: CONTRACTS.TimelockController,
@@ -484,8 +539,8 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "timelock.updateDelay",
     category: "timelock",
-    label: "Update Timelock Delay",
-    description: "更新 Timelock 的最小延迟。",
+    label: "更新时间锁延迟",
+    description: "更新时间锁的最小延迟。",
     riskLevel: "high",
     target: CONTRACTS.TimelockController as Address,
     functionName: "updateDelay",
@@ -504,8 +559,8 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "timelock.grantRole",
     category: "timelock",
-    label: "Grant Timelock Role",
-    description: "向指定账户授予 Timelock 角色。",
+    label: "授予时间锁角色",
+    description: "向指定账户授予时间锁角色。",
     riskLevel: "high",
     target: CONTRACTS.TimelockController as Address,
     functionName: "grantRole",
@@ -534,8 +589,8 @@ const ALL_GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "timelock.revokeRole",
     category: "timelock",
-    label: "Revoke Timelock Role",
-    description: "撤销指定账户的 Timelock 角色。",
+    label: "撤销时间锁角色",
+    description: "撤销指定账户的时间锁角色。",
     riskLevel: "high",
     target: CONTRACTS.TimelockController as Address,
     functionName: "revokeRole",
@@ -610,13 +665,53 @@ const templateCodecs: Record<string, TemplateCodec> = {
       });
     },
   },
+  "content.setContentPolicy": {
+    validate(values) {
+      const editLockVotes = parseRequiredUint(values, "editLockVotes", "编辑锁定票数");
+      if (isFailed(editLockVotes)) return editLockVotes;
+
+      const maxVersionsPerContent = parseRequiredUint(
+        values,
+        "maxVersionsPerContent",
+        "单内容最大版本数"
+      );
+      if (isFailed(maxVersionsPerContent)) return maxVersionsPerContent;
+
+      return ok();
+    },
+    encode(values) {
+      const editLockVotes = parseRequiredUint(values, "editLockVotes", "编辑锁定票数");
+      const maxVersionsPerContent = parseRequiredUint(
+        values,
+        "maxVersionsPerContent",
+        "单内容最大版本数"
+      );
+
+      if (isFailed(editLockVotes) || isFailed(maxVersionsPerContent)) {
+        throw new Error("无效的内容策略提案");
+      }
+
+      const allowDeleteAfterVote = readBoolean(values, "allowDeleteAfterVote");
+
+      return buildEncodedAction({
+        templateId: "content.setContentPolicy",
+        target: CONTRACTS.KnowledgeContent as Address,
+        abi: ABIS.KnowledgeContent,
+        functionName: "setContentPolicy",
+        args: [editLockVotes, allowDeleteAfterVote, maxVersionsPerContent],
+        title: "更新内容策略",
+        description: `将编辑锁定票数设为 ${editLockVotes.toString()}，投票后删除设为${allowDeleteAfterVote ? "允许" : "禁止"}，单内容最大版本数设为 ${maxVersionsPerContent.toString()}`,
+        riskLevel: "medium",
+      });
+    },
+  },
   "content.setTreasury": {
     validate(values) {
-      const treasury = parseRequiredAddress(values, "treasury", "Treasury 地址");
+      const treasury = parseRequiredAddress(values, "treasury", "金库地址");
       return isFailed(treasury) ? treasury : ok();
     },
     encode(values) {
-      const treasury = parseRequiredAddress(values, "treasury", "Treasury 地址");
+      const treasury = parseRequiredAddress(values, "treasury", "金库地址");
       if (isFailed(treasury)) {
         throw new Error("Invalid treasury address");
       }
@@ -627,8 +722,8 @@ const templateCodecs: Record<string, TemplateCodec> = {
         abi: ABIS.KnowledgeContent,
         functionName: "setTreasury",
         args: [treasury],
-        title: "更新 Treasury 地址",
-        description: `将内容合约的 Treasury 更新为 ${treasury}`,
+        title: "更新金库地址",
+        description: `将内容合约绑定的金库更新为 ${treasury}`,
         riskLevel: "medium",
       });
     },
@@ -657,7 +752,7 @@ const templateCodecs: Record<string, TemplateCodec> = {
         abi: ABIS.KnowledgeContent,
         functionName: "setAntiSybil",
         args: [votesContract, minStakeToVote],
-        title: "更新 Anti-Sybil 配置",
+        title: "更新防女巫配置",
         description: `将 Votes 合约设为 ${votesContract}，最小质押门槛设为 ${formatEther(minStakeToVote)} ${BRANDING.nativeTokenSymbol}`,
         riskLevel: "medium",
       });
@@ -719,7 +814,7 @@ const templateCodecs: Record<string, TemplateCodec> = {
         abi: ABIS.TreasuryNative,
         functionName: "setBudget",
         args: [epochDuration, epochBudget],
-        title: "更新 Treasury 预算",
+        title: "更新金库预算",
         description: `将周期时长设为 ${epochDuration.toString()} 秒，周期预算设为 ${formatEther(epochBudget)} ${BRANDING.nativeTokenSymbol}`,
         riskLevel: "medium",
       });
@@ -727,11 +822,11 @@ const templateCodecs: Record<string, TemplateCodec> = {
   },
   "treasury.setSpender": {
     validate(values) {
-      const spender = parseRequiredAddress(values, "spender", "Spender 地址");
+      const spender = parseRequiredAddress(values, "spender", "记账账户地址");
       return isFailed(spender) ? spender : ok();
     },
     encode(values) {
-      const spender = parseRequiredAddress(values, "spender", "Spender 地址");
+      const spender = parseRequiredAddress(values, "spender", "记账账户地址");
       if (isFailed(spender)) {
         throw new Error("Invalid treasury spender draft");
       }
@@ -744,8 +839,8 @@ const templateCodecs: Record<string, TemplateCodec> = {
         abi: ABIS.TreasuryNative,
         functionName: "setSpender",
         args: [spender, allowed],
-        title: "更新 Treasury Spender 权限",
-        description: `${allowed ? "授予" : "撤销"} ${spender} 的 spender 权限`,
+        title: "更新金库记账权限",
+        description: `${allowed ? "授予" : "撤销"} ${spender} 的记账权限`,
         riskLevel: "medium",
       });
     },
@@ -760,8 +855,8 @@ const templateCodecs: Record<string, TemplateCodec> = {
         target: CONTRACTS.TreasuryNative as Address,
         abi: ABIS.TreasuryNative,
         functionName: "pause",
-        title: "暂停 Treasury",
-        description: "暂停 Treasury 的敏感链上操作。",
+        title: "暂停金库",
+        description: "暂停金库的敏感链上操作。",
         riskLevel: "high",
       });
     },
@@ -776,8 +871,8 @@ const templateCodecs: Record<string, TemplateCodec> = {
         target: CONTRACTS.TreasuryNative as Address,
         abi: ABIS.TreasuryNative,
         functionName: "unpause",
-        title: "恢复 Treasury",
-        description: "恢复 Treasury 的敏感链上操作。",
+        title: "恢复金库",
+        description: "恢复金库的敏感链上操作。",
         riskLevel: "medium",
       });
     },
@@ -851,6 +946,37 @@ const templateCodecs: Record<string, TemplateCodec> = {
       });
     },
   },
+  "governor.setLateQuorumVoteExtension": {
+    validate(values) {
+      const lateQuorumVoteExtension = parseRequiredUint(
+        values,
+        "lateQuorumVoteExtension",
+        "延迟法定人数延长期"
+      );
+      return isFailed(lateQuorumVoteExtension) ? lateQuorumVoteExtension : ok();
+    },
+    encode(values) {
+      const lateQuorumVoteExtension = parseRequiredUint(
+        values,
+        "lateQuorumVoteExtension",
+        "延迟法定人数延长期"
+      );
+      if (isFailed(lateQuorumVoteExtension)) {
+        throw new Error("无效的延迟法定人数延长期提案");
+      }
+
+      return buildEncodedAction({
+        templateId: "governor.setLateQuorumVoteExtension",
+        target: CONTRACTS.KnowledgeGovernor as Address,
+        abi: ABIS.KnowledgeGovernor,
+        functionName: "setLateQuorumVoteExtension",
+        args: [lateQuorumVoteExtension],
+        title: "更新延迟法定人数延长期",
+        description: `将延迟法定人数延长期更新为 ${lateQuorumVoteExtension.toString()} 个区块`,
+        riskLevel: "medium",
+      });
+    },
+  },
   "governor.updateQuorumNumerator": {
     validate(values) {
       const quorumNumerator = parseRequiredUint(values, "quorumNumerator", "法定人数分子");
@@ -876,11 +1002,11 @@ const templateCodecs: Record<string, TemplateCodec> = {
   },
   "governor.updateTimelock": {
     validate(values) {
-      const timelock = parseRequiredAddress(values, "timelock", "Timelock 地址");
+      const timelock = parseRequiredAddress(values, "timelock", "时间锁地址");
       return isFailed(timelock) ? timelock : ok();
     },
     encode(values) {
-      const timelock = parseRequiredAddress(values, "timelock", "Timelock 地址");
+      const timelock = parseRequiredAddress(values, "timelock", "时间锁地址");
       if (isFailed(timelock)) {
         throw new Error("Invalid timelock draft");
       }
@@ -891,8 +1017,8 @@ const templateCodecs: Record<string, TemplateCodec> = {
         abi: ABIS.KnowledgeGovernor,
         functionName: "updateTimelock",
         args: [timelock],
-        title: "更新 Governor Timelock",
-        description: `将 Governor 绑定的 Timelock 更新为 ${timelock}`,
+        title: "更新时间锁绑定",
+        description: `将治理合约绑定的时间锁更新为 ${timelock}`,
         riskLevel: "high",
       });
     },
@@ -914,8 +1040,8 @@ const templateCodecs: Record<string, TemplateCodec> = {
         abi: ABIS.TimelockController,
         functionName: "updateDelay",
         args: [delaySeconds],
-        title: "更新 Timelock 延迟",
-        description: `将 Timelock 最小延迟更新为 ${delaySeconds.toString()} 秒`,
+        title: "更新时间锁延迟",
+        description: `将时间锁最小延迟更新为 ${delaySeconds.toString()} 秒`,
         riskLevel: "high",
       });
     },
@@ -955,7 +1081,7 @@ const templateCodecs: Record<string, TemplateCodec> = {
         abi: ABIS.TimelockController,
         functionName: "grantRole",
         args: [role, account],
-        title: "授予 Timelock 角色",
+        title: "授予时间锁角色",
         description: `向 ${account} 授予 ${roleLabel}`,
         riskLevel: "high",
       });
@@ -996,7 +1122,7 @@ const templateCodecs: Record<string, TemplateCodec> = {
         abi: ABIS.TimelockController,
         functionName: "revokeRole",
         args: [role, account],
-        title: "撤销 Timelock 角色",
+        title: "撤销时间锁角色",
         description: `撤销 ${account} 的 ${roleLabel}`,
         riskLevel: "high",
       });
@@ -1072,11 +1198,11 @@ export function getRiskBadgeClass(riskLevel: GovernanceRiskLevel) {
 export function getRiskLabel(riskLevel: GovernanceRiskLevel) {
   switch (riskLevel) {
     case "low":
-      return "Low";
+      return "低风险";
     case "medium":
-      return "Medium";
+      return "中风险";
     case "high":
-      return "High";
+      return "高风险";
     default:
       return riskLevel;
   }

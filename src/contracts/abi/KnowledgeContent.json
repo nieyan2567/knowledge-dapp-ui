@@ -55,6 +55,31 @@
         {
           "indexed": false,
           "internalType": "uint256",
+          "name": "editLockVotes",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "allowDeleteAfterVote",
+          "type": "bool"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "maxVersionsPerContent",
+          "type": "uint256"
+        }
+      ],
+      "name": "ContentPolicyUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
           "name": "id",
           "type": "uint256"
         },
@@ -283,6 +308,19 @@
     },
     {
       "inputs": [],
+      "name": "MAX_MAX_VERSIONS_PER_CONTENT",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "MAX_MIN_VOTES_TO_REWARD",
       "outputs": [
         {
@@ -302,6 +340,19 @@
           "internalType": "uint256",
           "name": "",
           "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "allowDeleteAfterVote",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -435,6 +486,19 @@
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "editLockVotes",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint256",
@@ -492,6 +556,19 @@
           "internalType": "bool",
           "name": "",
           "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "maxVersionsPerContent",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
         }
       ],
       "stateMutability": "view",
@@ -613,6 +690,29 @@
         }
       ],
       "name": "setAntiSybil",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_editLockVotes",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "_allowDeleteAfterVote",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_maxVersionsPerContent",
+          "type": "uint256"
+        }
+      ],
+      "name": "setContentPolicy",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

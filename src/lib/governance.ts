@@ -193,7 +193,35 @@ function summarizeDecodedAction(
           ),
           details: [
             { label: "最小获奖票数", value: args[0].toString() },
-            { label: "单票奖励", value: `${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}` },
+            {
+              label: "单票奖励",
+              value: `${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}`,
+            },
+          ],
+          rawCalldata: calldata,
+        });
+      }
+
+      if (
+        decoded.functionName === "setContentPolicy" &&
+        typeof args[0] === "bigint" &&
+        typeof args[1] === "boolean" &&
+        typeof args[2] === "bigint"
+      ) {
+        return createSummary({
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新内容策略",
+          description: appendValueSuffix(
+            `将编辑锁定票数更新为 ${args[0].toString()}，投票后删除设为${args[1] ? "允许" : "禁止"}，单内容最大版本数设为 ${args[2].toString()}`,
+            value
+          ),
+          details: [
+            { label: "编辑锁定票数", value: args[0].toString() },
+            { label: "投票后允许删除", value: args[1] ? "是" : "否" },
+            { label: "最大版本数", value: args[2].toString() },
           ],
           rawCalldata: calldata,
         });
@@ -205,9 +233,9 @@ function summarizeDecodedAction(
           targetLabel,
           value,
           functionName: decoded.functionName,
-          title: "更新 Treasury 地址",
-          description: appendValueSuffix(`将内容合约的 Treasury 更新为 ${args[0]}`, value),
-          details: [{ label: "Treasury", value: args[0] }],
+          title: "更新金库地址",
+          description: appendValueSuffix(`将内容合约绑定的金库更新为 ${args[0]}`, value),
+          details: [{ label: "金库地址", value: args[0] }],
           rawCalldata: calldata,
         });
       }
@@ -222,14 +250,17 @@ function summarizeDecodedAction(
           targetLabel,
           value,
           functionName: decoded.functionName,
-          title: "更新 Anti-Sybil 配置",
+          title: "更新防女巫配置",
           description: appendValueSuffix(
             `将 Votes 合约更新为 ${args[0]}，最小质押门槛设为 ${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}`,
             value
           ),
           details: [
             { label: "Votes 合约", value: args[0] },
-            { label: "最小质押门槛", value: `${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}` },
+            {
+              label: "最小质押门槛",
+              value: `${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}`,
+            },
           ],
           rawCalldata: calldata,
         });
@@ -272,14 +303,17 @@ function summarizeDecodedAction(
           targetLabel,
           value,
           functionName: decoded.functionName,
-          title: "更新 Treasury 预算",
+          title: "更新金库预算",
           description: appendValueSuffix(
             `将周期时长设为 ${args[0].toString()} 秒，周期预算设为 ${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}`,
             value
           ),
           details: [
             { label: "周期时长", value: `${args[0].toString()} 秒` },
-            { label: "周期预算", value: `${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}` },
+            {
+              label: "周期预算",
+              value: `${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}`,
+            },
           ],
           rawCalldata: calldata,
         });
@@ -295,14 +329,14 @@ function summarizeDecodedAction(
           targetLabel,
           value,
           functionName: decoded.functionName,
-          title: "更新 Treasury Spender 权限",
+          title: "更新金库记账权限",
           description: appendValueSuffix(
-            `${args[1] ? "授予" : "撤销"} ${args[0]} 的 spender 权限`,
+            `${args[1] ? "授予" : "撤销"} ${args[0]} 的记账权限`,
             value
           ),
           details: [
-            { label: "Spender", value: args[0] },
-            { label: "权限", value: args[1] ? "允许" : "撤销" },
+            { label: "记账账户地址", value: args[0] },
+            { label: "权限状态", value: args[1] ? "允许" : "撤销" },
           ],
           rawCalldata: calldata,
         });
@@ -315,9 +349,9 @@ function summarizeDecodedAction(
           targetLabel,
           value,
           functionName: decoded.functionName,
-          title: paused ? "暂停 Treasury" : "恢复 Treasury",
+          title: paused ? "暂停金库" : "恢复金库",
           description: appendValueSuffix(
-            paused ? "暂停 Treasury 的敏感链上操作" : "恢复 Treasury 的敏感链上操作",
+            paused ? "暂停金库的敏感链上操作" : "恢复金库的敏感链上操作",
             value
           ),
           details: [{ label: "模块", value: "TreasuryNative" }],
@@ -344,7 +378,12 @@ function summarizeDecodedAction(
             `将提案门槛更新为 ${formatEther(args[0])} ${BRANDING.nativeTokenSymbol}`,
             value
           ),
-          details: [{ label: "提案门槛", value: `${formatEther(args[0])} ${BRANDING.nativeTokenSymbol}` }],
+          details: [
+            {
+              label: "提案门槛",
+              value: `${formatEther(args[0])} ${BRANDING.nativeTokenSymbol}`,
+            },
+          ],
           rawCalldata: calldata,
         });
       }
@@ -356,7 +395,10 @@ function summarizeDecodedAction(
           value,
           functionName: decoded.functionName,
           title: "更新投票延迟",
-          description: appendValueSuffix(`将投票延迟更新为 ${args[0].toString()} 个区块`, value),
+          description: appendValueSuffix(
+            `将投票延迟更新为 ${args[0].toString()} 个区块`,
+            value
+          ),
           details: [{ label: "投票延迟", value: `${args[0].toString()} 个区块` }],
           rawCalldata: calldata,
         });
@@ -369,8 +411,30 @@ function summarizeDecodedAction(
           value,
           functionName: decoded.functionName,
           title: "更新投票周期",
-          description: appendValueSuffix(`将投票周期更新为 ${args[0].toString()} 个区块`, value),
+          description: appendValueSuffix(
+            `将投票周期更新为 ${args[0].toString()} 个区块`,
+            value
+          ),
           details: [{ label: "投票周期", value: `${args[0].toString()} 个区块` }],
+          rawCalldata: calldata,
+        });
+      }
+
+      if (
+        decoded.functionName === "setLateQuorumVoteExtension" &&
+        typeof args[0] === "bigint"
+      ) {
+        return createSummary({
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新延迟法定人数延长期",
+          description: appendValueSuffix(
+            `将延迟法定人数延长期更新为 ${args[0].toString()} 个区块`,
+            value
+          ),
+          details: [{ label: "延迟法定人数延长期", value: `${args[0].toString()} 个区块` }],
           rawCalldata: calldata,
         });
       }
@@ -394,9 +458,9 @@ function summarizeDecodedAction(
           targetLabel,
           value,
           functionName: decoded.functionName,
-          title: "更新 Governor Timelock",
-          description: appendValueSuffix(`将 Governor 使用的 Timelock 更新为 ${args[0]}`, value),
-          details: [{ label: "Timelock", value: args[0] }],
+          title: "更新时间锁绑定",
+          description: appendValueSuffix(`将治理合约绑定的时间锁更新为 ${args[0]}`, value),
+          details: [{ label: "时间锁地址", value: args[0] }],
           rawCalldata: calldata,
         });
       }
@@ -415,8 +479,11 @@ function summarizeDecodedAction(
           targetLabel,
           value,
           functionName: decoded.functionName,
-          title: "更新 Timelock 延迟",
-          description: appendValueSuffix(`将 Timelock 最小延迟更新为 ${args[0].toString()} 秒`, value),
+          title: "更新时间锁延迟",
+          description: appendValueSuffix(
+            `将时间锁最小延迟更新为 ${args[0].toString()} 秒`,
+            value
+          ),
           details: [{ label: "最小延迟", value: `${args[0].toString()} 秒` }],
           rawCalldata: calldata,
         });
@@ -433,7 +500,7 @@ function summarizeDecodedAction(
           targetLabel,
           value,
           functionName: decoded.functionName,
-          title: granting ? "授予 Timelock 角色" : "撤销 Timelock 角色",
+          title: granting ? "授予时间锁角色" : "撤销时间锁角色",
           description: appendValueSuffix(
             `${granting ? "授予" : "撤销"} ${args[1]} 的 ${formatRoleLabel(args[0])} 权限`,
             value
@@ -441,7 +508,7 @@ function summarizeDecodedAction(
           details: [
             { label: "角色", value: formatRoleLabel(args[0]) },
             { label: "账户", value: args[1] },
-            { label: "操作", value: granting ? "grantRole" : "revokeRole" },
+            { label: "操作", value: granting ? "授予角色" : "撤销角色" },
           ],
           rawCalldata: calldata,
         });
@@ -473,7 +540,7 @@ function summarizeDecodedAction(
         functionName: decoded.functionName,
         title: `调用 ${targetLabel}.${decoded.functionName}`,
         description: appendValueSuffix(
-          `参数: ${args.map((arg) => formatGenericArgument(arg)).join(", ") || "无"}`,
+          `参数：${args.map((arg) => formatGenericArgument(arg)).join("，") || "无"}`,
           value
         ),
         details: args.map((arg, index) => ({
@@ -484,7 +551,7 @@ function summarizeDecodedAction(
       });
     }
   } catch {
-    // Fall through.
+    // Fall through to unknown summary.
   }
 
   return createSummary({

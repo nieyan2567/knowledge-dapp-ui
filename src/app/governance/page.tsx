@@ -576,7 +576,7 @@ export default function GovernancePage() {
 
         <SectionCard
           title="提交前预览"
-          description="最终会把这些动作按顺序编码为 Governor.propose 的 targets、values 和 calldatas。"
+          description="最终会把这些动作按顺序编码为 `Governor.propose` 所需的 targets、values 和 calldatas。"
         >
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-3">
@@ -880,7 +880,7 @@ function DraftActionPreview({
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Function
+                函数
               </div>
               <div className="mt-1 font-mono text-xs text-slate-600 dark:text-slate-300">
                 {template.functionName}
@@ -888,7 +888,7 @@ function DraftActionPreview({
             </div>
             <div>
               <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Value
+                调用值
               </div>
               <div className="mt-1 font-mono text-xs text-slate-600 dark:text-slate-300">
                 {encodedAction.value.toString()}

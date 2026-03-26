@@ -121,7 +121,7 @@ export default function ContentDetailPage() {
 
         setVersions(parsed);
       } catch {
-        toast.error("Failed to load content versions");
+        toast.error("加载内容版本历史失败");
       } finally {
         setLoadingVersions(false);
       }
@@ -155,7 +155,7 @@ export default function ContentDetailPage() {
     return (
       <main className="mx-auto max-w-7xl px-6 py-10">
         <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-          Loading content details...
+          正在加载内容详情...
         </div>
       </main>
     );
@@ -169,11 +169,11 @@ export default function ContentDetailPage() {
           className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to content list
+          返回内容列表
         </Link>
 
         <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-          Content not found.
+          未找到该内容。
         </div>
       </main>
     );
@@ -187,12 +187,12 @@ export default function ContentDetailPage() {
 
   async function handleVote() {
     if (!content) {
-      toast.error("Content is unavailable");
+      toast.error("内容暂不可用");
       return;
     }
 
     if (!address) {
-      toast.error("Connect your wallet first");
+      toast.error("请先连接钱包");
       return;
     }
 
@@ -206,9 +206,9 @@ export default function ContentDetailPage() {
         args: [content.id],
         account: address,
       },
-      loading: "Submitting vote...",
-      success: "Vote submitted",
-      fail: "Vote failed",
+      loading: "正在提交投票...",
+      success: "投票交易已提交",
+      fail: "投票失败",
     });
 
     if (!hash) return;
@@ -217,12 +217,12 @@ export default function ContentDetailPage() {
 
   async function handleAccrueReward() {
     if (!content) {
-      toast.error("Content is unavailable");
+      toast.error("内容暂不可用");
       return;
     }
 
     if (!address) {
-      toast.error("Connect your wallet first");
+      toast.error("请先连接钱包");
       return;
     }
 
@@ -236,9 +236,9 @@ export default function ContentDetailPage() {
         args: [content.id],
         account: address,
       },
-      loading: "Submitting reward accrual...",
-      success: "Reward accrual submitted",
-      fail: "Reward accrual failed",
+      loading: "正在提交奖励记账...",
+      success: "奖励记账交易已提交",
+      fail: "奖励记账失败",
     });
 
     if (!hash) return;
@@ -247,22 +247,22 @@ export default function ContentDetailPage() {
 
   async function handleUpdateContent() {
     if (!content) {
-      toast.error("Content is unavailable");
+      toast.error("内容暂不可用");
       return;
     }
 
     if (!address) {
-      toast.error("Connect your wallet first");
+      toast.error("请先连接钱包");
       return;
     }
 
     if (!canEditContent) {
-      toast.error("Current content state does not allow editing");
+      toast.error("当前内容状态不允许编辑");
       return;
     }
 
     if (!editCid.trim() || !editTitle.trim()) {
-      toast.error("CID and title are required");
+      toast.error("CID 和标题不能为空");
       return;
     }
 
@@ -279,9 +279,9 @@ export default function ContentDetailPage() {
           args: [content.id, editCid.trim(), editTitle.trim(), editDescription.trim()],
           account: address,
         },
-        loading: "Submitting content update...",
-        success: "Content update submitted",
-        fail: "Content update failed",
+        loading: "正在提交内容更新...",
+        success: "内容更新交易已提交",
+        fail: "内容更新失败",
       });
 
       if (!hash) return;
@@ -293,17 +293,17 @@ export default function ContentDetailPage() {
 
   async function handleDeleteContent() {
     if (!content) {
-      toast.error("Content is unavailable");
+      toast.error("内容暂不可用");
       return;
     }
 
     if (!address) {
-      toast.error("Connect your wallet first");
+      toast.error("请先连接钱包");
       return;
     }
 
     if (!canDeleteContent) {
-      toast.error("Current content state does not allow deletion");
+      toast.error("当前内容状态不允许删除");
       return;
     }
 
@@ -320,9 +320,9 @@ export default function ContentDetailPage() {
           args: [content.id],
           account: address,
         },
-        loading: "Submitting content deletion...",
-        success: "Content deletion submitted",
-        fail: "Content deletion failed",
+        loading: "正在提交删除交易...",
+        success: "删除交易已提交",
+        fail: "删除失败",
       });
 
       if (!hash) return;
@@ -340,7 +340,7 @@ export default function ContentDetailPage() {
           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to content list
+          返回内容列表
         </Link>
 
         <a
@@ -349,22 +349,22 @@ export default function ContentDetailPage() {
           rel="noreferrer"
           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
         >
-          Open current IPFS file
+          查看当前 IPFS 文件
           <ExternalLink className="h-4 w-4" />
         </a>
       </div>
 
       <PageHeader
-        eyebrow={`Content #${content.id.toString()}`}
+        eyebrow={`内容 #${content.id.toString()}`}
         title={content.title}
-        description={content.description || "No description"}
+        description={content.description || "暂无描述"}
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
           <SectionCard
             title="Current File"
-            description="The latest version snapshot points to the current CID stored on-chain."
+            description="最新版本快照指向当前链上记录的 CID。"
           >
             <a
               href={previewUrl}
@@ -379,15 +379,15 @@ export default function ContentDetailPage() {
 
                 <div>
                   <div className="text-base font-semibold text-slate-950 dark:text-slate-100">
-                    Open current file
+                    打开当前文件
                   </div>
                   <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Version v{content.latestVersion.toString()} stored at the active CID.
+                    当前激活的 CID 对应版本 v{content.latestVersion.toString()}。
                   </div>
                 </div>
 
                 <div className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 group-hover:text-blue-700 dark:text-blue-400 dark:group-hover:text-blue-300">
-                  Open file
+                  打开文件
                   <ExternalLink className="h-4 w-4" />
                 </div>
               </div>
@@ -396,12 +396,12 @@ export default function ContentDetailPage() {
 
           <SectionCard
             title="Content Snapshot"
-            description="The current content record now includes snapshot fields and version metadata."
+            description="当前内容记录已包含快照字段和版本元数据。"
           >
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Author
+                  作者
                 </div>
                 <div className="flex items-center gap-2 text-sm text-slate-900 dark:text-slate-100">
                   <User className="h-4 w-4 text-slate-400 dark:text-slate-500" />
@@ -411,7 +411,7 @@ export default function ContentDetailPage() {
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Created At
+                  创建时间
                 </div>
                 <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
                   {formatDate(content.timestamp)}
@@ -420,7 +420,7 @@ export default function ContentDetailPage() {
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Latest Version
+                  最新版本
                 </div>
                 <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
                   v{content.latestVersion.toString()} / {versionCount.toString()} stored
@@ -429,7 +429,7 @@ export default function ContentDetailPage() {
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Last Updated
+                  最后更新时间
                 </div>
                 <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
                   {formatDate(content.lastUpdatedAt)}
@@ -438,7 +438,7 @@ export default function ContentDetailPage() {
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Votes
+                  票数
                 </div>
                 <div className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
                   <Heart className="h-4 w-4 text-slate-400 dark:text-slate-500" />
@@ -448,20 +448,20 @@ export default function ContentDetailPage() {
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Reward Status
+                  奖励状态
                 </div>
                 <div className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
                   <CheckCircle2 className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                  {content.rewardAccrued ? "Accrued" : "Pending"}
+                  {content.rewardAccrued ? "已记账" : "待记账"}
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Content Status
+                  内容状态
                 </div>
                 <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                  {content.deleted ? "Deleted" : "Active"}
+                  {content.deleted ? "已删除" : "正常"}
                 </div>
               </div>
             </div>
@@ -469,15 +469,15 @@ export default function ContentDetailPage() {
 
           <SectionCard
             title="Version History"
-            description="Older CID snapshots stay pinned and indexed on-chain as immutable versions."
+            description="较早的 CID 快照会继续保留 pin，并作为不可变版本记录在链上。"
           >
             {loadingVersions ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
-                Loading version history...
+                正在加载版本历史...
               </div>
             ) : versions.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
-                No versions found.
+                暂无版本记录。
               </div>
             ) : (
               <div className="space-y-4">
@@ -493,10 +493,10 @@ export default function ContentDetailPage() {
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
-                            Version v{version.version.toString()}
+                            版本 v{version.version.toString()}
                           </div>
                           <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            Stored at {formatDate(version.timestamp)}
+                            记录时间：{formatDate(version.timestamp)}
                           </div>
                         </div>
 
@@ -507,13 +507,13 @@ export default function ContentDetailPage() {
                               : "bg-white text-slate-600 dark:bg-slate-900 dark:text-slate-300"
                           }`}
                         >
-                          {isCurrentVersion ? "Current" : "Historical"}
+                          {isCurrentVersion ? "当前版本" : "历史版本"}
                         </div>
                       </div>
 
                       <div className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                        <div>Title: {version.title}</div>
-                        <div>Description: {version.description || "No description"}</div>
+                        <div>标题：{version.title}</div>
+                        <div>描述：{version.description || "暂无描述"}</div>
                         <div className="break-all text-xs text-slate-500 dark:text-slate-400">
                           CID: {version.ipfsHash}
                         </div>
@@ -526,7 +526,7 @@ export default function ContentDetailPage() {
                           rel="noreferrer"
                           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
-                          Open file
+                          打开文件
                           <ExternalLink className="h-4 w-4" />
                         </a>
                       </div>
@@ -541,7 +541,7 @@ export default function ContentDetailPage() {
         <div className="space-y-6">
           <SectionCard
             title="Content Actions"
-            description="Voting and reward accrual stay available only while the content remains active."
+            description="只有在内容处于正常状态时，才可继续投票和奖励记账。"
           >
             <div className="space-y-3">
               <button
@@ -550,7 +550,7 @@ export default function ContentDetailPage() {
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
               >
                 <Heart className="h-4 w-4" />
-                Vote
+                投票
               </button>
 
               <button
@@ -559,7 +559,7 @@ export default function ContentDetailPage() {
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <Coins className="h-4 w-4" />
-                Accrue reward
+                奖励记账
               </button>
             </div>
           </SectionCard>
@@ -567,14 +567,14 @@ export default function ContentDetailPage() {
           {isAuthor && (
             <SectionCard
               title="Author Actions"
-              description="Updating content creates a new on-chain version and keeps earlier CIDs available in history."
+              description="更新内容会创建新的链上版本，同时保留旧 CID 作为历史版本。"
             >
               <div className="space-y-3">
                 <input
                   value={editTitle}
                   onChange={(event) => setEditTitle(event.target.value)}
                   disabled={!canEditContent || savingEdit}
-                  placeholder="Content title"
+                  placeholder="内容标题"
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
                 />
 
@@ -582,7 +582,7 @@ export default function ContentDetailPage() {
                   value={editDescription}
                   onChange={(event) => setEditDescription(event.target.value)}
                   disabled={!canEditContent || savingEdit}
-                  placeholder="Content description"
+                  placeholder="内容描述"
                   rows={4}
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
                 />
@@ -591,14 +591,14 @@ export default function ContentDetailPage() {
                   value={editCid}
                   onChange={(event) => setEditCid(event.target.value)}
                   disabled={!canEditContent || savingEdit}
-                  placeholder="New IPFS CID"
+                  placeholder="新的 IPFS CID"
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
                 />
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
                   {canEditContent
-                    ? "Upload the new file first, then submit the replacement CID. The old CID remains pinned and will stay visible in version history."
-                    : "Editing is locked after deletion, after any vote, or once rewards have entered the accrual flow."}
+                    ? "请先上传新文件，再提交替换后的 CID。旧 CID 会继续保留 pin，并显示在版本历史中。"
+                    : "内容删除后、获得投票后，或进入奖励流程后，将不再允许编辑。"}
                 </div>
 
                 <div className="flex flex-wrap gap-3">
@@ -608,7 +608,7 @@ export default function ContentDetailPage() {
                     className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
                   >
                     <PencilLine className="h-4 w-4" />
-                    {savingEdit ? "Updating..." : "Create new version"}
+                    {savingEdit ? "正在更新..." : "创建新版本"}
                   </button>
 
                   <button
@@ -617,7 +617,7 @@ export default function ContentDetailPage() {
                     className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-rose-300 px-5 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/30"
                   >
                     <Trash2 className="h-4 w-4" />
-                    {deleting ? "Deleting..." : "Soft delete"}
+                    {deleting ? "正在删除..." : "软删除"}
                   </button>
                 </div>
               </div>
@@ -626,26 +626,26 @@ export default function ContentDetailPage() {
 
           <SectionCard
             title="Current Metadata"
-            description="The active content record points to the latest snapshot only."
+            description="当前内容记录只指向最新快照。"
           >
             <div className="space-y-3">
-              <CopyField label="Current CID" value={content.ipfsHash} />
-              <CopyField label="Gateway URL" value={previewUrl} />
+              <CopyField label="当前 CID" value={content.ipfsHash} />
+              <CopyField label="网关地址" value={previewUrl} />
             </div>
           </SectionCard>
 
           <SectionCard
             title="Record Summary"
-            description="Quick summary of the current content record."
+            description="当前内容记录的简要摘要。"
           >
             <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
               <div className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                <span>Content ID: {content.id.toString()}</span>
+                <span>内容 ID：{content.id.toString()}</span>
               </div>
-              <div>Title: {content.title}</div>
-              <div>Description: {content.description || "No description"}</div>
-              <div>Latest version: v{content.latestVersion.toString()}</div>
+              <div>标题：{content.title}</div>
+              <div>描述：{content.description || "暂无描述"}</div>
+              <div>最新版本：v{content.latestVersion.toString()}</div>
             </div>
           </SectionCard>
         </div>

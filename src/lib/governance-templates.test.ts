@@ -64,6 +64,20 @@ describe("governance-templates", () => {
     expect(encoded.description.length).toBeGreaterThan(0);
   });
 
+  it("encodes content policy proposals", () => {
+    const draft = createGovernanceDraftAction("content.setContentPolicy");
+    draft.values.editLockVotes = "3";
+    draft.values.allowDeleteAfterVote = true;
+    draft.values.maxVersionsPerContent = "12";
+
+    const encoded = encodeGovernanceActionDraft(draft);
+
+    expect(encoded.templateId).toBe("content.setContentPolicy");
+    expect(encoded.target).toBe(CONTRACTS.KnowledgeContent);
+    expect(encoded.description).toContain("3");
+    expect(encoded.description).toContain("12");
+  });
+
   it("encodes timelock delay proposals", () => {
     const draft = createGovernanceDraftAction("timelock.updateDelay");
     draft.values.delaySeconds = "7200";
@@ -73,5 +87,16 @@ describe("governance-templates", () => {
     expect(encoded.templateId).toBe("timelock.updateDelay");
     expect(encoded.target).toBe(CONTRACTS.TimelockController);
     expect(encoded.description).toContain("7200");
+  });
+
+  it("encodes late quorum extension proposals", () => {
+    const draft = createGovernanceDraftAction("governor.setLateQuorumVoteExtension");
+    draft.values.lateQuorumVoteExtension = "25";
+
+    const encoded = encodeGovernanceActionDraft(draft);
+
+    expect(encoded.templateId).toBe("governor.setLateQuorumVoteExtension");
+    expect(encoded.target).toBe(CONTRACTS.KnowledgeGovernor);
+    expect(encoded.description).toContain("25");
   });
 });

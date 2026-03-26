@@ -50,6 +50,19 @@ describe("governance summaries", () => {
     expect(summary?.details?.[0]?.value).toContain("3600");
   });
 
+  it("summarizes content policy updates", () => {
+    const summary = summarizeFromTemplate("content.setContentPolicy", {
+      editLockVotes: "4",
+      allowDeleteAfterVote: true,
+      maxVersionsPerContent: "16",
+    });
+
+    expect(summary?.title).toContain("内容");
+    expect(summary?.description).toContain("4");
+    expect(summary?.description).toContain("16");
+    expect(summary?.details?.[1]?.value).toBe("允许");
+  });
+
   it("summarizes governor parameter updates", () => {
     const summary = summarizeFromTemplate("governor.setVotingPeriod", {
       votingPeriod: "42",
@@ -58,6 +71,16 @@ describe("governance summaries", () => {
     expect(summary?.title).toContain("投票");
     expect(summary?.description).toContain("42");
     expect(summary?.details?.[0]?.value).toContain("42");
+  });
+
+  it("summarizes late quorum extension updates", () => {
+    const summary = summarizeFromTemplate("governor.setLateQuorumVoteExtension", {
+      lateQuorumVoteExtension: "24",
+    });
+
+    expect(summary?.title).toContain("延迟法定人数");
+    expect(summary?.description).toContain("24");
+    expect(summary?.details?.[0]?.value).toContain("24");
   });
 
   it("summarizes timelock delay updates", () => {

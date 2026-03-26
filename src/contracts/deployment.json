@@ -1,13 +1,14 @@
 {
   "network": "consortium",
   "chainId": 20260,
-  "timestamp": "2026-03-22T13:59:49.241Z",
+  "timestamp": "2026-03-26T16:29:20.363Z",
   "deployer": "0x148dd37731e3CaA6d7C0DcF6B89372e5aF135D0a",
   "contracts": {
     "NativeVotes": "0xf913CC093f66D705936f3c8376eF4CDaAD970a42",
     "KnowledgeContent": "0xd68fbD1ce33ed4A71Dc48780D377Be0466735b04",
     "TreasuryNative": "0x1f95175342cf3d46031bbCE29a339AfD8335db99",
-    "TimelockController": "0xd0de0912991896691E3671157A2adada5B102aFB",
-    "KnowledgeGovernor": "0x5f1F054903776a5025806Fc4FEeB0b0e55799A68"
+    "RevenueVault": "0xd0de0912991896691E3671157A2adada5B102aFB",
+    "TimelockController": "0x5f1F054903776a5025806Fc4FEeB0b0e55799A68",
+    "KnowledgeGovernor": "0xb1bb987e0d1eEE912aD4c68BC587Dd2DE0826157"
   }
 }

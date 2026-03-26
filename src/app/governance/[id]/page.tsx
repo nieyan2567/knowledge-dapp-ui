@@ -366,7 +366,7 @@ export default function ProposalDetailPage() {
 
           <SectionCard
             title="提案动作"
-            description="ProposalCreated 事件中记录的执行动作和参数。"
+            description="提案创建事件中记录的执行动作和参数。"
           >
             {loadingDetail ? (
               <div className="text-sm text-slate-500 dark:text-slate-400">
@@ -426,7 +426,7 @@ export default function ProposalDetailPage() {
 
                           <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                             <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                              Value
+                              调用值
                             </div>
                             <div className="mt-1.5 font-mono text-xs text-slate-700 dark:text-slate-300">
                               {proposalDetail.values[index]?.toString() ?? "0"}
@@ -526,7 +526,7 @@ export default function ProposalDetailPage() {
 
           <SectionCard
             title="浏览器"
-            description="在 ChainLens 中查看提案交易。"
+            description="在区块浏览器中查看该提案交易。"
           >
             <a
               href={proposalDetail?.transactionHash ? explorerProposalUrl(proposalDetail.transactionHash) : "#"}
