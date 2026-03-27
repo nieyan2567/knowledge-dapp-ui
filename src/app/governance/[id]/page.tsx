@@ -283,82 +283,46 @@ export default function ProposalDetailPage() {
         description="查看提案状态、投票分布、动作细节，并在详情页完成投票、排队和执行。"
       />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_380px] xl:items-start">
         <div className="space-y-6">
           <SectionCard
-            title="提案信息"
-            description="当前提案的核心链上信息。"
-          >
-            {loadingDetail ? (
-              <div className="animate-pulse text-sm text-slate-500 dark:text-slate-400">
-                正在加载提案详情...
-              </div>
-            ) : !proposalDetail ? (
-              <div className="text-sm text-slate-500 dark:text-slate-400">
-                未找到该提案的 ProposalCreated 事件记录。
-              </div>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                <InfoCard label="提案 ID" value={proposalId.toString()} />
-                <InfoBadgeCard
-                  label="状态"
-                  value={stateLabel(proposalState)}
-                  className={stateBadgeClass(proposalState)}
-                />
-                <InfoCard label="创建区块" value={proposalDetail.blockNumber.toString()} />
-                <InfoCard label="投票开始" value={proposalDetail.voteStart.toString()} />
-                <InfoCard label="投票结束" value={proposalDetail.voteEnd.toString()} />
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50 md:col-span-2">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    提案人
-                  </div>
-                  <div className="text-sm text-slate-900 dark:text-slate-100">
-                    <span className="font-mono break-all">{proposalDetail.proposer}</span>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50 md:col-span-2">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    治理合约
-                  </div>
-                  <span className="font-mono break-all text-sm text-slate-900 dark:text-slate-100">
-                    {CONTRACTS.KnowledgeGovernor}
-                  </span>
-                </div>
-              </div>
-            )}
-          </SectionCard>
-
-          <SectionCard
             title="投票分布"
-            description="赞成 / 反对 / 弃权 的当前投票分布。"
+            description="查看当前投票结果、总票数和各选项占比。"
           >
-            <div className="space-y-4">
-              <VoteBar
-                label="赞成"
-                value={voteData.forVotes}
-                percent={forPercent}
-                color="bg-emerald-500"
-              />
-              <VoteBar
-                label="反对"
-                value={voteData.againstVotes}
-                percent={againstPercent}
-                color="bg-rose-500"
-              />
-              <VoteBar
-                label="弃权"
-                value={voteData.abstainVotes}
-                percent={abstainPercent}
-                color="bg-slate-500"
-              />
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-4">
+                <InfoCard label="总票数" value={totalVotes === 0n ? "0" : formatEther(totalVotes)} />
+                <InfoCard label="赞成票" value={voteData.forVotes === 0n ? "0" : formatEther(voteData.forVotes)} />
+                <InfoCard label="反对票" value={voteData.againstVotes === 0n ? "0" : formatEther(voteData.againstVotes)} />
+                <InfoCard label="弃权票" value={voteData.abstainVotes === 0n ? "0" : formatEther(voteData.abstainVotes)} />
+              </div>
+
+              <div className="space-y-4">
+                <VoteBar
+                  label="赞成"
+                  value={voteData.forVotes}
+                  percent={forPercent}
+                  color="bg-emerald-500"
+                />
+                <VoteBar
+                  label="反对"
+                  value={voteData.againstVotes}
+                  percent={againstPercent}
+                  color="bg-rose-500"
+                />
+                <VoteBar
+                  label="弃权"
+                  value={voteData.abstainVotes}
+                  percent={abstainPercent}
+                  color="bg-slate-500"
+                />
+              </div>
             </div>
           </SectionCard>
 
           <SectionCard
             title="提案动作"
-            description="提案创建事件中记录的执行动作和参数。"
+            description="这里展示提案中的全部链上动作、参数明细和原始 calldata。"
           >
             {loadingDetail ? (
               <div className="text-sm text-slate-500 dark:text-slate-400">
@@ -464,12 +428,30 @@ export default function ProposalDetailPage() {
           </SectionCard>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 xl:sticky xl:top-6">
           <SectionCard
-            title="操作"
-            description="根据提案状态参与投票或执行治理动作。"
+            title="操作面板"
+            description="根据提案当前状态完成投票、排队或执行。"
           >
-            <div className="space-y-3">
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                  <Gavel className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                  <span>
+                    当前状态: <strong>{stateLabel(proposalState)}</strong>
+                  </span>
+                </div>
+                <div className="mt-3 rounded-lg bg-white/80 p-3 text-xs leading-relaxed text-slate-600 dark:bg-slate-900/70 dark:text-slate-300">
+                  {canVote
+                    ? "当前提案处于投票中状态，可以参与赞成、反对或弃权投票。"
+                    : canQueue
+                      ? "当前提案已通过投票，可以加入 Timelock 执行队列。"
+                      : canExecute
+                        ? "当前提案已排队且等待期结束，可以正式执行。"
+                        : "当前提案暂时没有可执行的治理操作，请关注状态变化。"}
+                </div>
+              </div>
+
               <button
                 onClick={() => void vote(1)}
                 disabled={!canVote}
@@ -517,6 +499,63 @@ export default function ProposalDetailPage() {
           </SectionCard>
 
           <SectionCard
+            title="提案信息"
+            description="右侧汇总当前提案的关键链上信息，便于随时对照。"
+          >
+            {loadingDetail ? (
+              <div className="animate-pulse text-sm text-slate-500 dark:text-slate-400">
+                正在加载提案详情...
+              </div>
+            ) : !proposalDetail ? (
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                未找到该提案的 ProposalCreated 事件记录。
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  <InfoCard label="提案 ID" value={proposalId.toString()} />
+                  <InfoBadgeCard
+                    label="状态"
+                    value={stateLabel(proposalState)}
+                    className={stateBadgeClass(proposalState)}
+                  />
+                  <InfoCard label="创建区块" value={proposalDetail.blockNumber.toString()} />
+                  <InfoCard label="投票开始" value={proposalDetail.voteStart.toString()} />
+                  <InfoCard label="投票结束" value={proposalDetail.voteEnd.toString()} />
+                  <InfoCard label="动作数量" value={proposalDetail.targets.length.toString()} />
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    提案人
+                  </div>
+                  <div className="text-sm text-slate-900 dark:text-slate-100">
+                    <span className="font-mono break-all">{proposalDetail.proposer}</span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    治理合约
+                  </div>
+                  <span className="font-mono break-all text-sm text-slate-900 dark:text-slate-100">
+                    {CONTRACTS.KnowledgeGovernor}
+                  </span>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Description Hash
+                  </div>
+                  <span className="font-mono break-all text-sm text-slate-900 dark:text-slate-100">
+                    {proposalDetail.descriptionHash}
+                  </span>
+                </div>
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard
             title="浏览器"
             description="在区块浏览器中查看该提案交易。"
           >
@@ -539,29 +578,6 @@ export default function ProposalDetailPage() {
               在 ChainLens 中查看
               <ExternalLink className="h-4 w-4" />
             </a>
-          </SectionCard>
-
-          <SectionCard
-            title="摘要"
-            description="提案当前状态和可用操作的摘要。"
-          >
-            <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
-              <div className="flex items-center gap-2">
-                <Gavel className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                <span>
-                  当前状态: <strong>{stateLabel(proposalState)}</strong>
-                </span>
-              </div>
-              <div className="rounded-lg bg-slate-50 p-3 text-xs leading-relaxed dark:bg-slate-800/50">
-                {canVote
-                  ? "当前提案处于投票中状态，你可以进行投票。"
-                  : canQueue
-                    ? "当前提案已通过，可以加入执行队列。"
-                    : canExecute
-                      ? "当前提案已排队且等待期已结束，可以执行。"
-                      : "当前提案暂时不可操作，请检查是否尚未开始、已结束或已取消。"}
-              </div>
-            </div>
           </SectionCard>
         </div>
       </div>

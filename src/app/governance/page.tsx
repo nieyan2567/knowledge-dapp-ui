@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { formatEther } from "viem";
 import {
   useAccount,
-  useBlockNumber,
   usePublicClient,
   useReadContract,
   useWriteContract,
@@ -14,7 +13,6 @@ import { toast } from "sonner";
 import {
   ArrowDown,
   ArrowUp,
-  CheckCircle2,
   Clock3,
   ExternalLink,
   Gavel,
@@ -60,12 +58,36 @@ import type {
 } from "@/types/governance";
 
 const MAX_DRAFT_ACTIONS = 5;
+
 const CATEGORY_LABELS: Record<GovernanceTemplateCategory, string> = {
   content: "Content",
   treasury: "Treasury",
   governor: "Governor",
   timelock: "Timelock",
 };
+
+const GOVERNANCE_FLOW_STEPS = [
+  {
+    step: "01",
+    title: "配置提案动作",
+    description: "从治理模板中组合链上动作，明确要修改的规则与参数。",
+  },
+  {
+    step: "02",
+    title: "提交并进入投票",
+    description: "提案达到门槛后发起，经过 voting delay 后进入投票阶段。",
+  },
+  {
+    step: "03",
+    title: "通过后排队",
+    description: "成功提案会进入 Timelock 队列，等待最小延迟结束。",
+  },
+  {
+    step: "04",
+    title: "执行生效",
+    description: "队列完成后执行提案，治理参数和系统配置正式更新。",
+  },
+] as const;
 
 type DraftActionState = {
   action: GovernanceDraftAction;
@@ -222,9 +244,10 @@ export default function GovernancePage() {
   const encodedActions = draftStates.flatMap((state) =>
     state.encodedAction ? [state.encodedAction] : []
   );
-  const hasHighRiskAction = encodedActions.some(
+  const highRiskActionCount = encodedActions.filter(
     (action) => action.riskLevel === "high"
-  );
+  ).length;
+  const hasHighRiskAction = highRiskActionCount > 0;
   const trimmedDescription = description.trim();
   const canSubmitProposal =
     trimmedDescription.length > 0 &&
@@ -409,215 +432,306 @@ export default function GovernancePage() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
+    <main className="mx-auto max-w-375 space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
         eyebrow="Governor / Timelock / DAO"
         title="Governance Center"
-        description="创建模板化治理提案，组合多个链上动作，并在同一页面查看提案状态、投票、排队和执行。"
+        description="在同一页面查看治理流程、浏览提案、核对参数，并完成提案创建与提交前确认。"
         right={
-          <div className="flex items-center gap-3">
-
-            <a
-              href={explorerAddressUrl(CONTRACTS.KnowledgeGovernor)}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              查看合约
-              <ExternalLink className="h-4 w-4" />
-            </a>
-          </div>
+          <a
+            href={explorerAddressUrl(CONTRACTS.KnowledgeGovernor)}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            查看 Governor 合约
+            <ExternalLink className="h-4 w-4" />
+          </a>
         }
       />
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="text-sm text-slate-500 dark:text-slate-400">
-              提案门槛
-            </div>
-            <Gavel className="h-5 w-5 text-slate-400 dark:text-slate-500" />
-          </div>
-          <div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
-            {proposalThreshold
-              ? `${formatEther(proposalThreshold as bigint)} ${BRANDING.nativeTokenSymbol}`
-              : "-"}
-          </div>
-          <div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-            创建提案所需的最低投票权。
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="text-sm text-slate-500 dark:text-slate-400">
-              投票延迟
-            </div>
-            <Clock3 className="h-5 w-5 text-slate-400 dark:text-slate-500" />
-          </div>
-          <div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
-            {votingDelay ? String(votingDelay) : "-"}
-          </div>
-          <div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-            提案创建后到投票开始前的等待区块数。
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="text-sm text-slate-500 dark:text-slate-400">
-              投票周期
-            </div>
-            <Vote className="h-5 w-5 text-slate-400 dark:text-slate-500" />
-          </div>
-          <div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
-            {votingPeriod ? String(votingPeriod) : "-"}
-          </div>
-          <div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-            提案处于可投票状态的持续区块数。
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
-        <SectionCard
-          title="创建提案"
-          description="从白名单模板中组合多个治理动作，再统一发起同一份提案。"
-        >
-          <div className="space-y-6">
-            <div className="space-y-3">
-              <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                提案描述
-              </div>
-              <textarea
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
-                rows={4}
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="描述这份治理提案的目标和影响"
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  提案动作
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">
-                  当前 {draftActions.length} / {MAX_DRAFT_ACTIONS} 个动作
-                </div>
-              </div>
-              <button
-                onClick={handleAddAction}
-                disabled={draftActions.length >= MAX_DRAFT_ACTIONS}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                <Plus className="h-4 w-4" />
-                新增动作
-              </button>
-            </div>
-
-            {draftStates.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
-                当前没有提案动作，请先添加一个治理动作。
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {draftStates.map((state, index) => (
-                  <DraftActionEditor
-                    key={state.action.id}
-                    index={index}
-                    action={state.action}
-                    template={state.template}
-                    validation={state.validation}
-                    groupedTemplates={groupedTemplates}
-                    totalActions={draftStates.length}
-                    onTemplateChange={handleTemplateChange}
-                    onFieldChange={handleFieldChange}
-                    onMoveAction={handleMoveAction}
-                    onRemoveAction={handleRemoveAction}
-                  />
-                ))}
-              </div>
-            )}
-
-            {hasHighRiskAction ? (
-              <label className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500"
-                  checked={highRiskConfirmed}
-                  onChange={(event) => setHighRiskConfirmed(event.target.checked)}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_320px] xl:items-start">
+        <div className="space-y-6">
+          <SectionCard
+            title="操作流程"
+            description="先配置治理动作，再发起提案并投票，成功后经 Timelock 排队，最终执行生效。"
+          >
+            <div className="grid gap-4 lg:grid-cols-4">
+              {GOVERNANCE_FLOW_STEPS.map((item) => (
+                <GovernanceFlowStep
+                  key={item.step}
+                  step={item.step}
+                  title={item.title}
+                  description={item.description}
                 />
-                <span>
-                  该提案包含高风险治理动作，可能影响系统可用性或核心治理参数。我已经核对目标合约、参数和预期影响。
-                </span>
-              </label>
-            ) : null}
+              ))}
+            </div>
+          </SectionCard>
 
-            <button
-              data-testid="governance-propose-button"
-              onClick={handlePropose}
-              disabled={!canSubmitProposal}
-              className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
-            >
-              发起提案
-            </button>
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          title="提交前预览"
-          description="最终会把这些动作按顺序编码为 `Governor.propose` 所需的 targets、values 和 calldatas。"
-        >
-          <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <PreviewStat
-                label="动作数量"
-                value={String(draftActions.length)}
-              />
-              <PreviewStat
-                label="有效动作"
-                value={String(encodedActions.length)}
-              />
-              <PreviewStat
-                label="高风险动作"
-                value={String(
-                  encodedActions.filter((action) => action.riskLevel === "high").length
-                )}
-              />
+          <SectionCard
+            title="提案列表"
+            description="这里集中展示全部治理提案，支持滚动浏览状态、投票进度与后续处理阶段。"
+          >
+            <div className="mb-4 grid gap-3 sm:grid-cols-3">
+              <PreviewStat label="当前提案" value={String(proposals.length)} />
+              <PreviewStat label="已配置动作" value={String(draftActions.length)} />
+              <PreviewStat label="高风险动作" value={String(highRiskActionCount)} />
             </div>
 
-            {!trimmedDescription ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
-                请输入提案描述，预览区才算完整。
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-950/40">
+              <div className="h-136 overflow-y-auto pr-1 sm:h-152 xl:h-176">
+                <ProposalList
+                  proposals={proposals}
+                  loading={loadingProposals}
+                />
               </div>
-            ) : null}
+            </div>
+          </SectionCard>
 
-            {draftStates.map((state, index) => (
-              <DraftActionPreview
-                key={state.action.id}
-                index={index}
-                template={state.template}
-                validation={state.validation}
-                encodedAction={state.encodedAction}
+          <section className="grid gap-6 2xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.95fr)] 2xl:items-stretch">
+            <SectionCard
+              title="创建提案"
+              description="在一个提案里组合多个治理动作，按执行顺序发起链上变更。"
+              className="h-208"
+              bodyClassName="flex min-h-0 flex-col"
+            >
+              <div className="flex min-h-0 flex-1 flex-col gap-5">
+                <div className="space-y-3">
+                  <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    提案描述
+                  </div>
+                  <textarea
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
+                    rows={2}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    placeholder="描述这份治理提案的目标、影响范围与预期结果"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                      提案动作
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      当前 {draftActions.length} / {MAX_DRAFT_ACTIONS} 个动作
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleAddAction}
+                    disabled={draftActions.length >= MAX_DRAFT_ACTIONS}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    <Plus className="h-4 w-4" />
+                    新增动作
+                  </button>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  {draftStates.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
+                      当前还没有提案动作，请先添加至少一个治理动作。
+                    </div>
+                  ) : (
+                    <div className="h-full space-y-4 overflow-y-auto pr-1">
+                      {draftStates.map((state, index) => (
+                        <DraftActionEditor
+                          key={state.action.id}
+                          index={index}
+                          action={state.action}
+                          template={state.template}
+                          validation={state.validation}
+                          groupedTemplates={groupedTemplates}
+                          totalActions={draftStates.length}
+                          onTemplateChange={handleTemplateChange}
+                          onFieldChange={handleFieldChange}
+                          onMoveAction={handleMoveAction}
+                          onRemoveAction={handleRemoveAction}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {hasHighRiskAction ? (
+                  <label className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500"
+                      checked={highRiskConfirmed}
+                      onChange={(event) => setHighRiskConfirmed(event.target.checked)}
+                    />
+                    <span>
+                      这份提案包含高风险治理动作，可能影响核心治理参数或执行延迟。我已核对目标合约、输入参数和预期影响。
+                    </span>
+                  </label>
+                ) : null}
+
+                <button
+                  data-testid="governance-propose-button"
+                  onClick={handlePropose}
+                  disabled={!canSubmitProposal}
+                  className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
+                >
+                  发起提案
+                </button>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              title="提交前预览"
+              description="这里会按顺序展示最终要写入 Governor.propose 的目标地址、编码动作与风险等级。"
+              className="h-208"
+              bodyClassName="flex min-h-0 flex-col"
+            >
+              <div className="flex min-h-0 flex-1 flex-col gap-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <PreviewStat label="动作数量" value={String(draftActions.length)} />
+                  <PreviewStat label="有效动作" value={String(encodedActions.length)} />
+                  <PreviewStat label="高风险动作" value={String(highRiskActionCount)} />
+                </div>
+
+                {!trimmedDescription ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
+                    请输入提案描述，预览区会更完整地反映最终提交内容。
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-200">
+                    <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Proposal Description
+                    </div>
+                    <div className="mt-1">{trimmedDescription}</div>
+                  </div>
+                )}
+
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <div className="h-full space-y-4 overflow-y-auto pr-1">
+                    {draftStates.map((state, index) => (
+                      <DraftActionPreview
+                        key={state.action.id}
+                        index={index}
+                        template={state.template}
+                        validation={state.validation}
+                        encodedAction={state.encodedAction}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+          </section>
+        </div>
+        <div className="space-y-6 xl:sticky xl:top-6">
+          <SectionCard
+            title="治理参数"
+            description="展示当前治理所需的关键参数，便于在配置提案时随时参考。"
+          >
+            <div className="space-y-3">
+              <GovernanceMetricCard
+                icon={<Gavel className="h-5 w-5 text-slate-500 dark:text-slate-400" />}
+                label="提案门槛"
+                value={
+                  proposalThreshold
+                    ? `${formatEther(proposalThreshold as bigint)} ${BRANDING.nativeTokenSymbol}`
+                    : "-"
+                }
+                description="创建提案所需的最低投票权。"
               />
-            ))}
-          </div>
-        </SectionCard>
-      </section>
 
-      <SectionCard
-        title="提案列表"
-        description="查看当前提案状态、动作摘要和投票情况。"
-      >
-        <ProposalList
-          proposals={proposals}
-          loading={loadingProposals}
-          onActionComplete={loadProposals}
-        />
-      </SectionCard>
+              <GovernanceMetricCard
+                icon={<Clock3 className="h-5 w-5 text-slate-500 dark:text-slate-400" />}
+                label="投票延迟"
+                value={votingDelay ? String(votingDelay) : "-"}
+                description="提案创建后到投票开始前需要等待的区块数。"
+              />
+
+              <GovernanceMetricCard
+                icon={<Vote className="h-5 w-5 text-slate-500 dark:text-slate-400" />}
+                label="投票周期"
+                value={votingPeriod ? String(votingPeriod) : "-"}
+                description="提案保持可投票状态的持续区块数。"
+              />
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
+                <div className="font-medium text-slate-900 dark:text-slate-100">
+                  Governor合约地址
+                </div>
+                <div className="mt-2 break-all font-mono text-xs text-slate-500 dark:text-slate-400">
+                  {CONTRACTS.KnowledgeGovernor}
+                </div>
+                <a
+                  href={explorerAddressUrl(CONTRACTS.KnowledgeGovernor)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-slate-900 transition hover:text-slate-600 dark:text-slate-100 dark:hover:text-slate-300"
+                >
+                  在浏览器中查看
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </div>
+            </div>
+          </SectionCard>
+        </div>
+      </div>
     </main>
+  );
+}
+
+function GovernanceFlowStep({
+  step,
+  title,
+  description,
+}: {
+  step: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-linear-to-br from-white to-slate-50 p-5 shadow-sm dark:border-slate-800 dark:from-slate-900 dark:to-slate-950">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white dark:bg-white dark:text-slate-950">
+          {step}
+        </span>
+        <span className="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
+          Flow
+        </span>
+      </div>
+      <div className="text-base font-semibold text-slate-950 dark:text-slate-100">
+        {title}
+      </div>
+      <div className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+        {description}
+      </div>
+    </div>
+  );
+}
+
+function GovernanceMetricCard({
+  icon,
+  label,
+  value,
+  description,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="text-sm text-slate-500 dark:text-slate-400">{label}</div>
+        {icon}
+      </div>
+      <div className="text-xl font-semibold text-slate-950 dark:text-slate-100">
+        {value}
+      </div>
+      <div className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+        {description}
+      </div>
+    </div>
   );
 }
 
@@ -679,6 +793,7 @@ function DraftActionEditor({
           >
             <ArrowUp className="h-4 w-4" />
           </button>
+
           <button
             onClick={() => onMoveAction(action.id, "down")}
             disabled={index === totalActions - 1}
@@ -687,6 +802,7 @@ function DraftActionEditor({
           >
             <ArrowDown className="h-4 w-4" />
           </button>
+
           <button
             onClick={() => onRemoveAction(action.id)}
             disabled={totalActions === 1}
@@ -734,7 +850,7 @@ function DraftActionEditor({
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
-            该模板没有额外参数，提交时会直接编码对应函数调用。
+            这个模板没有额外参数，提交时会直接编码对应的函数调用。
           </div>
         )}
 
@@ -832,7 +948,7 @@ function DraftActionPreview({
   if (!template) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
-        动作 #{index + 1} 尚未选择模板。
+        动作 #{index + 1} 还没有选择模板。
       </div>
     );
   }
@@ -848,6 +964,7 @@ function DraftActionPreview({
             目标合约: {formatGovernanceTemplateTarget(template.target)}
           </div>
         </div>
+
         <span
           className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${getRiskBadgeClass(
             template.riskLevel
@@ -869,6 +986,7 @@ function DraftActionPreview({
             </div>
             <div className="mt-1">{encodedAction.description}</div>
           </div>
+
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -878,6 +996,7 @@ function DraftActionPreview({
                 {template.functionName}
               </div>
             </div>
+
             <div>
               <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 调用值
@@ -915,11 +1034,9 @@ function PreviewStat({
 function ProposalList({
   proposals,
   loading,
-  onActionComplete,
 }: {
   proposals: ProposalItem[];
   loading: boolean;
-  onActionComplete: () => unknown | Promise<unknown>;
 }) {
   if (loading) {
     return (
@@ -943,34 +1060,21 @@ function ProposalList({
         <ProposalCard
           key={proposal.proposalId.toString()}
           proposal={proposal}
-          onActionComplete={onActionComplete}
         />
       ))}
     </div>
   );
 }
 
-function ProposalCard({
-  proposal,
-  onActionComplete,
-}: {
-  proposal: ProposalItem;
-  onActionComplete: () => unknown | Promise<unknown>;
-}) {
-  const { address } = useAccount();
-  const publicClient = usePublicClient();
-  const { data: blockNumber } = useBlockNumber({ watch: true });
-  const { writeContractAsync } = useWriteContract();
-  const refreshAfterTx = useRefreshOnTxConfirmed();
-
-  const { data: state, refetch: refetchState } = useReadContract({
+function ProposalCard({ proposal }: { proposal: ProposalItem }) {
+  const { data: state } = useReadContract({
     address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
     abi: ABIS.KnowledgeGovernor,
     functionName: "state",
     args: [proposal.proposalId],
   });
 
-  const { data: votes, refetch: refetchVotes } = useReadContract({
+  const { data: votes } = useReadContract({
     address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
     abi: ABIS.KnowledgeGovernor,
     functionName: "proposalVotes",
@@ -1003,229 +1107,98 @@ function ProposalCard({
   const canVote = Number(proposalState ?? -1) === 1;
   const canQueue = Number(proposalState ?? -1) === 4;
   const canExecute = Number(proposalState ?? -1) === 5;
-
-  useEffect(() => {
-    if (blockNumber === undefined) {
-      return;
-    }
-
-    void Promise.all([refetchState(), refetchVotes()]);
-  }, [blockNumber, refetchState, refetchVotes]);
-
-  async function refreshProposalCard() {
-    await Promise.all([refetchState(), refetchVotes(), onActionComplete()]);
-  }
-
-  async function handleVote(support: 0 | 1 | 2) {
-    if (!address) {
-      toast.error("请先连接钱包");
-      return;
-    }
-
-    let actionText = "赞成";
-    if (support === 0) actionText = "反对";
-    if (support === 2) actionText = "弃权";
-
-    const hash = await writeTxToast({
-      publicClient,
-      writeContractAsync,
-      request: {
-        address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-        abi: ABIS.KnowledgeGovernor,
-        functionName: "castVote",
-        args: [proposal.proposalId, support],
-        account: address,
-      },
-      loading: `正在提交${actionText}投票...`,
-      success: "投票交易已提交",
-      fail: "投票失败",
-    });
-
-    if (!hash) return;
-
-    await refreshAfterTx(hash, refreshProposalCard, ["governance", "system"]);
-  }
-
-  async function handleQueue() {
-    if (!address) {
-      toast.error("请先连接钱包");
-      return;
-    }
-
-    const hash = await writeTxToast({
-      publicClient,
-      writeContractAsync,
-      request: {
-        address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-        abi: ABIS.KnowledgeGovernor,
-        functionName: "queue",
-        args: [
-          proposal.targets,
-          proposal.values,
-          proposal.calldatas,
-          proposal.descriptionHash,
-        ],
-        account: address,
-      },
-      loading: "正在提交排队交易...",
-      success: "排队交易已提交",
-      fail: "排队失败",
-    });
-
-    if (!hash) return;
-
-    await refreshAfterTx(hash, refreshProposalCard, ["governance", "system"]);
-  }
-
-  async function handleExecute() {
-    if (!address) {
-      toast.error("请先连接钱包");
-      return;
-    }
-
-    const hash = await writeTxToast({
-      publicClient,
-      writeContractAsync,
-      request: {
-        address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-        abi: ABIS.KnowledgeGovernor,
-        functionName: "execute",
-        args: [
-          proposal.targets,
-          proposal.values,
-          proposal.calldatas,
-          proposal.descriptionHash,
-        ],
-        account: address,
-      },
-      loading: "正在提交执行交易...",
-      success: "执行交易已提交",
-      fail: "执行失败",
-    });
-
-    if (!hash) return;
-
-    await refreshAfterTx(hash, refreshProposalCard, ["governance", "system"]);
-  }
+  const availableActions = [
+    canVote ? "投票" : null,
+    canQueue ? "排队" : null,
+    canExecute ? "执行" : null,
+  ].filter(Boolean) as string[];
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="space-y-4">
-        <div className="min-w-0">
-          <div className="mb-1.5 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              提案 #{proposal.proposalId.toString()}
-            </span>
-            <span
-              className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${stateBadgeClass(
-                proposalState
-              )}`}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                提案 #{proposal.proposalId.toString()}
+              </span>
+              <span
+                className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${stateBadgeClass(
+                  proposalState
+                )}`}
+              >
+                {currentStateLabel}
+              </span>
+            </div>
+
+            <Link
+              href={`/governance/${proposal.proposalId.toString()}`}
+              className="line-clamp-2 text-sm font-semibold text-slate-950 transition hover:text-slate-700 dark:text-slate-100 dark:hover:text-slate-300"
             >
-              {currentStateLabel}
-            </span>
+              {proposal.description || "无描述提案"}
+            </Link>
           </div>
 
           <Link
             href={`/governance/${proposal.proposalId.toString()}`}
-            className="text-base font-semibold text-slate-950 dark:text-slate-100"
+            className="shrink-0 text-sm font-medium text-slate-600 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-slate-100"
           >
-            {proposal.description || "无描述"}
+            查看详情
           </Link>
-
-          {actionSummaries.length > 0 ? (
-            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
-              <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                提案内容
-              </div>
-              <div className="mt-1.5 space-y-1.5 text-sm text-slate-700 dark:text-slate-200">
-                {actionSummaries.slice(0, 2).map((action, index) => (
-                  <div key={`${action.functionName}-${index}`}>
-                    <div className="font-medium">{action.title}</div>
-                    <div className="text-slate-500 dark:text-slate-400">
-                      {action.description}
-                    </div>
-                  </div>
-                ))}
-                {actionSummaries.length > 2 ? (
-                  <div className="text-slate-500 dark:text-slate-400">
-                    另有 {actionSummaries.length - 2} 个提案动作，请进入详情查看。
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-            <span>发起人: {shortenAddress(proposal.proposer)}</span>
-            <span>创建区块: {proposal.blockNumber.toString()}</span>
-            <span>
-              投票区间: {formatBlockRange(proposal.voteStart, proposal.voteEnd)}
-            </span>
-          </div>
-
-          <div className="mt-3 space-y-2">
-            <VoteStat
-              label="赞成"
-              value={voteData.forVotes}
-              percent={forPercent}
-              color="bg-emerald-500"
-            />
-            <VoteStat
-              label="反对"
-              value={voteData.againstVotes}
-              percent={againstPercent}
-              color="bg-rose-500"
-            />
-            <VoteStat
-              label="弃权"
-              value={voteData.abstainVotes}
-              percent={abstainPercent}
-              color="bg-slate-500"
-            />
-          </div>
         </div>
 
-        <div className="grid gap-2 border-t border-slate-200 pt-3 dark:border-slate-800 sm:grid-cols-2 xl:grid-cols-5">
-          <button
-            onClick={() => handleVote(1)}
-            disabled={!canVote}
-            className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-          >
-            投赞成票
-          </button>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+          <span>发起人: {shortenAddress(proposal.proposer)}</span>
+          <span>创建区块: {proposal.blockNumber.toString()}</span>
+          <span>投票区间: {formatBlockRange(proposal.voteStart, proposal.voteEnd)}</span>
+        </div>
 
-          <button
-            onClick={() => handleVote(0)}
-            disabled={!canVote}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            投反对票
-          </button>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
+          {actionSummaries.length > 0 ? (
+            <div className="space-y-1">
+              <div className="font-medium text-slate-800 dark:text-slate-100">
+                {actionSummaries[0]?.title}
+              </div>
+              <div className="line-clamp-2">
+                {actionSummaries[0]?.description}
+                {actionSummaries.length > 1
+                  ? ` 另有 ${actionSummaries.length - 1} 个动作，进入详情查看。`
+                  : ""}
+              </div>
+            </div>
+          ) : (
+            <div>暂无可解析的动作摘要，请进入详情页查看完整 calldata。</div>
+          )}
+        </div>
 
-          <button
-            onClick={() => handleVote(2)}
-            disabled={!canVote}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            弃权
-          </button>
+        <div className="grid grid-cols-3 gap-2">
+          <VoteStat
+            label="赞成"
+            value={voteData.forVotes}
+            percent={forPercent}
+            color="bg-emerald-500"
+          />
+          <VoteStat
+            label="反对"
+            value={voteData.againstVotes}
+            percent={againstPercent}
+            color="bg-rose-500"
+          />
+          <VoteStat
+            label="弃权"
+            value={voteData.abstainVotes}
+            percent={abstainPercent}
+            color="bg-slate-500"
+          />
+        </div>
 
-          <button
-            onClick={handleQueue}
-            disabled={!canQueue}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            加入队列
-          </button>
-
-          <button
-            onClick={handleExecute}
-            disabled={!canExecute}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
-          >
-            <CheckCircle2 className="h-4 w-4" />
-            执行
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+          <span>
+            可在详情页操作:
+            {" "}
+            {availableActions.length > 0 ? availableActions.join(" / ") : "当前无可执行操作"}
+          </span>
+          <span>{proposal.targets.length} 个链上动作</span>
         </div>
       </div>
     </div>
