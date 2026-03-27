@@ -14,6 +14,7 @@ import {
   FileText,
   Heart,
   PencilLine,
+  RotateCcw,
   Trash2,
   User,
 } from "lucide-react";
@@ -74,6 +75,7 @@ export default function ContentDetailPage() {
   const [uploadingVersionFile, setUploadingVersionFile] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [versions, setVersions] = useState<ContentVersionData[]>([]);
 
@@ -173,19 +175,28 @@ export default function ContentDetailPage() {
     );
   }, [loadVersions, refetchContent, refetchVersionCount]);
 
+  const currentContentId = content?.id;
+  const currentContentTitle = content?.title;
+  const currentContentDescription = content?.description;
+  const currentContentCid = content?.ipfsHash;
+  const currentContentLatestVersion = content?.latestVersion;
+
   useEffect(() => {
-    if (!content) return;
-    setEditTitle(content.title);
-    setEditDescription(content.description);
-    setEditCid(content.ipfsHash);
+    if (!currentContentTitle || currentContentDescription === undefined || !currentContentCid) {
+      return;
+    }
+
+    setEditTitle(currentContentTitle);
+    setEditDescription(currentContentDescription);
+    setEditCid(currentContentCid);
     setVersionFile(null);
     setUploadedVersionUrl("");
   }, [
-    content?.id,
-    content?.title,
-    content?.description,
-    content?.ipfsHash,
-    content?.latestVersion,
+    currentContentCid,
+    currentContentDescription,
+    currentContentId,
+    currentContentLatestVersion,
+    currentContentTitle,
   ]);
 
   useEffect(() => {
@@ -230,6 +241,7 @@ export default function ContentDetailPage() {
     !!address && contentRecord.author.toLowerCase() === address.toLowerCase();
   const canEditContent = isAuthor && !contentRecord.deleted;
   const canDeleteContent = isAuthor && !contentRecord.deleted;
+  const canRestoreContent = isAuthor && contentRecord.deleted;
 
   function handleVersionFileChange(selectedFile: File) {
     const uploadValidation = validateUploadFile(selectedFile);
@@ -451,6 +463,42 @@ export default function ContentDetailPage() {
     }
   }
 
+  async function handleRestoreContent() {
+    if (!address) {
+      toast.error("请先连接钱包");
+      return;
+    }
+
+    if (!canRestoreContent) {
+      toast.error("当前内容状态不允许恢复");
+      return;
+    }
+
+    setRestoring(true);
+
+    try {
+      const hash = await writeTxToast({
+        publicClient,
+        writeContractAsync,
+        request: {
+          address: CONTRACTS.KnowledgeContent as `0x${string}`,
+          abi: ABIS.KnowledgeContent,
+          functionName: "restoreContent",
+          args: [contentRecord.id],
+          account: address,
+        },
+        loading: "正在提交恢复交易...",
+        success: "恢复交易已提交",
+        fail: "恢复失败",
+      });
+
+      if (!hash) return;
+      await refreshAfterTx(hash, refreshDetail, ["content", "dashboard"]);
+    } finally {
+      setRestoring(false);
+    }
+  }
+
   return (
     <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
       <div className="flex items-center justify-between gap-4">
@@ -642,6 +690,17 @@ export default function ContentDetailPage() {
                 <Coins className="h-4 w-4" />
                 奖励记账
               </button>
+
+              {canRestoreContent ? (
+                <button
+                  onClick={handleRestoreContent}
+                  disabled={restoring}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 px-5 py-3 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  {restoring ? "正在恢复..." : "恢复内容"}
+                </button>
+              ) : null}
             </div>
           </SectionCard>
 
@@ -725,12 +784,26 @@ export default function ContentDetailPage() {
                   </button>
 
                   <button
-                    onClick={handleDeleteContent}
-                    disabled={!canDeleteContent || deleting}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-rose-300 px-5 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/30"
+                    onClick={canRestoreContent ? handleRestoreContent : handleDeleteContent}
+                    disabled={canRestoreContent ? restoring : !canDeleteContent || deleting}
+                    className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                      canRestoreContent
+                        ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+                        : "border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/30"
+                    }`}
                   >
-                    <Trash2 className="h-4 w-4" />
-                    {deleting ? "正在删除..." : "软删除"}
+                    {canRestoreContent ? (
+                      <RotateCcw className="h-4 w-4" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    {canRestoreContent
+                      ? restoring
+                        ? "正在恢复..."
+                        : "恢复内容"
+                      : deleting
+                        ? "正在删除..."
+                        : "软删除"}
                   </button>
                 </div>
               </div>

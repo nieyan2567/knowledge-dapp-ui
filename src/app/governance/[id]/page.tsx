@@ -17,7 +17,6 @@ import {
   CheckCircle2,
   ExternalLink,
   Gavel,
-  RefreshCw,
   Vote as VoteIcon,
 } from "lucide-react";
 
@@ -276,13 +275,6 @@ export default function ProposalDetailPage() {
           返回提案列表
         </Link>
 
-        <button
-          onClick={() => void refreshProposalDetail()}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-        >
-          <RefreshCw className="h-4 w-4" />
-          刷新
-        </button>
       </div>
 
       <PageHeader

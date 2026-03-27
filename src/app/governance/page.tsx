@@ -19,7 +19,6 @@ import {
   ExternalLink,
   Gavel,
   Plus,
-  RefreshCw,
   Trash2,
   Vote,
 } from "lucide-react";
@@ -417,13 +416,6 @@ export default function GovernancePage() {
         description="创建模板化治理提案，组合多个链上动作，并在同一页面查看提案状态、投票、排队和执行。"
         right={
           <div className="flex items-center gap-3">
-            <button
-              onClick={loadProposals}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              <RefreshCw className="h-4 w-4" />
-              刷新
-            </button>
 
             <a
               href={explorerAddressUrl(CONTRACTS.KnowledgeGovernor)}
