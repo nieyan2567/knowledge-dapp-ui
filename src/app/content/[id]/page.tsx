@@ -118,8 +118,16 @@ export default function ContentDetailPage() {
     },
   });
 
+  const { data: maxVersionsPerContentData } = useReadContract({
+    address: CONTRACTS.KnowledgeContent as `0x${string}`,
+    abi: ABIS.KnowledgeContent,
+    functionName: "maxVersionsPerContent",
+  });
+
   const content = asContentData(contentData);
   const versionCount = typeof versionCountData === "bigint" ? versionCountData : 0n;
+  const maxVersionsPerContent =
+    typeof maxVersionsPerContentData === "bigint" ? maxVersionsPerContentData : undefined;
 
   const loadVersions = useCallback(
     async (countOverride?: bigint) => {
@@ -180,6 +188,7 @@ export default function ContentDetailPage() {
   const currentContentDescription = content?.description;
   const currentContentCid = content?.ipfsHash;
   const currentContentLatestVersion = content?.latestVersion;
+  const currentContentDeleted = content?.deleted;
 
   useEffect(() => {
     if (!currentContentTitle || currentContentDescription === undefined || !currentContentCid) {
@@ -194,6 +203,7 @@ export default function ContentDetailPage() {
   }, [
     currentContentCid,
     currentContentDescription,
+    currentContentDeleted,
     currentContentId,
     currentContentLatestVersion,
     currentContentTitle,
@@ -239,9 +249,18 @@ export default function ContentDetailPage() {
   const previewUrl = getIpfsFileUrl(contentRecord.ipfsHash);
   const isAuthor =
     !!address && contentRecord.author.toLowerCase() === address.toLowerCase();
-  const canEditContent = isAuthor && !contentRecord.deleted;
+  const hasReachedMaxVersions =
+    maxVersionsPerContent !== undefined && versionCount >= maxVersionsPerContent;
+  const canEditContent = isAuthor && !contentRecord.deleted && !hasReachedMaxVersions;
   const canDeleteContent = isAuthor && !contentRecord.deleted;
   const canRestoreContent = isAuthor && contentRecord.deleted;
+  const newVersionBlockedReason = !isAuthor
+    ? "只有内容作者可以创建新版本。"
+    : contentRecord.deleted
+      ? "内容已软删除，恢复后才能继续创建新版本。"
+      : hasReachedMaxVersions
+        ? `已达到当前内容的最大版本数上限（${maxVersionsPerContent?.toString() ?? versionCount.toString()}）。`
+        : null;
 
   function handleVersionFileChange(selectedFile: File) {
     const uploadValidation = validateUploadFile(selectedFile);
@@ -257,6 +276,11 @@ export default function ContentDetailPage() {
   async function handleUploadVersionFile() {
     if (!content) {
       toast.error("内容暂不可用");
+      return;
+    }
+
+    if (newVersionBlockedReason) {
+      toast.error(newVersionBlockedReason);
       return;
     }
 
@@ -379,7 +403,7 @@ export default function ContentDetailPage() {
       return;
     }
 
-    if (!canEditContent) {
+    if (newVersionBlockedReason) {
       toast.error("当前内容状态不允许创建新版本");
       return;
     }
@@ -531,34 +555,97 @@ export default function ContentDetailPage() {
         <div className="space-y-6">
           <SectionCard
             title="当前文件"
-            description="当前快照指向链上记录中的最新 CID。"
+            description="把记录摘要、文件入口和当前元数据集中到同一处查看。"
           >
-            <a
-              href={previewUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="group block rounded-3xl border border-slate-200 bg-slate-50 p-8 transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:hover:border-slate-700 dark:hover:bg-slate-800"
-            >
-              <div className="flex flex-col items-center justify-center gap-4 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">
-                  <FileText className="h-8 w-8" />
+            <div className="space-y-5">
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  <BookOpen className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                  记录摘要
                 </div>
-
-                <div>
-                  <div className="text-base font-semibold text-slate-950 dark:text-slate-100">
-                    打开当前文件
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900/80">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      内容 ID
+                    </div>
+                    <div className="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100">
+                      #{contentRecord.id.toString()}
+                    </div>
                   </div>
-                  <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    当前激活版本为 v{contentRecord.latestVersion.toString()}
+                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900/80">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      最新版本
+                    </div>
+                    <div className="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100">
+                      v{contentRecord.latestVersion.toString()}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900/80">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      状态
+                    </div>
+                    <div className="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100">
+                      {contentRecord.deleted ? "已删除" : "正常"}
+                    </div>
                   </div>
                 </div>
-
-                <div className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 group-hover:text-blue-700 dark:text-blue-400 dark:group-hover:text-blue-300">
-                  打开文件
-                  <ExternalLink className="h-4 w-4" />
+                <div className="mt-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900/80">
+                  <div className="flex items-start gap-2">
+                    <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      标题
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-medium text-slate-900 dark:text-slate-100">
+                      {contentRecord.title}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-start gap-2">
+                    <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      描述
+                    </span>
+                    <span className="flex-1 text-xs leading-5 text-slate-700 dark:text-slate-300">
+                      {contentRecord.description || "暂无描述"}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </a>
+
+              <a
+                href={previewUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="group block rounded-3xl border border-slate-200 bg-slate-50 p-8 transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:hover:border-slate-700 dark:hover:bg-slate-800"
+              >
+                <div className="flex flex-col items-center justify-center gap-4 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">
+                    <FileText className="h-8 w-8" />
+                  </div>
+
+                  <div>
+                    <div className="text-base font-semibold text-slate-950 dark:text-slate-100">
+                      打开当前文件
+                    </div>
+                    <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      当前激活版本为 v{contentRecord.latestVersion.toString()}
+                    </div>
+                  </div>
+
+                  <div className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 group-hover:text-blue-700 dark:text-blue-400 dark:group-hover:text-blue-300">
+                    打开文件
+                    <ExternalLink className="h-4 w-4" />
+                  </div>
+                </div>
+              </a>
+
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  当前元数据
+                </div>
+                <div className="space-y-3">
+                  <CopyField label="当前 CID" value={content.ipfsHash} />
+                  <CopyField label="网关地址" value={previewUrl} />
+                </div>
+              </div>
+            </div>
           </SectionCard>
 
           <SectionCard
@@ -712,7 +799,7 @@ export default function ContentDetailPage() {
                 <input
                   value={editTitle}
                   onChange={(event) => setEditTitle(event.target.value)}
-                  disabled={savingEdit || uploadingVersionFile}
+                  disabled={!!newVersionBlockedReason || savingEdit || uploadingVersionFile}
                   placeholder="内容标题"
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
                 />
@@ -720,7 +807,7 @@ export default function ContentDetailPage() {
                 <textarea
                   value={editDescription}
                   onChange={(event) => setEditDescription(event.target.value)}
-                  disabled={savingEdit || uploadingVersionFile}
+                  disabled={!!newVersionBlockedReason || savingEdit || uploadingVersionFile}
                   placeholder="内容描述"
                   rows={4}
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
@@ -737,6 +824,7 @@ export default function ContentDetailPage() {
                   <button
                     onClick={handleUploadVersionFile}
                     disabled={
+                      !!newVersionBlockedReason ||
                       !versionFile ||
                       savingEdit ||
                       uploadingVersionFile ||
@@ -755,7 +843,7 @@ export default function ContentDetailPage() {
                 <input
                   value={editCid}
                   onChange={(event) => setEditCid(event.target.value)}
-                  disabled={savingEdit || uploadingVersionFile}
+                  disabled={!!newVersionBlockedReason || savingEdit || uploadingVersionFile}
                   placeholder="新的 IPFS CID"
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
                 />
@@ -763,6 +851,12 @@ export default function ContentDetailPage() {
                 <CopyField label="当前 CID" value={contentRecord.ipfsHash} />
                 {uploadedVersionUrl ? (
                   <CopyField label="新版本网关地址" value={uploadedVersionUrl} />
+                ) : null}
+
+                {newVersionBlockedReason ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-6 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+                    {newVersionBlockedReason}
+                  </div>
                 ) : null}
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
@@ -776,7 +870,7 @@ export default function ContentDetailPage() {
                 <div className="flex flex-wrap gap-3">
                   <button
                     onClick={handleUpdateContent}
-                    disabled={savingEdit || uploadingVersionFile}
+                    disabled={!!newVersionBlockedReason || savingEdit || uploadingVersionFile}
                     className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
                   >
                     <PencilLine className="h-4 w-4" />
@@ -809,31 +903,6 @@ export default function ContentDetailPage() {
               </div>
             </SectionCard>
 
-          <SectionCard
-            title="当前元数据"
-            description="当前内容记录只指向最新快照。"
-          >
-            <div className="space-y-3">
-              <CopyField label="当前 CID" value={content.ipfsHash} />
-              <CopyField label="网关地址" value={previewUrl} />
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="记录摘要"
-            description="当前内容记录的简要概览。"
-          >
-            <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                <span>内容 ID：{contentRecord.id.toString()}</span>
-              </div>
-              <div>标题：{contentRecord.title}</div>
-              <div>描述：{contentRecord.description || "暂无描述"}</div>
-              <div>最新版本：v{contentRecord.latestVersion.toString()}</div>
-              <div>状态：{contentRecord.deleted ? "已删除" : "正常"}</div>
-            </div>
-          </SectionCard>
         </div>
       </div>
     </main>
