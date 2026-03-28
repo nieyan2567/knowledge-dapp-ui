@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -11,6 +11,7 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ci-playwright-project-id
 
     steps:
@@ -40,3 +41,4 @@ jobs:
 
       - name: E2E
         run: npm run test:e2e
+

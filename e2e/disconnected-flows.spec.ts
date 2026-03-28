@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+﻿import { expect, test, type Page } from "@playwright/test";
 
 import { mockKnowChainRpc } from "./support/rpc";
 
@@ -20,14 +20,15 @@ test("shows a browser toast when proposing without a connected wallet", async ({
   await expectToast(page);
 });
 
-test("shows a browser toast when staking without a connected wallet", async ({
+test("keeps staking actions disabled while the wallet is disconnected", async ({
   page,
 }) => {
   await page.goto("/stake");
 
-  await page.getByTestId("stake-deposit-button").click();
-
-  await expectToast(page);
+  await expect(page.getByTestId("stake-deposit-button")).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Connect wallet", exact: true })
+  ).toBeVisible();
 });
 
 test("keeps faucet claiming disabled while the wallet is disconnected", async ({
@@ -40,3 +41,4 @@ test("keeps faucet claiming disabled while the wallet is disconnected", async ({
     page.getByRole("button", { name: "Connect wallet", exact: true })
   ).toBeVisible();
 });
+
