@@ -13,6 +13,8 @@ const originalEnv = {
     process.env["NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID"],
   NEXT_PUBLIC_IPFS_GATEWAY_URL: process.env["NEXT_PUBLIC_IPFS_GATEWAY_URL"],
   UPLOAD_AUTH_SECRET: process.env["UPLOAD_AUTH_SECRET"],
+  IPFS_API_URL: process.env["IPFS_API_URL"],
+  IPFS_GATEWAY_URL: process.env["IPFS_GATEWAY_URL"],
   API_RATE_LIMIT_MAX: process.env["API_RATE_LIMIT_MAX"],
   REDIS_URL: process.env["REDIS_URL"],
   OBS_SERVICE_NAME: process.env["OBS_SERVICE_NAME"],
@@ -43,6 +45,8 @@ function applyValidServerEnv() {
   mutableEnv.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID = "";
   mutableEnv.NEXT_PUBLIC_IPFS_GATEWAY_URL = "http://127.0.0.1:8080/ipfs";
   mutableEnv.UPLOAD_AUTH_SECRET = "test-upload-secret";
+  mutableEnv.IPFS_API_URL = "http://127.0.0.1:5001";
+  mutableEnv.IPFS_GATEWAY_URL = "http://127.0.0.1:8080/ipfs";
   mutableEnv.API_RATE_LIMIT_MAX = "120";
   mutableEnv.REDIS_URL = "redis://localhost:6379";
   mutableEnv.OBS_SERVICE_NAME = "knowledge-dapp-ui";
@@ -56,6 +60,14 @@ function applyValidServerEnv() {
   mutableEnv.REBALANCE_API_TOKEN = "rebalance-secret";
 }
 
+function applyValidProductionUrls() {
+  mutableEnv.NEXT_PUBLIC_BESU_RPC_URL = "https://rpc.example.com";
+  mutableEnv.NEXT_PUBLIC_CHAINLENS_URL = "https://scan.example.com";
+  mutableEnv.NEXT_PUBLIC_IPFS_GATEWAY_URL = "https://ipfs.example.com/ipfs";
+  mutableEnv.IPFS_API_URL = "https://ipfs-api.example.com";
+  mutableEnv.IPFS_GATEWAY_URL = "https://ipfs.example.com/ipfs";
+}
+
 afterEach(() => {
   restoreEnvValue("NODE_ENV", originalEnv.NODE_ENV);
   restoreEnvValue("NEXT_PUBLIC_BESU_RPC_URL", originalEnv.NEXT_PUBLIC_BESU_RPC_URL);
@@ -67,6 +79,8 @@ afterEach(() => {
   );
   restoreEnvValue("NEXT_PUBLIC_IPFS_GATEWAY_URL", originalEnv.NEXT_PUBLIC_IPFS_GATEWAY_URL);
   restoreEnvValue("UPLOAD_AUTH_SECRET", originalEnv.UPLOAD_AUTH_SECRET);
+  restoreEnvValue("IPFS_API_URL", originalEnv.IPFS_API_URL);
+  restoreEnvValue("IPFS_GATEWAY_URL", originalEnv.IPFS_GATEWAY_URL);
   restoreEnvValue("API_RATE_LIMIT_MAX", originalEnv.API_RATE_LIMIT_MAX);
   restoreEnvValue("REDIS_URL", originalEnv.REDIS_URL);
   restoreEnvValue("OBS_SERVICE_NAME", originalEnv.OBS_SERVICE_NAME);
@@ -119,14 +133,48 @@ describe("env", () => {
 
   it("requires upload auth secret in production", () => {
     applyValidServerEnv();
+    applyValidProductionUrls();
     mutableEnv.NODE_ENV = "production";
     delete process.env.UPLOAD_AUTH_SECRET;
 
     expect(() => getServerEnv()).toThrow(/UPLOAD_AUTH_SECRET/i);
   });
 
+  it("requires explicit public URLs in production", () => {
+    applyValidServerEnv();
+    applyValidProductionUrls();
+    mutableEnv.NODE_ENV = "production";
+    delete process.env.NEXT_PUBLIC_BESU_RPC_URL;
+
+    expect(() => getPublicEnv()).toThrow(/NEXT_PUBLIC_BESU_RPC_URL/i);
+  });
+
+  it("rejects localhost public URLs in production", () => {
+    applyValidServerEnv();
+    mutableEnv.NODE_ENV = "production";
+
+    expect(() => getPublicEnv()).toThrow(/Must not point to localhost/i);
+  });
+
+  it("requires explicit server URLs in production", () => {
+    applyValidServerEnv();
+    applyValidProductionUrls();
+    mutableEnv.NODE_ENV = "production";
+    delete process.env.IPFS_API_URL;
+
+    expect(() => getServerEnv()).toThrow(/IPFS_API_URL/i);
+  });
+
+  it("rejects localhost server URLs in production", () => {
+    applyValidServerEnv();
+    mutableEnv.NODE_ENV = "production";
+
+    expect(() => getServerEnv()).toThrow(/IPFS_API_URL|Must not point to localhost/i);
+  });
+
   it("requires an alert webhook in production", () => {
     applyValidServerEnv();
+    applyValidProductionUrls();
     mutableEnv.NODE_ENV = "production";
     delete process.env.OBS_ALERT_WEBHOOK_URL;
 

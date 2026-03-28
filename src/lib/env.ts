@@ -45,6 +45,17 @@ const optionalUrl = z.preprocess(
   z.string().url().optional()
 );
 
+const productionRequiredPublicUrls = [
+  "NEXT_PUBLIC_BESU_RPC_URL",
+  "NEXT_PUBLIC_CHAINLENS_URL",
+  "NEXT_PUBLIC_IPFS_GATEWAY_URL",
+] as const;
+
+const productionRequiredServerUrls = [
+  "IPFS_API_URL",
+  "IPFS_GATEWAY_URL",
+] as const;
+
 const publicEnvSchema = z.object({
   NEXT_PUBLIC_BESU_RPC_URL: urlWithDefault("http://127.0.0.1:8545"),
   NEXT_PUBLIC_BESU_CHAIN_ID: positiveIntWithDefault(20260),
@@ -136,6 +147,8 @@ const serverEnvSchema = publicEnvSchema
 
 type PublicEnvSchema = z.infer<typeof publicEnvSchema>;
 type ServerEnvSchema = z.infer<typeof serverEnvSchema>;
+type PublicUrlKey = (typeof productionRequiredPublicUrls)[number];
+type ServerUrlKey = (typeof productionRequiredServerUrls)[number];
 
 function formatEnvErrors(scope: string, error: z.ZodError) {
   const details = error.issues
@@ -146,6 +159,49 @@ function formatEnvErrors(scope: string, error: z.ZodError) {
     .join("; ");
 
   return `Invalid ${scope} environment variables: ${details}`;
+}
+
+function isLocalOnlyUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return (
+      url.hostname === "127.0.0.1" ||
+      url.hostname === "localhost" ||
+      url.hostname === "::1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function assertProductionUrlConfig(
+  rawEnv: Record<string, string | undefined>,
+  parsedEnv: Partial<Record<PublicUrlKey | ServerUrlKey, string>>,
+  scope: "public" | "server"
+) {
+  if (rawEnv.NODE_ENV !== "production") {
+    return;
+  }
+
+  const requiredKeys =
+    scope === "public" ? productionRequiredPublicUrls : productionRequiredServerUrls;
+
+  for (const key of requiredKeys) {
+    const rawValue = rawEnv[key];
+    const parsedValue = parsedEnv[key];
+
+    if (!rawValue?.trim()) {
+      throw new Error(
+        `Invalid ${scope} environment variables: ${key}: Required when NODE_ENV=production`
+      );
+    }
+
+    if (parsedValue && isLocalOnlyUrl(parsedValue)) {
+      throw new Error(
+        `Invalid ${scope} environment variables: ${key}: Must not point to localhost when NODE_ENV=production`
+      );
+    }
+  }
 }
 
 function parseEnv<TSchema extends z.ZodTypeAny>(
@@ -214,7 +270,13 @@ function getServerEnvSource() {
 }
 
 export function getPublicEnv(): PublicEnvSchema {
-  return parseEnv(publicEnvSchema, getPublicEnvSource(), "public");
+  const rawEnv = {
+    ...getPublicEnvSource(),
+    NODE_ENV: process.env.NODE_ENV,
+  };
+  const parsed = parseEnv(publicEnvSchema, rawEnv, "public");
+  assertProductionUrlConfig(rawEnv, parsed, "public");
+  return parsed;
 }
 
 export function getServerEnv(): ServerEnvSchema {
@@ -222,7 +284,11 @@ export function getServerEnv(): ServerEnvSchema {
     throw new Error("Server environment variables are not available in the browser");
   }
 
-  return parseEnv(serverEnvSchema, getServerEnvSource(), "server");
+  const rawEnv = getServerEnvSource();
+  const parsed = parseEnv(serverEnvSchema, rawEnv, "server");
+  assertProductionUrlConfig(rawEnv, parsed, "public");
+  assertProductionUrlConfig(rawEnv, parsed, "server");
+  return parsed;
 }
 
 export type PublicEnv = PublicEnvSchema;

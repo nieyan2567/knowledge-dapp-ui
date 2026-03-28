@@ -23,9 +23,15 @@ describe("governance-templates", () => {
   it("lists only supported proposal actions", () => {
     const templates = getGovernanceTemplates();
 
-    expect(templates.length).toBe(9);
+    expect(templates.length).toBe(11);
     expect(getGovernanceTemplateById("governor.setVotingPeriod")?.functionName).toBe(
       "setVotingPeriod"
+    );
+    expect(getGovernanceTemplateById("stake.setCooldownSeconds")?.functionName).toBe(
+      "setCooldownSeconds"
+    );
+    expect(getGovernanceTemplateById("stake.setActivationBlocks")?.functionName).toBe(
+      "setActivationBlocks"
     );
     expect(getGovernanceTemplateById("content.setTreasury")).toBeNull();
     expect(getGovernanceTemplateById("content.setAntiSybil")).toBeNull();
@@ -92,6 +98,28 @@ describe("governance-templates", () => {
     expect(encoded.templateId).toBe("timelock.updateDelay");
     expect(encoded.target).toBe(CONTRACTS.TimelockController);
     expect(encoded.description).toContain("7200");
+  });
+
+  it("encodes stake cooldown proposals", () => {
+    const draft = createGovernanceDraftAction("stake.setCooldownSeconds");
+    draft.values.cooldownSeconds = "5400";
+
+    const encoded = encodeGovernanceActionDraft(draft);
+
+    expect(encoded.templateId).toBe("stake.setCooldownSeconds");
+    expect(encoded.target).toBe(CONTRACTS.NativeVotes);
+    expect(encoded.description).toContain("5400");
+  });
+
+  it("encodes stake activation delay proposals", () => {
+    const draft = createGovernanceDraftAction("stake.setActivationBlocks");
+    draft.values.activationBlocks = "15";
+
+    const encoded = encodeGovernanceActionDraft(draft);
+
+    expect(encoded.templateId).toBe("stake.setActivationBlocks");
+    expect(encoded.target).toBe(CONTRACTS.NativeVotes);
+    expect(encoded.description).toContain("15");
   });
 
   it("encodes late quorum extension proposals", () => {

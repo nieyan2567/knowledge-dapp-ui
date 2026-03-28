@@ -73,6 +73,26 @@ describe("governance summaries", () => {
     expect(summary?.details?.[0]?.value).toContain("42");
   });
 
+  it("summarizes stake cooldown updates", () => {
+    const summary = summarizeFromTemplate("stake.setCooldownSeconds", {
+      cooldownSeconds: "3600",
+    });
+
+    expect(summary?.title).toContain("冷却");
+    expect(summary?.description).toContain("3600");
+    expect(summary?.details?.[0]?.value).toContain("3600");
+  });
+
+  it("summarizes stake activation delay updates", () => {
+    const summary = summarizeFromTemplate("stake.setActivationBlocks", {
+      activationBlocks: "12",
+    });
+
+    expect(summary?.title).toContain("激活");
+    expect(summary?.description).toContain("12");
+    expect(summary?.details?.[0]?.value).toContain("12");
+  });
+
   it("summarizes late quorum extension updates", () => {
     const summary = summarizeFromTemplate("governor.setLateQuorumVoteExtension", {
       lateQuorumVoteExtension: "24",

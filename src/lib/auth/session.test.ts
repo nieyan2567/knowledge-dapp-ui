@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
@@ -11,9 +11,11 @@ import {
 import { __resetUploadSessionStoreForTests } from "./session-store";
 
 const address = "0x1234567890abcdef1234567890abcdef12345678" as const;
+const mutableEnv = process.env as Record<string, string | undefined>;
 const originalRedisUrl = process.env.REDIS_URL;
 const originalSecret = process.env.UPLOAD_AUTH_SECRET;
 const originalTtl = process.env.UPLOAD_AUTH_SESSION_TTL_SECONDS;
+const originalNodeEnv = process.env.NODE_ENV;
 
 function createRequest(path: string, init?: { cookie?: string; userAgent?: string }) {
   const headers = new Headers();
@@ -51,22 +53,40 @@ async function issueSession(userAgent = "vitest-agent") {
 }
 
 beforeEach(() => {
+  mutableEnv.NODE_ENV = "test";
   process.env.REDIS_URL = "";
   process.env.UPLOAD_AUTH_SECRET = "test-upload-secret";
   delete process.env.UPLOAD_AUTH_SESSION_TTL_SECONDS;
+  globalThis.__knowledgeUploadSessionSecretWarned = undefined;
   __resetUploadSessionStoreForTests();
 });
 
 afterEach(() => {
+  mutableEnv.NODE_ENV = originalNodeEnv;
   process.env.REDIS_URL = originalRedisUrl;
   process.env.UPLOAD_AUTH_SECRET = originalSecret;
   process.env.UPLOAD_AUTH_SESSION_TTL_SECONDS = originalTtl;
+  globalThis.__knowledgeUploadSessionSecretWarned = undefined;
   __resetUploadSessionStoreForTests();
 });
 
 describe("auth/session", () => {
   it("uses a shorter default session ttl", () => {
     expect(getUploadSessionTtlSeconds()).toBe(7200);
+  });
+
+  it("warns once when development falls back to the default upload secret", async () => {
+    mutableEnv.NODE_ENV = "development";
+    process.env.UPLOAD_AUTH_SECRET = "";
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await issueSession();
+    await issueSession("another-agent");
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toContain("UPLOAD_AUTH_SECRET is not configured");
+
+    warn.mockRestore();
   });
 
   it("reads a valid session from the signed cookie", async () => {

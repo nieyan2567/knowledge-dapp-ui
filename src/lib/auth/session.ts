@@ -17,6 +17,11 @@ import {
 
 const uploadSessionCookieName = "knowledge_upload_session";
 const defaultUploadSessionTtlSeconds = 2 * 60 * 60;
+const defaultUploadSessionSecret = "knowledge-dapp-dev-upload-secret";
+
+declare global {
+  var __knowledgeUploadSessionSecretWarned: boolean | undefined;
+}
 
 export type UploadSession = {
   id: string;
@@ -29,7 +34,23 @@ export type UploadSession = {
 };
 
 function getUploadSessionSecret() {
-  return getServerEnv().UPLOAD_AUTH_SECRET || "knowledge-dapp-dev-upload-secret";
+  const env = getServerEnv();
+
+  if (!env.UPLOAD_AUTH_SECRET) {
+    if (
+      env.NODE_ENV === "development" &&
+      !globalThis.__knowledgeUploadSessionSecretWarned
+    ) {
+      globalThis.__knowledgeUploadSessionSecretWarned = true;
+      console.warn(
+        "UPLOAD_AUTH_SECRET is not configured. Falling back to the shared development upload session secret. Set a custom secret in .env.local to avoid sharing upload sessions across local environments."
+      );
+    }
+
+    return defaultUploadSessionSecret;
+  }
+
+  return env.UPLOAD_AUTH_SECRET;
 }
 
 export function getUploadSessionTtlSeconds() {
