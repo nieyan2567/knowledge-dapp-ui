@@ -64,6 +64,7 @@ const MAX_DRAFT_ACTIONS = 5;
 
 const CATEGORY_LABELS: Record<GovernanceTemplateCategory, string> = {
   content: "Content",
+  stake: "Stake",
   treasury: "Treasury",
   governor: "Governor",
   timelock: "Timelock",
@@ -141,12 +142,14 @@ function getCategoryOrder(category: GovernanceTemplateCategory) {
   switch (category) {
     case "content":
       return 0;
-    case "treasury":
+    case "stake":
       return 1;
-    case "governor":
+    case "treasury":
       return 2;
-    case "timelock":
+    case "governor":
       return 3;
+    case "timelock":
+      return 4;
     default:
       return 999;
   }
@@ -222,6 +225,7 @@ export default function GovernancePage() {
         },
         {
           content: [],
+          stake: [],
           treasury: [],
           governor: [],
           timelock: [],

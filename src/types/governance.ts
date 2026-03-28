@@ -43,6 +43,7 @@ export interface ProposalActionSummary {
 
 export type GovernanceTemplateCategory =
   | "content"
+  | "stake"
   | "treasury"
   | "governor"
   | "timelock"

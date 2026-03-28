@@ -423,6 +423,46 @@ function summarizeDecodedAction(
       }
     }
 
+    if (isSameAddress(target, CONTRACTS.NativeVotes)) {
+      const decoded = decodeFunctionData({
+        abi: ABIS.NativeVotes,
+        data: calldata,
+      });
+      const args = decoded.args ?? [];
+
+      if (decoded.functionName === "setCooldownSeconds" && typeof args[0] === "bigint") {
+        return createSummary({
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新退出冷却期",
+          description: appendValueSuffix(
+            `将退出冷却期更新为 ${args[0].toString()} 秒`,
+            value
+          ),
+          details: [{ label: "退出冷却期", value: `${args[0].toString()} 秒` }],
+          rawCalldata: calldata,
+        });
+      }
+
+      if (decoded.functionName === "setActivationBlocks" && typeof args[0] === "bigint") {
+        return createSummary({
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新质押激活延迟",
+          description: appendValueSuffix(
+            `将质押激活延迟更新为 ${args[0].toString()} 个区块`,
+            value
+          ),
+          details: [{ label: "激活延迟", value: `${args[0].toString()} 个区块` }],
+          rawCalldata: calldata,
+        });
+      }
+    }
+
     if (isSameAddress(target, CONTRACTS.KnowledgeGovernor)) {
       const decoded = decodeFunctionData({
         abi: ABIS.KnowledgeGovernor,
@@ -548,6 +588,8 @@ function summarizeDecodedAction(
     const abi =
       isSameAddress(target, CONTRACTS.KnowledgeContent)
         ? ABIS.KnowledgeContent
+        : isSameAddress(target, CONTRACTS.NativeVotes)
+          ? ABIS.NativeVotes
         : isSameAddress(target, CONTRACTS.TreasuryNative)
           ? ABIS.TreasuryNative
           : isSameAddress(target, CONTRACTS.KnowledgeGovernor)

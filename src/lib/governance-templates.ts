@@ -202,6 +202,46 @@ const GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     ],
   },
   {
+    id: "stake.setCooldownSeconds",
+    category: "stake",
+    label: "更新退出冷却期",
+    description: "更新质押退出后的冷却时间。",
+    riskLevel: "medium",
+    target: CONTRACTS.NativeVotes as Address,
+    functionName: "setCooldownSeconds",
+    valueMode: "fixedZero",
+    fields: [
+      {
+        key: "cooldownSeconds",
+        label: "退出冷却期（秒）",
+        type: "uint256",
+        required: true,
+        placeholder: "例如 3600",
+        defaultValue: "3600",
+      },
+    ],
+  },
+  {
+    id: "stake.setActivationBlocks",
+    category: "stake",
+    label: "更新质押激活延迟",
+    description: "更新质押存入后获得投票权前的等待区块数。",
+    riskLevel: "medium",
+    target: CONTRACTS.NativeVotes as Address,
+    functionName: "setActivationBlocks",
+    valueMode: "fixedZero",
+    fields: [
+      {
+        key: "activationBlocks",
+        label: "激活延迟（区块）",
+        type: "uint256",
+        required: true,
+        placeholder: "例如 10",
+        defaultValue: "10",
+      },
+    ],
+  },
+  {
     id: "treasury.setBudget",
     category: "treasury",
     label: "更新金库预算",
@@ -442,6 +482,68 @@ const templateCodecs: Record<string, TemplateCodec> = {
         args: [editLockVotes, allowDeleteAfterVote, maxVersionsPerContent],
         title: "更新内容策略",
         description: `将编辑锁定票数设为 ${editLockVotes.toString()}，投票后删除设为${allowDeleteAfterVote ? "允许" : "禁止"}，单内容最大版本数设为 ${maxVersionsPerContent.toString()}`,
+        riskLevel: "medium",
+      });
+    },
+  },
+  "stake.setCooldownSeconds": {
+    validate(values) {
+      const cooldownSeconds = parseRequiredUint(
+        values,
+        "cooldownSeconds",
+        "退出冷却期"
+      );
+      return isFailed(cooldownSeconds) ? cooldownSeconds : ok();
+    },
+    encode(values) {
+      const cooldownSeconds = parseRequiredUint(
+        values,
+        "cooldownSeconds",
+        "退出冷却期"
+      );
+      if (isFailed(cooldownSeconds)) {
+        throw new Error("无效的退出冷却期提案");
+      }
+
+      return buildEncodedAction({
+        templateId: "stake.setCooldownSeconds",
+        target: CONTRACTS.NativeVotes as Address,
+        abi: ABIS.NativeVotes,
+        functionName: "setCooldownSeconds",
+        args: [cooldownSeconds],
+        title: "更新退出冷却期",
+        description: `将退出冷却期更新为 ${cooldownSeconds.toString()} 秒`,
+        riskLevel: "medium",
+      });
+    },
+  },
+  "stake.setActivationBlocks": {
+    validate(values) {
+      const activationBlocks = parseRequiredUint(
+        values,
+        "activationBlocks",
+        "激活延迟"
+      );
+      return isFailed(activationBlocks) ? activationBlocks : ok();
+    },
+    encode(values) {
+      const activationBlocks = parseRequiredUint(
+        values,
+        "activationBlocks",
+        "激活延迟"
+      );
+      if (isFailed(activationBlocks)) {
+        throw new Error("无效的质押激活延迟提案");
+      }
+
+      return buildEncodedAction({
+        templateId: "stake.setActivationBlocks",
+        target: CONTRACTS.NativeVotes as Address,
+        abi: ABIS.NativeVotes,
+        functionName: "setActivationBlocks",
+        args: [activationBlocks],
+        title: "更新质押激活延迟",
+        description: `将质押激活延迟更新为 ${activationBlocks.toString()} 个区块`,
         riskLevel: "medium",
       });
     },
@@ -719,6 +821,10 @@ export function getRiskLabel(riskLevel: GovernanceRiskLevel) {
 }
 
 export function formatGovernanceTemplateTarget(address: Address) {
+  if (address.toLowerCase() === CONTRACTS.NativeVotes.toLowerCase()) {
+    return "NativeVotes";
+  }
+
   if (address.toLowerCase() === CONTRACTS.KnowledgeContent.toLowerCase()) {
     return "KnowledgeContent";
   }
