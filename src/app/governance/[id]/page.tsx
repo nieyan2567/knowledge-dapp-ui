@@ -280,21 +280,49 @@ export default function ProposalDetailPage() {
       <PageHeader
         eyebrow={`提案 #${proposalId.toString()}`}
         title={proposalDetail?.description || "治理提案"}
-        description="查看提案状态、投票分布、动作细节，并在详情页完成投票、排队和执行。"
+        description="在这里查看提案投票结果、动作摘要，并完成后续治理操作。"
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_380px] xl:items-start">
         <div className="space-y-6">
           <SectionCard
             title="投票分布"
-            description="查看当前投票结果、总票数和各选项占比。"
+            description="快速查看提案状态、总票数和各选项占比。"
           >
             <div className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                  <Gavel className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                  当前状态
+                </div>
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${stateBadgeClass(proposalState)}`}
+                >
+                  {stateLabel(proposalState)}
+                </span>
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-4">
-                <InfoCard label="总票数" value={totalVotes === 0n ? "0" : formatEther(totalVotes)} />
-                <InfoCard label="赞成票" value={voteData.forVotes === 0n ? "0" : formatEther(voteData.forVotes)} />
-                <InfoCard label="反对票" value={voteData.againstVotes === 0n ? "0" : formatEther(voteData.againstVotes)} />
-                <InfoCard label="弃权票" value={voteData.abstainVotes === 0n ? "0" : formatEther(voteData.abstainVotes)} />
+                <InfoCard
+                  compact
+                  label="总票数"
+                  value={totalVotes === 0n ? "0" : formatEther(totalVotes)}
+                />
+                <InfoCard
+                  compact
+                  label="赞成票"
+                  value={voteData.forVotes === 0n ? "0" : formatEther(voteData.forVotes)}
+                />
+                <InfoCard
+                  compact
+                  label="反对票"
+                  value={voteData.againstVotes === 0n ? "0" : formatEther(voteData.againstVotes)}
+                />
+                <InfoCard
+                  compact
+                  label="弃权票"
+                  value={voteData.abstainVotes === 0n ? "0" : formatEther(voteData.abstainVotes)}
+                />
               </div>
 
               <div className="space-y-4">
@@ -322,7 +350,7 @@ export default function ProposalDetailPage() {
 
           <SectionCard
             title="提案动作"
-            description="这里展示提案中的全部链上动作、参数明细和原始 calldata。"
+            description="保留每个动作的核心摘要，原始参数按需展开查看。"
           >
             {loadingDetail ? (
               <div className="text-sm text-slate-500 dark:text-slate-400">
@@ -375,8 +403,10 @@ export default function ProposalDetailPage() {
                             <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                               目标合约
                             </div>
-                            <div className="mt-1.5">
-                              <AddressBadge address={target} />
+                            <div className="mt-1.5 rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2 shadow-sm dark:border-slate-700/80 dark:bg-slate-800/60">
+                              <span className="break-all font-mono text-xs text-slate-700 dark:text-slate-300">
+                                {target}
+                              </span>
                             </div>
                           </div>
 
@@ -384,40 +414,23 @@ export default function ProposalDetailPage() {
                             <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                               调用值
                             </div>
-                            <div className="mt-1.5 font-mono text-xs text-slate-700 dark:text-slate-300">
-                              {proposalDetail.values[index]?.toString() ?? "0"}
+                            <div className="mt-1.5 rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2 shadow-sm dark:border-slate-700/80 dark:bg-slate-800/60">
+                              <span className="font-mono text-xs text-slate-700 dark:text-slate-300">
+                                {proposalDetail.values[index]?.toString() ?? "0"}
+                              </span>
                             </div>
                           </div>
                         </div>
 
-                        {summary?.details?.length ? (
-                          <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-                            <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                              参数明细
-                            </div>
-                            <div className="mt-2 grid gap-2 md:grid-cols-2">
-                              {summary.details.map((detail, detailIndex) => (
-                                <div
-                                  key={`${detail.label}-${detailIndex}`}
-                                  className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/60"
-                                >
-                                  <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                                    {detail.label}
-                                  </div>
-                                  <div className="mt-1 break-all text-sm text-slate-800 dark:text-slate-200">
-                                    {detail.value}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ) : null}
-
-                        <div className="break-all rounded-xl bg-slate-200 p-3 font-mono text-xs dark:bg-slate-900">
-                          <span className="mb-1 block text-slate-500 dark:text-slate-400">
+                        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                          <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                             原始 calldata
-                          </span>
-                          {summary?.rawCalldata ?? proposalDetail.calldatas[index]}
+                          </div>
+                          <div className="mt-1.5 rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2 shadow-sm dark:border-slate-700/80 dark:bg-slate-800/60">
+                            <span className="break-all font-mono text-xs text-slate-700 dark:text-slate-300">
+                              {summary?.rawCalldata ?? proposalDetail.calldatas[index]}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -434,14 +447,8 @@ export default function ProposalDetailPage() {
             description="根据提案当前状态完成投票、排队或执行。"
           >
             <div className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                  <Gavel className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                  <span>
-                    当前状态: <strong>{stateLabel(proposalState)}</strong>
-                  </span>
-                </div>
-                <div className="mt-3 rounded-lg bg-white/80 p-3 text-xs leading-relaxed text-slate-600 dark:bg-slate-900/70 dark:text-slate-300">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="rounded-lg bg-white/80 p-3 text-xs leading-relaxed text-slate-600 dark:bg-slate-900/70 dark:text-slate-300">
                   {canVote
                     ? "当前提案处于投票中状态，可以参与赞成、反对或弃权投票。"
                     : canQueue
@@ -500,7 +507,7 @@ export default function ProposalDetailPage() {
 
           <SectionCard
             title="提案信息"
-            description="右侧汇总当前提案的关键链上信息，便于随时对照。"
+            description="保留当前提案最常查看的关键信息。"
           >
             {loadingDetail ? (
               <div className="animate-pulse text-sm text-slate-500 dark:text-slate-400">
@@ -513,43 +520,20 @@ export default function ProposalDetailPage() {
             ) : (
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  <InfoCard label="提案 ID" value={proposalId.toString()} />
-                  <InfoBadgeCard
-                    label="状态"
-                    value={stateLabel(proposalState)}
-                    className={stateBadgeClass(proposalState)}
-                  />
-                  <InfoCard label="创建区块" value={proposalDetail.blockNumber.toString()} />
-                  <InfoCard label="投票开始" value={proposalDetail.voteStart.toString()} />
-                  <InfoCard label="投票结束" value={proposalDetail.voteEnd.toString()} />
-                  <InfoCard label="动作数量" value={proposalDetail.targets.length.toString()} />
+                  <InfoCard compact label="提案 ID" value={proposalId.toString()} />
+                  <InfoCard compact label="创建区块" value={proposalDetail.blockNumber.toString()} />
+                  <InfoCard compact label="投票开始" value={proposalDetail.voteStart.toString()} />
+                  <InfoCard compact label="投票结束" value={proposalDetail.voteEnd.toString()} />
+                  <InfoCard compact label="动作数量" value={proposalDetail.targets.length.toString()} />
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     提案人
                   </div>
                   <div className="text-sm text-slate-900 dark:text-slate-100">
-                    <span className="font-mono break-all">{proposalDetail.proposer}</span>
+                    <AddressBadge address={proposalDetail.proposer} />
                   </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    治理合约
-                  </div>
-                  <span className="font-mono break-all text-sm text-slate-900 dark:text-slate-100">
-                    {CONTRACTS.KnowledgeGovernor}
-                  </span>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Description Hash
-                  </div>
-                  <span className="font-mono break-all text-sm text-slate-900 dark:text-slate-100">
-                    {proposalDetail.descriptionHash}
-                  </span>
                 </div>
               </div>
             )}
@@ -585,36 +569,35 @@ export default function ProposalDetailPage() {
   );
 }
 
-function InfoCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-        {label}
-      </div>
-      <div className="break-all text-sm font-medium text-slate-900 dark:text-slate-100">
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function InfoBadgeCard({
+function InfoCard({
   label,
   value,
-  className,
+  compact = false,
 }: {
   label: string;
   value: string;
-  className: string;
+  compact?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+    <div
+      className={`rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50 ${
+        compact ? "p-3" : "p-4"
+      }`}
+    >
+      <div
+        className={`text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 ${
+          compact ? "mb-1" : "mb-2"
+        }`}
+      >
         {label}
       </div>
-      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${className}`}>
+      <div
+        className={`break-all font-medium text-slate-900 dark:text-slate-100 ${
+          compact ? "text-[13px]" : "text-sm"
+        }`}
+      >
         {value}
-      </span>
+      </div>
     </div>
   );
 }
