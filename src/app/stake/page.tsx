@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Clock3, Coins, ShieldCheck, Wallet } from "lucide-react";
@@ -645,6 +645,7 @@ export default function StakePage() {
 								存入
 							</button>
 							<button
+								data-testid="stake-activate-button"
 								onClick={handleActivate}
 								disabled={activateDisabled}
 								className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -722,6 +723,7 @@ export default function StakePage() {
 
 						<div className="flex flex-wrap gap-3">
 							<button
+								data-testid="stake-request-withdraw-button"
 								onClick={handleRequestWithdraw}
 								disabled={requestWithdrawDisabled}
 								className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -729,6 +731,7 @@ export default function StakePage() {
 								申请退出
 							</button>
 							<button
+								data-testid="stake-withdraw-button"
 								onClick={handleWithdraw}
 								disabled={withdrawDisabled}
 								className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
@@ -763,3 +766,4 @@ function QuickAmountButton({
 		</button>
 	);
 }
+

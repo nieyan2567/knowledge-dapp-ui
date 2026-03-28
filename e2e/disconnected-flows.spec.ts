@@ -26,9 +26,9 @@ test("keeps staking actions disabled while the wallet is disconnected", async ({
   await page.goto("/stake");
 
   await expect(page.getByTestId("stake-deposit-button")).toBeDisabled();
-  await expect(
-    page.getByRole("button", { name: "Connect wallet", exact: true })
-  ).toBeVisible();
+  await expect(page.getByTestId("stake-activate-button")).toBeDisabled();
+  await expect(page.getByTestId("stake-request-withdraw-button")).toBeDisabled();
+  await expect(page.getByTestId("stake-withdraw-button")).toBeDisabled();
 });
 
 test("keeps faucet claiming disabled while the wallet is disconnected", async ({
@@ -41,4 +41,5 @@ test("keeps faucet claiming disabled while the wallet is disconnected", async ({
     page.getByRole("button", { name: "Connect wallet", exact: true })
   ).toBeVisible();
 });
+
 
