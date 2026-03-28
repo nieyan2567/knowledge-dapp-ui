@@ -5,6 +5,7 @@ import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { formatEther } from "viem";
 import {
   useAccount,
+  useBlockNumber,
   usePublicClient,
   useReadContract,
   useWriteContract,
@@ -26,6 +27,7 @@ import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
+import { collectByBlockRange } from "@/lib/block-range";
 import {
   createGovernanceDraftAction,
   encodeGovernanceActionDraft,
@@ -38,6 +40,7 @@ import {
 } from "@/lib/governance-templates";
 import {
   formatProposalBlockRange,
+  getProposalStageCountdown,
   governanceStateBadgeClass as stateBadgeClass,
   governanceStateLabel as stateLabel,
   parseProposalCreatedLog,
@@ -151,6 +154,7 @@ function getCategoryOrder(category: GovernanceTemplateCategory) {
 
 export default function GovernancePage() {
   const { address } = useAccount();
+  const { data: blockNumber } = useBlockNumber({ watch: true });
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const refreshAfterTx = useRefreshOnTxConfirmed();
@@ -162,6 +166,51 @@ export default function GovernancePage() {
   const [highRiskConfirmed, setHighRiskConfirmed] = useState(false);
   const [loadingProposals, setLoadingProposals] = useState(false);
   const [proposals, setProposals] = useState<ProposalItem[]>([]);
+  const [nowTs, setNowTs] = useState(() => Math.floor(Date.now() / 1000));
+  const [liveBlockNumber, setLiveBlockNumber] = useState<bigint | undefined>(
+    typeof blockNumber === "bigint" ? blockNumber : undefined
+  );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowTs(Math.floor(Date.now() / 1000));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (typeof blockNumber === "bigint") {
+      setLiveBlockNumber(blockNumber);
+    }
+  }, [blockNumber]);
+
+  useEffect(() => {
+    if (!publicClient) return;
+
+    let cancelled = false;
+
+    const updateBlockNumber = async () => {
+      try {
+        const latestBlock = await publicClient.getBlockNumber();
+        if (!cancelled) {
+          setLiveBlockNumber(latestBlock);
+        }
+      } catch {
+        // Keep the latest known block when polling fails transiently.
+      }
+    };
+
+    void updateBlockNumber();
+    const timer = window.setInterval(() => {
+      void updateBlockNumber();
+    }, 8000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [publicClient]);
 
   const templates = useMemo(() => getGovernanceTemplates(), []);
   const groupedTemplates = useMemo(() => {
@@ -267,12 +316,15 @@ export default function GovernancePage() {
     setLoadingProposals(true);
     try {
       const latestBlock = await publicClient.getBlockNumber();
-
-      const logs = await publicClient.getLogs({
-        address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-        event: proposalCreatedEvent,
-        fromBlock: 0n,
+      const logs = await collectByBlockRange({
         toBlock: latestBlock,
+        fetchRange: ({ fromBlock, toBlock }) =>
+          publicClient.getLogs({
+            address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
+            event: proposalCreatedEvent,
+            fromBlock,
+            toBlock,
+          }),
       });
 
       const parsed = logs.map((log) => parseProposalCreatedLog(log)).reverse();
@@ -480,10 +532,12 @@ export default function GovernancePage() {
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-950/40">
               <div className="h-136 overflow-y-auto pr-1 sm:h-152 xl:h-176">
-                <ProposalList
-                  proposals={proposals}
-                  loading={loadingProposals}
-                />
+              <ProposalList
+                proposals={proposals}
+                loading={loadingProposals}
+                currentBlock={liveBlockNumber}
+                nowTs={nowTs}
+              />
               </div>
             </div>
           </SectionCard>
@@ -1034,9 +1088,13 @@ function PreviewStat({
 function ProposalList({
   proposals,
   loading,
+  currentBlock,
+  nowTs,
 }: {
   proposals: ProposalItem[];
   loading: boolean;
+  currentBlock?: bigint;
+  nowTs: number;
 }) {
   if (loading) {
     return (
@@ -1060,32 +1118,70 @@ function ProposalList({
         <ProposalCard
           key={proposal.proposalId.toString()}
           proposal={proposal}
+          currentBlock={currentBlock}
+          nowTs={nowTs}
         />
       ))}
     </div>
   );
 }
 
-function ProposalCard({ proposal }: { proposal: ProposalItem }) {
-  const { data: state } = useReadContract({
+function ProposalCard({
+  proposal,
+  currentBlock,
+  nowTs,
+}: {
+  proposal: ProposalItem;
+  currentBlock?: bigint;
+  nowTs: number;
+}) {
+  const { data: state, refetch: refetchState } = useReadContract({
     address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
     abi: ABIS.KnowledgeGovernor,
     functionName: "state",
     args: [proposal.proposalId],
   });
 
-  const { data: votes } = useReadContract({
+  const { data: votes, refetch: refetchVotes } = useReadContract({
     address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
     abi: ABIS.KnowledgeGovernor,
     functionName: "proposalVotes",
     args: [proposal.proposalId],
   });
 
+  const { data: proposalEta, refetch: refetchProposalEta } = useReadContract({
+    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
+    abi: ABIS.KnowledgeGovernor,
+    functionName: "proposalEta",
+    args: [proposal.proposalId],
+  });
+
+  useEffect(() => {
+    if (currentBlock === undefined) {
+      return;
+    }
+
+    void Promise.all([refetchProposalEta(), refetchState(), refetchVotes()]);
+  }, [currentBlock, refetchProposalEta, refetchState, refetchVotes]);
+
   const proposalState = asBigInt(state);
+  const proposalEtaValue = asBigInt(proposalEta);
   const currentStateLabel = stateLabel(proposalState);
   const actionSummaries = useMemo(
     () => summarizeProposalActions(proposal),
     [proposal]
+  );
+  const countdown = useMemo(
+    () =>
+      getProposalStageCountdown(
+        currentBlock,
+        proposal.voteStart,
+        proposal.voteEnd,
+        proposalState,
+        proposalEtaValue,
+        BigInt(nowTs)
+      ),
+    [currentBlock, nowTs, proposal.voteEnd, proposal.voteStart, proposalEtaValue, proposalState]
   );
 
   const voteData: ProposalVotes =
@@ -1106,7 +1202,11 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
 
   const canVote = Number(proposalState ?? -1) === 1;
   const canQueue = Number(proposalState ?? -1) === 4;
-  const canExecute = Number(proposalState ?? -1) === 5;
+  const canExecute =
+    Number(proposalState ?? -1) === 5 &&
+    proposalEtaValue !== undefined &&
+    proposalEtaValue > 0n &&
+    BigInt(nowTs) >= proposalEtaValue;
   const availableActions = [
     canVote ? "投票" : null,
     canQueue ? "排队" : null,
@@ -1151,6 +1251,9 @@ function ProposalCard({ proposal }: { proposal: ProposalItem }) {
           <span>发起人: {shortenAddress(proposal.proposer)}</span>
           <span>创建区块: {proposal.blockNumber.toString()}</span>
           <span>投票区间: {formatBlockRange(proposal.voteStart, proposal.voteEnd)}</span>
+          <span>
+            {countdown.label}: {countdown.value}
+          </span>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">

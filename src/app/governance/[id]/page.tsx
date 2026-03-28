@@ -26,8 +26,10 @@ import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
+import { collectByBlockRange } from "@/lib/block-range";
 import { BRANDING } from "@/lib/branding";
 import {
+  getProposalStageCountdown,
   governanceStateBadgeClass as stateBadgeClass,
   governanceStateLabel as stateLabel,
   parseProposalCreatedLog,
@@ -64,6 +66,10 @@ export default function ProposalDetailPage() {
 
   const [proposalDetail, setProposalDetail] = useState<ProposalItem | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [nowTs, setNowTs] = useState(() => Math.floor(Date.now() / 1000));
+  const [liveBlockNumber, setLiveBlockNumber] = useState<bigint | undefined>(
+    typeof blockNumber === "bigint" ? blockNumber : undefined
+  );
 
   const proposalId = useMemo(() => {
     const raw = typeof params?.id === "string" ? params.id : null;
@@ -89,13 +95,63 @@ export default function ProposalDetailPage() {
     query: { enabled: !!proposalId },
   });
 
+  const { data: proposalEta, refetch: refetchProposalEta } = useReadContract({
+    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
+    abi: ABIS.KnowledgeGovernor,
+    functionName: "proposalEta",
+    args: proposalId ? [proposalId] : undefined,
+    query: { enabled: !!proposalId },
+  });
+
   const proposalState = asBigInt(state);
+  const proposalEtaValue = asBigInt(proposalEta);
   const voteData: ProposalVotes =
     asProposalVotes(votes) ?? {
       againstVotes: 0n,
       forVotes: 0n,
       abstainVotes: 0n,
     };
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowTs(Math.floor(Date.now() / 1000));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (typeof blockNumber === "bigint") {
+      setLiveBlockNumber(blockNumber);
+    }
+  }, [blockNumber]);
+
+  useEffect(() => {
+    if (!publicClient) return;
+
+    let cancelled = false;
+
+    const updateBlockNumber = async () => {
+      try {
+        const latestBlock = await publicClient.getBlockNumber();
+        if (!cancelled) {
+          setLiveBlockNumber(latestBlock);
+        }
+      } catch {
+        // Keep the latest known block when polling fails transiently.
+      }
+    };
+
+    void updateBlockNumber();
+    const timer = window.setInterval(() => {
+      void updateBlockNumber();
+    }, 8000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [publicClient]);
 
   const totalVotes =
     voteData.forVotes + voteData.againstVotes + voteData.abstainVotes;
@@ -108,10 +164,34 @@ export default function ProposalDetailPage() {
 
   const canVote = Number(proposalState ?? -1) === 1;
   const canQueue = Number(proposalState ?? -1) === 4;
-  const canExecute = Number(proposalState ?? -1) === 5;
+  const isQueued = Number(proposalState ?? -1) === 5;
+  const canExecute =
+    isQueued &&
+    proposalEtaValue !== undefined &&
+    proposalEtaValue > 0n &&
+    BigInt(nowTs) >= proposalEtaValue;
   const actionSummaries = useMemo(
     () => (proposalDetail ? summarizeProposalActions(proposalDetail) : []),
     [proposalDetail]
+  );
+  const countdown = useMemo(
+    () =>
+      getProposalStageCountdown(
+        liveBlockNumber,
+        proposalDetail?.voteStart,
+        proposalDetail?.voteEnd,
+        proposalState,
+        proposalEtaValue,
+        BigInt(nowTs)
+      ),
+    [
+      liveBlockNumber,
+      nowTs,
+      proposalDetail?.voteEnd,
+      proposalDetail?.voteStart,
+      proposalEtaValue,
+      proposalState,
+    ]
   );
 
   const loadProposalDetail = useCallback(async () => {
@@ -123,11 +203,15 @@ export default function ProposalDetailPage() {
     setLoadingDetail(true);
     try {
       const latestBlock = await publicClient.getBlockNumber();
-      const logs = await publicClient.getLogs({
-        address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-        event: proposalCreatedEvent,
-        fromBlock: 0n,
+      const logs = await collectByBlockRange({
         toBlock: latestBlock,
+        fetchRange: ({ fromBlock, toBlock }) =>
+          publicClient.getLogs({
+            address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
+            event: proposalCreatedEvent,
+            fromBlock,
+            toBlock,
+          }),
       });
 
       const matched = logs.find((log) => {
@@ -153,8 +237,13 @@ export default function ProposalDetailPage() {
   }, [loadProposalDetail]);
 
   const refreshProposalDetail = useCallback(async () => {
-    await Promise.all([refetchState(), refetchVotes(), loadProposalDetail()]);
-  }, [loadProposalDetail, refetchState, refetchVotes]);
+    await Promise.all([
+      refetchProposalEta(),
+      refetchState(),
+      refetchVotes(),
+      loadProposalDetail(),
+    ]);
+  }, [loadProposalDetail, refetchProposalEta, refetchState, refetchVotes]);
 
   const governanceRefreshDomains = useMemo(
     () => ["governance", "system"] as const,
@@ -168,12 +257,12 @@ export default function ProposalDetailPage() {
   useTxEventRefetch(governanceRefreshDomains, governanceRefetchers);
 
   useEffect(() => {
-    if (blockNumber === undefined || proposalId === null) {
+    if (liveBlockNumber === undefined || proposalId === null) {
       return;
     }
 
-    void Promise.all([refetchState(), refetchVotes()]);
-  }, [blockNumber, proposalId, refetchState, refetchVotes]);
+    void Promise.all([refetchProposalEta(), refetchState(), refetchVotes()]);
+  }, [liveBlockNumber, proposalId, refetchProposalEta, refetchState, refetchVotes]);
 
   async function vote(support: 0 | 1 | 2) {
     if (!address || !proposalId) {
@@ -295,11 +384,16 @@ export default function ProposalDetailPage() {
                   <Gavel className="h-4 w-4 text-slate-400 dark:text-slate-500" />
                   当前状态
                 </div>
-                <span
-                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${stateBadgeClass(proposalState)}`}
-                >
-                  {stateLabel(proposalState)}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-900/70 dark:text-slate-300">
+                    {countdown.label}: {countdown.value}
+                  </div>
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${stateBadgeClass(proposalState)}`}
+                  >
+                    {stateLabel(proposalState)}
+                  </span>
+                </div>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-4">
@@ -524,6 +618,7 @@ export default function ProposalDetailPage() {
                   <InfoCard compact label="创建区块" value={proposalDetail.blockNumber.toString()} />
                   <InfoCard compact label="投票开始" value={proposalDetail.voteStart.toString()} />
                   <InfoCard compact label="投票结束" value={proposalDetail.voteEnd.toString()} />
+                  <InfoCard compact label={countdown.label} value={countdown.value} />
                   <InfoCard compact label="动作数量" value={proposalDetail.targets.length.toString()} />
                 </div>
 

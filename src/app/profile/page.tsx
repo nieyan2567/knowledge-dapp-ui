@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
+import { collectByBlockRange } from "@/lib/block-range";
 import { BRANDING } from "@/lib/branding";
 import {
   formatProposalBlockRange,
@@ -178,11 +179,15 @@ export default function ProfilePage() {
 
     try {
       const latestBlock = await publicClient.getBlockNumber();
-      const logs = await publicClient.getLogs({
-        address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-        event: proposalCreatedEvent,
-        fromBlock: 0n,
+      const logs = await collectByBlockRange({
         toBlock: latestBlock,
+        fetchRange: ({ fromBlock, toBlock }) =>
+          publicClient.getLogs({
+            address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
+            event: proposalCreatedEvent,
+            fromBlock,
+            toBlock,
+          }),
       });
 
       const proposals = logs

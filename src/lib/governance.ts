@@ -113,6 +113,184 @@ export function formatProposalBlockRange(start?: bigint, end?: bigint) {
   return `${start.toString()} -> ${end.toString()}`;
 }
 
+export function formatBlockCountdown(blocks: bigint) {
+  return `${blocks.toString()} 个区块`;
+}
+
+export function getProposalCountdown(
+  currentBlock?: bigint,
+  voteStart?: bigint,
+  voteEnd?: bigint,
+  state?: bigint
+) {
+  if (currentBlock === undefined || voteStart === undefined || voteEnd === undefined) {
+    return {
+      label: "阶段倒计时",
+      value: "等待区块同步",
+    };
+  }
+
+  switch (Number(state ?? -1)) {
+    case 0:
+      return voteStart > currentBlock
+        ? {
+            label: "距开始投票",
+            value: formatBlockCountdown(voteStart - currentBlock),
+          }
+        : {
+            label: "阶段倒计时",
+            value: "投票即将开始",
+          };
+    case 1:
+      return voteEnd > currentBlock
+        ? {
+            label: "距结束投票",
+            value: formatBlockCountdown(voteEnd - currentBlock),
+          }
+        : {
+            label: "阶段倒计时",
+            value: "投票即将结束",
+          };
+    case 4:
+      return {
+        label: "阶段状态",
+        value: "投票已通过，等待排队",
+      };
+    case 5:
+      return {
+        label: "阶段状态",
+        value: "已排队，等待执行",
+      };
+    case 7:
+      return {
+        label: "阶段状态",
+        value: "提案已执行",
+      };
+    case 2:
+    case 3:
+    case 6:
+      return {
+        label: "阶段状态",
+        value: "投票已结束",
+      };
+    default:
+      return {
+        label: "阶段倒计时",
+        value: "等待状态更新",
+      };
+  }
+}
+
+function formatQueuedCountdown(seconds: bigint) {
+  if (seconds <= 0n) {
+    return "已到执行时间";
+  }
+
+  const days = seconds / 86400n;
+  const hours = (seconds % 86400n) / 3600n;
+  const minutes = (seconds % 3600n) / 60n;
+  const secs = seconds % 60n;
+
+  if (days > 0n) {
+    return `${days.toString()}天 ${hours.toString()}小时`;
+  }
+
+  if (hours > 0n) {
+    return `${hours.toString()}小时 ${minutes.toString()}分钟`;
+  }
+
+  if (minutes > 0n) {
+    return `${minutes.toString()}分钟 ${secs.toString()}秒`;
+  }
+
+  return `${secs.toString()}秒`;
+}
+
+export function getProposalStageCountdown(
+  currentBlock?: bigint,
+  voteStart?: bigint,
+  voteEnd?: bigint,
+  state?: bigint,
+  proposalEta?: bigint,
+  nowTs?: bigint
+) {
+  if (currentBlock === undefined || voteStart === undefined || voteEnd === undefined) {
+    return {
+      label: "阶段倒计时",
+      value: "等待区块同步",
+    };
+  }
+
+  switch (Number(state ?? -1)) {
+    case 0:
+      return voteStart > currentBlock
+        ? {
+            label: "距开始投票",
+            value: `${(voteStart - currentBlock).toString()} 个区块`,
+          }
+        : {
+            label: "阶段倒计时",
+            value: "投票即将开始",
+          };
+    case 1:
+      return voteEnd > currentBlock
+        ? {
+            label: "距结束投票",
+            value: `${(voteEnd - currentBlock).toString()} 个区块`,
+          }
+        : {
+            label: "阶段倒计时",
+            value: "投票即将结束",
+          };
+    case 4:
+      return {
+        label: "下一步",
+        value: "投票已通过，请先加入队列",
+      };
+    case 5:
+      if (proposalEta === undefined || proposalEta <= 0n) {
+        return {
+          label: "距可执行",
+          value: "等待执行时间同步",
+        };
+      }
+
+      if (nowTs === undefined) {
+        return {
+          label: "距可执行",
+          value: "等待本地时间同步",
+        };
+      }
+
+      return proposalEta > nowTs
+        ? {
+            label: "距可执行",
+            value: formatQueuedCountdown(proposalEta - nowTs),
+          }
+        : {
+            label: "执行状态",
+            value: "现在可以执行",
+          };
+    case 7:
+      return {
+        label: "阶段状态",
+        value: "提案已执行",
+      };
+    case 2:
+    case 3:
+    case 6:
+      return {
+        label: "阶段状态",
+        value: "投票已结束",
+      };
+    default:
+      return {
+        label: "阶段倒计时",
+        value: "等待状态更新",
+      };
+  }
+}
+
 function isSameAddress(left: string, right: string) {
   return left.toLowerCase() === right.toLowerCase();
 }

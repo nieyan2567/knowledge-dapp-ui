@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Coins, ShieldCheck, Wallet } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Coins, ExternalLink, ShieldCheck, Wallet } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { formatEther, parseAbiItem } from "viem";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
@@ -11,6 +11,8 @@ import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
+import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
+import { collectByBlockRange } from "@/lib/block-range";
 import { BRANDING } from "@/lib/branding";
 import { reportClientError } from "@/lib/observability/client";
 import { writeTxToast } from "@/lib/tx-toast";
@@ -25,6 +27,9 @@ const rewardClaimedEvent = parseAbiItem(
 );
 
 const PAGE_SIZE_OPTIONS = [3, 5, 10] as const;
+const HISTORY_FILTERS = ["all", "accrued", "claimed"] as const;
+
+type HistoryFilter = (typeof HISTORY_FILTERS)[number];
 
 type RewardHistoryItem = {
 	id: string;
@@ -65,6 +70,11 @@ function formatRewardDate(timestamp?: bigint) {
 	});
 }
 
+function explorerTxUrl(txHash?: `0x${string}`) {
+	if (!txHash) return "#";
+	return `${BRANDING.explorerUrl}/tx/${txHash}`;
+}
+
 export default function RewardsPage() {
 	const { address } = useAccount();
 	const publicClient = usePublicClient();
@@ -77,6 +87,7 @@ export default function RewardsPage() {
 	const [rewardSources, setRewardSources] = useState<RewardSourceItem[]>([]);
 	const [historyPage, setHistoryPage] = useState(1);
 	const [historyPageSize, setHistoryPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(3);
+	const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
 	const [sourcePage, setSourcePage] = useState(1);
 	const [sourcePageSize, setSourcePageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(3);
 
@@ -120,21 +131,28 @@ export default function RewardsPage() {
 
 		try {
 			const latestBlock = await publicClient.getBlockNumber();
-
 			const [accrualLogs, claimLogs] = await Promise.all([
-				publicClient.getLogs({
-					address: CONTRACTS.KnowledgeContent as `0x${string}`,
-					event: rewardAccrueRequestedEvent,
-					args: { author: address },
-					fromBlock: 0n,
+				collectByBlockRange({
 					toBlock: latestBlock,
+					fetchRange: ({ fromBlock, toBlock }) =>
+						publicClient.getLogs({
+							address: CONTRACTS.KnowledgeContent as `0x${string}`,
+							event: rewardAccrueRequestedEvent,
+							args: { author: address },
+							fromBlock,
+							toBlock,
+						}),
 				}),
-				publicClient.getLogs({
-					address: CONTRACTS.TreasuryNative as `0x${string}`,
-					event: rewardClaimedEvent,
-					args: { beneficiary: address },
-					fromBlock: 0n,
+				collectByBlockRange({
 					toBlock: latestBlock,
+					fetchRange: ({ fromBlock, toBlock }) =>
+						publicClient.getLogs({
+							address: CONTRACTS.TreasuryNative as `0x${string}`,
+							event: rewardClaimedEvent,
+							args: { beneficiary: address },
+							fromBlock,
+							toBlock,
+						}),
 				}),
 			]);
 
@@ -264,11 +282,37 @@ export default function RewardsPage() {
 		]);
 	}, [loadRewardActivity, refetchEpochBudget, refetchEpochSpent, refetchPendingRewards]);
 
+	const rewardRefreshDomains = useMemo(
+		() => ["rewards", "content", "dashboard", "system"] as const,
+		[]
+	);
+	const rewardRefetchers = useMemo(() => [refreshRewardsData], [refreshRewardsData]);
+
+	useTxEventRefetch(rewardRefreshDomains, rewardRefetchers);
+
 	useEffect(() => {
 		void loadRewardActivity();
 	}, [loadRewardActivity]);
 
-	const historyTotalPages = Math.max(1, Math.ceil(rewardHistory.length / historyPageSize));
+	useEffect(() => {
+		if (!address) return;
+
+		const timer = window.setInterval(() => {
+			void refreshRewardsData();
+		}, 30000);
+
+		return () => window.clearInterval(timer);
+	}, [address, refreshRewardsData]);
+
+	const filteredRewardHistory = useMemo(
+		() =>
+			historyFilter === "all"
+				? rewardHistory
+				: rewardHistory.filter((item) => item.kind === historyFilter),
+		[historyFilter, rewardHistory]
+	);
+
+	const historyTotalPages = Math.max(1, Math.ceil(filteredRewardHistory.length / historyPageSize));
 	const sourceTotalPages = Math.max(1, Math.ceil(rewardSources.length / sourcePageSize));
 
 	useEffect(() => {
@@ -283,7 +327,11 @@ export default function RewardsPage() {
 		}
 	}, [sourcePage, sourceTotalPages]);
 
-	const pagedRewardHistory = rewardHistory.slice(
+	useEffect(() => {
+		setHistoryPage(1);
+	}, [historyFilter]);
+
+	const pagedRewardHistory = filteredRewardHistory.slice(
 		(historyPage - 1) * historyPageSize,
 		historyPage * historyPageSize
 	);
@@ -339,57 +387,66 @@ export default function RewardsPage() {
 				description="领取当前连接钱包在金库中累计的奖励。"
 			/>
 
-			<section className="grid gap-4 md:grid-cols-3">
-				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-					<div className="mb-4 flex items-center justify-between">
-						<div className="text-sm text-slate-500 dark:text-slate-400">待领取奖励</div>
-						<Wallet className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+			<section className="grid gap-3 md:grid-cols-3">
+				<div className="flex h-28 flex-col rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+					<div className="mb-2.5 flex items-center justify-between">
+						<div className="text-xs text-slate-500 dark:text-slate-400">待领取奖励</div>
+						<Wallet className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
 					</div>
 
-					<div className="text-3xl font-semibold text-slate-950 dark:text-slate-100">
-						{pending} {BRANDING.nativeTokenSymbol}
+					<div className="flex items-end justify-between gap-3">
+						<div className="text-xl font-semibold leading-none text-slate-950 dark:text-slate-100">
+							{pending} {BRANDING.nativeTokenSymbol}
+						</div>
+						<button
+							onClick={handleClaim}
+							disabled={loading || !pending}
+							className="rounded-full bg-slate-950 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+						>
+							{loading ? "领取中..." : "领取"}
+						</button>
 					</div>
 
-					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+					<div className="mt-auto pt-1.5 text-xs text-slate-500 dark:text-slate-400">
 						当前可领取的奖励。
 					</div>
 				</div>
 
-				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-					<div className="mb-4 flex items-center justify-between">
-						<div className="text-sm text-slate-500 dark:text-slate-400">周期预算使用</div>
-						<Coins className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+				<div className="flex h-28 flex-col rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+					<div className="mb-2.5 flex items-center justify-between">
+						<div className="text-xs text-slate-500 dark:text-slate-400">周期预算使用</div>
+						<Coins className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
 					</div>
 
-					<div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
+					<div className="text-lg font-semibold leading-none text-slate-950 dark:text-slate-100">
 						{progress.toFixed(1)}%
 					</div>
 
-					<div className="mt-4 space-y-3">
-						<div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+					<div className="mt-auto space-y-1 pt-1.5">
+						<div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
 							<div
 								className="h-full bg-blue-500 transition-all"
 								style={{ width: `${progress}%` }}
 							/>
 						</div>
 
-						<div className="text-sm text-slate-500 dark:text-slate-400">
+						<div className="text-xs text-slate-500 dark:text-slate-400">
 							已使用 {spent} / {budget} {BRANDING.nativeTokenSymbol}
 						</div>
 					</div>
 				</div>
 
-				<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-					<div className="mb-4 flex items-center justify-between">
-						<div className="text-sm text-slate-500 dark:text-slate-400">周期已发放</div>
-						<ShieldCheck className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+				<div className="flex h-28 flex-col rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+					<div className="mb-2.5 flex items-center justify-between">
+						<div className="text-xs text-slate-500 dark:text-slate-400">周期已发放</div>
+						<ShieldCheck className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
 					</div>
 
-					<div className="text-2xl font-semibold text-slate-950 dark:text-slate-100">
+					<div className="text-lg font-semibold leading-none text-slate-950 dark:text-slate-100">
 						{spent} {BRANDING.nativeTokenSymbol}
 					</div>
 
-					<div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+					<div className="mt-auto pt-1.5 text-xs text-slate-500 dark:text-slate-400">
 						当前周期已分配的奖励。
 					</div>
 				</div>
@@ -414,6 +471,27 @@ export default function RewardsPage() {
 						</div>
 					) : (
 						<div className="space-y-3">
+							<div className="flex flex-wrap gap-2">
+								{HISTORY_FILTERS.map((filter) => (
+									<button
+										key={filter}
+										type="button"
+										onClick={() => setHistoryFilter(filter)}
+										className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+											historyFilter === filter
+												? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
+												: "border border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+										}`}
+									>
+										{filter === "all"
+											? "全部"
+											: filter === "accrued"
+												? "仅记账"
+												: "仅领取"}
+									</button>
+								))}
+							</div>
+
 							{pagedRewardHistory.map((item) => (
 								<div
 									key={item.id}
@@ -443,16 +521,28 @@ export default function RewardsPage() {
 											</div>
 
 											<div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-												{item.kind === "accrued" && item.contentId !== undefined ? (
-													<Link
-														href={`/content/${item.contentId.toString()}`}
-														className="hover:text-slate-700 dark:hover:text-slate-200"
-													>
-														查看内容详情
-													</Link>
-												) : (
-													formatRewardDate(item.timestamp)
-												)}
+												<div className="flex flex-wrap items-center gap-3">
+													{item.kind === "accrued" && item.contentId !== undefined ? (
+														<Link
+															href={`/content/${item.contentId.toString()}`}
+															className="hover:text-slate-700 dark:hover:text-slate-200"
+														>
+															查看内容详情
+														</Link>
+													) : null}
+													{item.txHash ? (
+														<a
+															href={explorerTxUrl(item.txHash)}
+															target="_blank"
+															rel="noreferrer"
+															className="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200"
+														>
+															查看交易
+															<ExternalLink className="h-3.5 w-3.5" />
+														</a>
+													) : null}
+													<span>{formatRewardDate(item.timestamp)}</span>
+												</div>
 											</div>
 										</div>
 
@@ -472,7 +562,7 @@ export default function RewardsPage() {
 								page={historyPage}
 								totalPages={historyTotalPages}
 								pageSize={historyPageSize}
-								totalItems={rewardHistory.length}
+								totalItems={filteredRewardHistory.length}
 								onPageChange={setHistoryPage}
 								onPageSizeChange={(size) => {
 									setHistoryPageSize(size);
@@ -545,28 +635,6 @@ export default function RewardsPage() {
 				</SectionCard>
 			</div>
 
-			<SectionCard
-				title="领取奖励"
-				description="在奖励记录入库后，使用此操作进行领取。"
-			>
-				<div className="flex items-center justify-between">
-					<div>
-						<div className="text-sm text-slate-500 dark:text-slate-400">可领取</div>
-
-						<div className="text-xl font-semibold text-slate-950 dark:text-slate-100">
-							{pending} {BRANDING.nativeTokenSymbol}
-						</div>
-					</div>
-
-					<button
-						onClick={handleClaim}
-						disabled={loading || !pending}
-						className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-					>
-						{loading ? "领取中..." : "领取奖励"}
-					</button>
-				</div>
-			</SectionCard>
 		</main>
 	);
 }
