@@ -26,6 +26,8 @@ export function ContentCard({
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const refreshAfterTx = useRefreshOnTxConfirmed();
+  const isAuthor =
+    !!address && content.author.toLowerCase() === address.toLowerCase();
 
   const fileUrl = getIpfsFileUrl(content.ipfsHash);
 
@@ -62,6 +64,11 @@ export function ContentCard({
   async function handleDistributeReward() {
     if (!address) {
       toast.error("请先连接钱包");
+      return;
+    }
+
+    if (!isAuthor) {
+      toast.error("只有内容作者可以发起奖励记账");
       return;
     }
 
@@ -120,7 +127,7 @@ export function ContentCard({
         <div title={content.author}>作者: {shortenAddress(content.author)}</div>
         <div>票数: {content.voteCount.toString()}</div>
         <div>发布时间: {new Date(Number(content.timestamp) * 1000).toLocaleString()}</div>
-        <div>奖励状态: {content.rewardAccrued ? "已记账" : "未记账"}</div>
+        <div>奖励状态: {content.rewardAccrued ? "已记过账" : "未记账"}</div>
         <div>内容状态: {content.deleted ? "已删除" : "正常"}</div>
 
         <div
@@ -156,7 +163,7 @@ export function ContentCard({
 
         <button
           onClick={handleDistributeReward}
-          disabled={content.deleted}
+          disabled={content.deleted || !isAuthor}
           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           <Coins className="h-4 w-4" />

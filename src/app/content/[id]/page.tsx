@@ -457,6 +457,11 @@ export default function ContentDetailPage() {
       return;
     }
 
+    if (!isAuthor) {
+      toast.error("只有内容作者可以发起奖励记账");
+      return;
+    }
+
     const hash = await writeTxToast({
       publicClient,
       writeContractAsync,
@@ -766,7 +771,7 @@ export default function ContentDetailPage() {
               <InfoCard label="奖励状态">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                  {contentRecord.rewardAccrued ? "已记账" : "未记账"}
+                  {contentRecord.rewardAccrued ? "已记过账" : "未记账"}
                 </div>
               </InfoCard>
             </div>
@@ -879,7 +884,7 @@ export default function ContentDetailPage() {
         <div className="space-y-6">
           <SectionCard
             title="内容操作"
-            description="内容未删除时可以继续投票和记账。"
+            description="内容未删除时可以继续投票；奖励记账仅允许作者本人发起，后续新增票数也可以继续记账。"
           >
             <div className="space-y-3">
               <button
@@ -893,12 +898,18 @@ export default function ContentDetailPage() {
 
               <button
                 onClick={handleAccrueReward}
-                disabled={contentRecord.deleted}
+                disabled={contentRecord.deleted || !isAuthor}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <Coins className="h-4 w-4" />
                 奖励记账
               </button>
+
+              {!isAuthor ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-500 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-400">
+                  当前账号不是内容作者，不能为这条内容发起奖励记账。
+                </div>
+              ) : null}
 
               {canRestoreContent ? (
                 <button
