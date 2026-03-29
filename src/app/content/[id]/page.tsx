@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import {
@@ -57,6 +57,31 @@ function reportContentDetailError(
     error,
     context,
   });
+}
+
+function getVersionChangeSummary(
+  version: ContentVersionData,
+  previousVersion?: ContentVersionData
+) {
+  if (!previousVersion) {
+    return ["初始版本"];
+  }
+
+  const changes: string[] = [];
+
+  if (version.ipfsHash !== previousVersion.ipfsHash) {
+    changes.push("文件已更新");
+  }
+
+  if (version.title !== previousVersion.title) {
+    changes.push("标题已更新");
+  }
+
+  if (version.description !== previousVersion.description) {
+    changes.push("描述已更新");
+  }
+
+  return changes.length > 0 ? changes : ["元数据未变化"];
 }
 
 export default function ContentDetailPage() {
@@ -213,6 +238,22 @@ export default function ContentDetailPage() {
     void loadVersions();
   }, [loadVersions]);
 
+  const handleCopyToClipboard = useCallback(
+    async (value: string, label: string) => {
+      try {
+        await navigator.clipboard.writeText(value);
+        toast.success(`${label}已复制`);
+      } catch (error) {
+        reportContentDetailError("Failed to copy content detail field", error, {
+          contentId: contentId?.toString() ?? "unknown",
+          label,
+        });
+        toast.error(`复制${label}失败`);
+      }
+    },
+    [contentId]
+  );
+
   if (!contentId) {
     notFound();
   }
@@ -261,6 +302,44 @@ export default function ContentDetailPage() {
       : hasReachedMaxVersions
         ? `已达到当前内容的最大版本数上限（${maxVersionsPerContent?.toString() ?? versionCount.toString()}）。`
         : null;
+  const remainingVersionSlots =
+    maxVersionsPerContent !== undefined
+      ? Math.max(Number(maxVersionsPerContent - versionCount), 0)
+      : null;
+  const contentStatusSummary = [
+    {
+      label: "作者权限",
+      value: isAuthor ? "当前账号可编辑" : "当前账号仅可查看",
+      description: isAuthor
+        ? "你可以管理版本、删除和恢复状态。"
+        : "只有作者地址可以提交新版本或恢复内容。",
+    },
+    {
+      label: "内容状态",
+      value: contentRecord.deleted ? "已软删除" : "正常展示中",
+      description: contentRecord.deleted
+        ? "恢复后才能继续创建新版本。"
+        : "当前内容仍可参与浏览、投票与奖励流程。",
+    },
+    {
+      label: "新版本权限",
+      value: newVersionBlockedReason ? "当前不可创建" : "当前可创建新版本",
+      description:
+        newVersionBlockedReason ??
+        "标题、描述和文件变更都可以提交为新版本。",
+    },
+    {
+      label: "版本额度",
+      value:
+        remainingVersionSlots === null
+          ? `${versionCount.toString()} 个已用版本`
+          : `剩余 ${remainingVersionSlots} / ${maxVersionsPerContent?.toString()}`,
+      description:
+        remainingVersionSlots === null
+          ? "当前合约未返回版本上限。"
+          : `当前已使用 ${versionCount.toString()} 个版本名额。`,
+    },
+  ] as const;
 
   function handleVersionFileChange(selectedFile: File) {
     const uploadValidation = validateUploadFile(selectedFile);
@@ -551,6 +630,17 @@ export default function ContentDetailPage() {
         description={contentRecord.description || "暂无描述"}
       />
 
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {contentStatusSummary.map((item) => (
+          <StatusSummaryCard
+            key={item.label}
+            label={item.label}
+            value={item.value}
+            description={item.description}
+          />
+        ))}
+      </div>
+
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
           <SectionCard
@@ -696,10 +786,15 @@ export default function ContentDetailPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {versions.map((version) => {
+                {versions.map((version, index) => {
                   const isCurrentVersion =
                     version.version === contentRecord.latestVersion;
                   const versionUrl = getIpfsFileUrl(version.ipfsHash);
+                  const previousVersion = versions[index + 1];
+                  const changeSummary = getVersionChangeSummary(
+                    version,
+                    previousVersion
+                  );
 
                   return (
                     <div
@@ -727,7 +822,27 @@ export default function ContentDetailPage() {
                         </div>
                       </div>
 
-                      <div className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                      <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
+                        <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 dark:border-slate-700 dark:bg-slate-900/80">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            变更摘要
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {changeSummary.map((item) => (
+                              <span
+                                key={`${version.version.toString()}-${item}`}
+                                className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                              >
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                            {previousVersion
+                              ? `相较 v${previousVersion.version.toString()} 的变化`
+                              : "这是内容的初始版本记录。"}
+                          </div>
+                        </div>
                         <div>标题：{version.title}</div>
                         <div>描述：{version.description || "暂无描述"}</div>
                         <div className="break-all text-xs text-slate-500 dark:text-slate-400">
@@ -745,6 +860,13 @@ export default function ContentDetailPage() {
                           打开文件
                           <ExternalLink className="h-4 w-4" />
                         </a>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyToClipboard(version.ipfsHash, "CID")}
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                          复制 CID
+                        </button>
                       </div>
                     </div>
                   );
@@ -861,9 +983,9 @@ export default function ContentDetailPage() {
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
                   {canEditContent
-                    ? "你现在可以直接修改标题和描述，也可以先上传一个新的文件生成新 CID，再提交链上更新。是否允许创建新版本，最终由合约当前内容策略决定。"
+                    ? "你现在可以直接修改标题和描述，也可以先上传一个新的文件生成新 CID，再提交链上更新。"
                     : isAuthor
-                      ? "当前内容状态可能已被合约策略限制，表单仍可编辑，但真正提交时会按链上规则校验。"
+                      ? "当前内容状态受到合约规则限制，表单仍可查看，但提交时会按链上规则校验。"
                       : "你可以先准备标题、描述和新 CID；只有作者地址才能真正提交新版本。"}
                 </div>
 
@@ -914,7 +1036,7 @@ function InfoCard({
   children,
 }: {
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
@@ -922,6 +1044,30 @@ function InfoCard({
         {label}
       </div>
       <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{children}</div>
+    </div>
+  );
+}
+
+function StatusSummaryCard({
+  label,
+  value,
+  description,
+}: {
+  label: string;
+  value: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/50">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {label}
+      </div>
+      <div className="mt-1 text-sm font-semibold text-slate-950 dark:text-slate-100">
+        {value}
+      </div>
+      <div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+        {description}
+      </div>
     </div>
   );
 }
