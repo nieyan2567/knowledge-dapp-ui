@@ -278,18 +278,20 @@ export default function ProfilePage() {
           <div className="grid gap-6 xl:grid-cols-2">
             <SectionCard
               title="我的内容"
+              className="h-168"
+              bodyClassName="flex min-h-0 flex-col"
               description={`共 ${myContents.length} 条内容，其中正常内容 ${activeContents} 条。`}
             >
               {loadingContents ? (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
+                <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
                   正在加载你的内容...
                 </div>
               ) : myContents.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
+                <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
                   你还没有发布内容。
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
                   {myContents.map((item) => (
                     <article
                       key={item.id.toString()}
@@ -373,18 +375,20 @@ export default function ProfilePage() {
 
             <SectionCard
               title="我发起的提案"
+              className="h-168"
+              bodyClassName="flex min-h-0 flex-col"
               description={`共 ${myProposals.length} 个提案，按创建区块倒序展示。`}
             >
               {loadingProposals ? (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
+                <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
                   正在加载你的提案...
                 </div>
               ) : myProposals.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
+                <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
                   你还没有发起提案。
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
                   {myProposals.map((proposal) => (
                     <ProfileProposalCard
                       key={proposal.proposalId.toString()}
