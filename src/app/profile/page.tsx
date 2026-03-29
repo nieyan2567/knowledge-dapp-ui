@@ -71,6 +71,15 @@ function shortenCid(cid: string) {
   return `${cid.slice(0, 8)}...${cid.slice(-8)}`;
 }
 
+function shortenProposalId(proposalId: bigint) {
+  const value = proposalId.toString();
+  if (value.length <= 10) {
+    return value;
+  }
+
+  return `${value.slice(0, 30)}...`;
+}
+
 function shortenAddress(address?: string | null) {
   if (!address) return "未连接";
   if (address.length < 12) return address;
@@ -614,10 +623,11 @@ function ProfileProposalCard({ proposal }: { proposal: ProposalItem }) {
     <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5 transition hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:hover:border-slate-700 dark:hover:bg-slate-900">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            <span>提案 #{proposal.proposalId.toString()}</span>
-            <span>·</span>
-            <span>创建区块 {proposal.blockNumber.toString()}</span>
+          <div
+            title={`提案 #${proposal.proposalId.toString()}`}
+            className="text-xs text-slate-500 dark:text-slate-400"
+          >
+            提案 #{shortenProposalId(proposal.proposalId)}
           </div>
           <Link
             href={`/governance/${proposal.proposalId.toString()}`}
@@ -666,7 +676,13 @@ function ProfileProposalCard({ proposal }: { proposal: ProposalItem }) {
         )}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-600 dark:text-slate-300">
+      <div className="mt-4 grid grid-cols-1 gap-3 text-sm text-slate-600 sm:grid-cols-3 dark:text-slate-300">
+        <div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            创建区块
+          </div>
+          <div className="mt-1">{proposal.blockNumber.toString()}</div>
+        </div>
         <div>
           <div className="text-xs text-slate-500 dark:text-slate-400">
             投票区间
