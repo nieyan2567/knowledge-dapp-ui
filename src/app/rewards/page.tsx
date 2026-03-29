@@ -19,7 +19,7 @@ import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt, asContentData } from "@/lib/web3-types";
 
 const rewardAccrueRequestedEvent = parseAbiItem(
-	"event RewardAccrueRequested(uint256 indexed contentId, address indexed author, uint256 amount)"
+	"event RewardAccrueRequested(uint256 indexed contentId, address indexed author, uint256 amount, uint256 voteCountAtAccrual)"
 );
 
 const rewardClaimedEvent = parseAbiItem(
