@@ -34,6 +34,10 @@ function tryParseAmount(value: string) {
 
 function formatTokenInput(amount: bigint) {
 	const formatted = formatEther(amount);
+	if (!formatted.includes(".")) {
+		return formatted;
+	}
+
 	return formatted.replace(/\.?0+$/, "") || "0";
 }
 
@@ -264,6 +268,7 @@ export default function StakePage() {
 	const requestWithdrawDisabled =
 		!address ||
 		withdrawAmountWei === null ||
+		hasPendingWithdraw ||
 		stakedValue <= 0n ||
 		withdrawAmountWei > stakedValue;
 	const withdrawDisabled =
@@ -413,6 +418,11 @@ export default function StakePage() {
 	async function handleRequestWithdraw() {
 		if (!address) {
 			toast.error("请先连接钱包");
+			return;
+		}
+
+		if (hasPendingWithdraw) {
+			toast.error("当前已有待提取余额，请等待冷却结束后再提取");
 			return;
 		}
 
@@ -630,51 +640,26 @@ export default function StakePage() {
 							placeholder="输入质押数量，例如 1"
 						/>
 
-						<div className="grid gap-2.5 md:grid-cols-2">
-							<div className="space-y-2">
-								<div className="text-xs font-medium text-slate-500 dark:text-slate-400">
-									按钱包余额填充
-								</div>
-								<div className="flex flex-wrap gap-2">
-									<QuickAmountButton
-										label="25%"
-										onClick={() => applyQuickAmount(walletBalanceValue, 1n, 4n, setDepositAmount)}
-										disabled={!address || walletBalanceValue <= 0n}
-									/>
-									<QuickAmountButton
-										label="50%"
-										onClick={() => applyQuickAmount(walletBalanceValue, 1n, 2n, setDepositAmount)}
-										disabled={!address || walletBalanceValue <= 0n}
-									/>
-									<QuickAmountButton
-										label="MAX"
-										onClick={() => applyQuickAmount(walletBalanceValue, 1n, 1n, setDepositAmount)}
-										disabled={!address || walletBalanceValue <= 0n}
-									/>
-								</div>
+						<div className="space-y-2">
+							<div className="text-xs font-medium text-slate-500 dark:text-slate-400">
+								按钱包余额填充
 							</div>
-
-							<div className="space-y-2">
-								<div className="text-xs font-medium text-slate-500 dark:text-slate-400">
-									按待激活质押填充
-								</div>
-								<div className="flex flex-wrap gap-2">
-									<QuickAmountButton
-										label="25%"
-										onClick={() => applyQuickAmount(pendingStakeValue, 1n, 4n, setDepositAmount)}
-										disabled={pendingStakeValue <= 0n}
-									/>
-									<QuickAmountButton
-										label="50%"
-										onClick={() => applyQuickAmount(pendingStakeValue, 1n, 2n, setDepositAmount)}
-										disabled={pendingStakeValue <= 0n}
-									/>
-									<QuickAmountButton
-										label="全部待激活"
-										onClick={() => applyQuickAmount(pendingStakeValue, 1n, 1n, setDepositAmount)}
-										disabled={pendingStakeValue <= 0n}
-									/>
-								</div>
+							<div className="flex flex-wrap gap-2">
+								<QuickAmountButton
+									label="25%"
+									onClick={() => applyQuickAmount(walletBalanceValue, 1n, 4n, setDepositAmount)}
+									disabled={!address || walletBalanceValue <= 0n}
+								/>
+								<QuickAmountButton
+									label="50%"
+									onClick={() => applyQuickAmount(walletBalanceValue, 1n, 2n, setDepositAmount)}
+									disabled={!address || walletBalanceValue <= 0n}
+								/>
+								<QuickAmountButton
+									label="MAX"
+									onClick={() => applyQuickAmount(walletBalanceValue, 1n, 1n, setDepositAmount)}
+									disabled={!address || walletBalanceValue <= 0n}
+								/>
 							</div>
 						</div>
 
