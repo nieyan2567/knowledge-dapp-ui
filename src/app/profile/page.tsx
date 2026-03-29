@@ -6,12 +6,15 @@ import { formatEther } from "viem";
 import {
   BookOpen,
   CheckCircle2,
+  Clock3,
   Coins,
-  Gavel,
   ExternalLink,
   FileText,
+  Gavel,
+  RefreshCw,
   UserRound,
   Vote,
+  Wallet,
 } from "lucide-react";
 import { useAccount, usePublicClient, useReadContract } from "wagmi";
 
@@ -35,6 +38,21 @@ import { asBigInt, asContentData } from "@/lib/web3-types";
 import type { ContentData } from "@/types/content";
 import type { ProposalItem } from "@/types/governance";
 
+type ContentFilter = "all" | "active" | "deleted";
+type ContentSort = "updated_desc" | "votes_desc" | "version_desc";
+
+const CONTENT_FILTER_OPTIONS: Array<{ value: ContentFilter; label: string }> = [
+  { value: "all", label: "全部" },
+  { value: "active", label: "正常内容" },
+  { value: "deleted", label: "已删除" },
+];
+
+const CONTENT_SORT_OPTIONS: Array<{ value: ContentSort; label: string }> = [
+  { value: "updated_desc", label: "最近更新" },
+  { value: "votes_desc", label: "票数优先" },
+  { value: "version_desc", label: "版本数优先" },
+];
+
 function formatDate(timestamp: bigint) {
   return new Date(Number(timestamp) * 1000).toLocaleString("zh-CN", {
     year: "numeric",
@@ -46,12 +64,6 @@ function formatDate(timestamp: bigint) {
   });
 }
 
-function sortByUpdatedTime(contents: ContentData[]) {
-  return [...contents].sort((left, right) =>
-    Number(right.lastUpdatedAt - left.lastUpdatedAt)
-  );
-}
-
 function shortenCid(cid: string) {
   if (cid.length <= 16) {
     return cid;
@@ -60,13 +72,29 @@ function shortenCid(cid: string) {
   return `${cid.slice(0, 8)}...${cid.slice(-8)}`;
 }
 
+function formatTokenValue(amount: bigint) {
+  return `${formatEther(amount)} ${BRANDING.nativeTokenSymbol}`;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return `${fallback}：${error.message}`;
+  }
+
+  return fallback;
+}
+
 export default function ProfilePage() {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const [loadingContents, setLoadingContents] = useState(false);
+  const [contentError, setContentError] = useState<string | null>(null);
   const [myContents, setMyContents] = useState<ContentData[]>([]);
   const [loadingProposals, setLoadingProposals] = useState(false);
+  const [proposalError, setProposalError] = useState<string | null>(null);
   const [myProposals, setMyProposals] = useState<ProposalItem[]>([]);
+  const [contentFilter, setContentFilter] = useState<ContentFilter>("all");
+  const [contentSort, setContentSort] = useState<ContentSort>("updated_desc");
 
   const { data: contentCount, refetch: refetchContentCount } = useReadContract({
     address: CONTRACTS.KnowledgeContent as `0x${string}`,
@@ -82,6 +110,30 @@ export default function ProfilePage() {
     query: { enabled: !!address },
   });
 
+  const { data: myStaked, refetch: refetchMyStaked } = useReadContract({
+    address: CONTRACTS.NativeVotes as `0x${string}`,
+    abi: ABIS.NativeVotes,
+    functionName: "staked",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const { data: myPendingStake, refetch: refetchMyPendingStake } = useReadContract({
+    address: CONTRACTS.NativeVotes as `0x${string}`,
+    abi: ABIS.NativeVotes,
+    functionName: "pendingStake",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const { data: myPendingWithdraw, refetch: refetchMyPendingWithdraw } = useReadContract({
+    address: CONTRACTS.NativeVotes as `0x${string}`,
+    abi: ABIS.NativeVotes,
+    functionName: "pendingWithdraw",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
   const { data: myPendingRewards, refetch: refetchMyPendingRewards } = useReadContract({
     address: CONTRACTS.TreasuryNative as `0x${string}`,
     abi: ABIS.TreasuryNative,
@@ -91,7 +143,11 @@ export default function ProfilePage() {
   });
 
   const myVotesValue = asBigInt(myVotes) ?? 0n;
+  const myStakedValue = asBigInt(myStaked) ?? 0n;
+  const myPendingStakeValue = asBigInt(myPendingStake) ?? 0n;
+  const myPendingWithdrawValue = asBigInt(myPendingWithdraw) ?? 0n;
   const myPendingRewardsValue = asBigInt(myPendingRewards) ?? 0n;
+
   const deletedContents = useMemo(
     () => myContents.filter((item) => item.deleted).length,
     [myContents]
@@ -102,20 +158,43 @@ export default function ProfilePage() {
     [myContents]
   );
 
+  const visibleContents = useMemo(() => {
+    const filtered = myContents.filter((item) => {
+      if (contentFilter === "active") return !item.deleted;
+      if (contentFilter === "deleted") return item.deleted;
+      return true;
+    });
+
+    return [...filtered].sort((left, right) => {
+      switch (contentSort) {
+        case "votes_desc":
+          return Number(right.voteCount - left.voteCount);
+        case "version_desc":
+          return Number(right.latestVersion - left.latestVersion);
+        case "updated_desc":
+        default:
+          return Number(right.lastUpdatedAt - left.lastUpdatedAt);
+      }
+    });
+  }, [contentFilter, contentSort, myContents]);
+
   const loadMyContents = useCallback(
     async (countOverride?: bigint) => {
       if (!publicClient || !address) {
         setMyContents([]);
+        setContentError(null);
         return;
       }
 
       const total = Number(countOverride ?? contentCount ?? 0n);
       if (total <= 0) {
         setMyContents([]);
+        setContentError(null);
         return;
       }
 
       setLoadingContents(true);
+      setContentError(null);
 
       try {
         const ids = Array.from({ length: total }, (_, index) => BigInt(index + 1));
@@ -137,7 +216,9 @@ export default function ProfilePage() {
               !!item && item.author.toLowerCase() === address.toLowerCase()
           );
 
-        setMyContents(sortByUpdatedTime(authoredContents));
+        setMyContents(authoredContents);
+      } catch (error) {
+        setContentError(getErrorMessage(error, "加载我的内容失败"));
       } finally {
         setLoadingContents(false);
       }
@@ -149,33 +230,47 @@ export default function ProfilePage() {
     if (!address) {
       setMyContents([]);
       setMyProposals([]);
+      setContentError(null);
+      setProposalError(null);
       return;
     }
 
-    const [countResult] = await Promise.all([
-      refetchContentCount(),
-      refetchMyVotes(),
-      refetchMyPendingRewards(),
-    ]);
+    try {
+      const [countResult] = await Promise.all([
+        refetchContentCount(),
+        refetchMyVotes(),
+        refetchMyStaked(),
+        refetchMyPendingStake(),
+        refetchMyPendingWithdraw(),
+        refetchMyPendingRewards(),
+      ]);
 
-    await loadMyContents(
-      typeof countResult.data === "bigint" ? countResult.data : undefined
-    );
+      await loadMyContents(
+        typeof countResult.data === "bigint" ? countResult.data : undefined
+      );
+    } catch (error) {
+      setContentError(getErrorMessage(error, "刷新个人内容失败"));
+    }
   }, [
     address,
     loadMyContents,
     refetchContentCount,
     refetchMyPendingRewards,
+    refetchMyPendingStake,
+    refetchMyPendingWithdraw,
+    refetchMyStaked,
     refetchMyVotes,
   ]);
 
   const loadMyProposals = useCallback(async () => {
     if (!publicClient || !address) {
       setMyProposals([]);
+      setProposalError(null);
       return;
     }
 
     setLoadingProposals(true);
+    setProposalError(null);
 
     try {
       const latestBlock = await publicClient.getBlockNumber();
@@ -198,6 +293,8 @@ export default function ProfilePage() {
         .sort((left, right) => Number(right.blockNumber - left.blockNumber));
 
       setMyProposals(proposals);
+    } catch (error) {
+      setProposalError(getErrorMessage(error, "加载我发起的提案失败"));
     } finally {
       setLoadingProposals(false);
     }
@@ -222,24 +319,25 @@ export default function ProfilePage() {
   return (
     <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
       <PageHeader
-        eyebrow="Wallet · Content · Rewards"
+        eyebrow="Wallet · Content · Governance"
         title="Profile"
-        description="查看当前钱包地址下的内容、投票权和待领奖励，个人内容会按最近更新时间排序展示。"
+        description="查看当前钱包的内容记录、治理参与、质押状态与待领奖励。"
         right={
-          <Link
-            href="/content"
+          <button
+            type="button"
+            onClick={() => void refreshProfilePage()}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
-            <FileText className="h-4 w-4" />
-            前往内容中心
-          </Link>
+            <RefreshCw className="h-4 w-4" />
+            刷新数据
+          </button>
         }
       />
 
       {!isConnected || !address ? (
         <SectionCard
           title="连接钱包后查看个人中心"
-          description="当前页面需要读取链上账户数据。连接钱包后会显示你的地址、内容列表和奖励信息。"
+          description="个人中心需要读取当前钱包的链上状态。连接后会显示你的内容、提案、质押与奖励信息。"
         >
           <div className="flex items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-300">
             <UserRound className="h-5 w-5 shrink-0" />
@@ -248,51 +346,118 @@ export default function ProfilePage() {
         </SectionCard>
       ) : (
         <>
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <ProfileStatCard
-              icon={<UserRound className="h-5 w-5" />}
-              label="当前地址"
-              value={<AddressBadge address={address} />}
-              description="已连接的钱包地址。"
-            />
-            <ProfileStatCard
-              icon={<Vote className="h-5 w-5" />}
-              label="投票权"
-              value={`${formatEther(myVotesValue)} ${BRANDING.nativeTokenSymbol}`}
-              description="当前账户可用于治理投票的票权。"
-            />
-            <ProfileStatCard
-              icon={<Coins className="h-5 w-5" />}
-              label="待领奖励"
-              value={`${formatEther(myPendingRewardsValue)} ${BRANDING.nativeTokenSymbol}`}
-              description="当前可从 Treasury 领取的奖励。"
-            />
-            <ProfileStatCard
-              icon={<BookOpen className="h-5 w-5" />}
-              label="我的内容"
-              value={String(myContents.length)}
-              description={`其中已删除 ${deletedContents} 条，仍会保留历史版本。`}
-            />
-          </section>
+          <SectionCard
+            title="账户摘要"
+            description="快速查看当前钱包在内容、质押、治理和奖励中的整体状态。"
+            className="p-5"
+          >
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <SummaryMetricCard
+                icon={<UserRound className="h-4 w-4" />}
+                label="当前地址"
+                value={<AddressBadge address={address} />}
+                description="当前连接的钱包地址"
+              />
+              <SummaryMetricCard
+                icon={<Vote className="h-4 w-4" />}
+                label="投票权"
+                value={formatTokenValue(myVotesValue)}
+                description="当前可用于治理投票的权重"
+              />
+              <SummaryMetricCard
+                icon={<Coins className="h-4 w-4" />}
+                label="已激活质押"
+                value={formatTokenValue(myStakedValue)}
+                description="已经生效并参与投票权计算"
+              />
+              <SummaryMetricCard
+                icon={<Clock3 className="h-4 w-4" />}
+                label="待激活质押"
+                value={formatTokenValue(myPendingStakeValue)}
+                description="已存入但尚未激活的质押"
+              />
+              <SummaryMetricCard
+                icon={<Wallet className="h-4 w-4" />}
+                label="待提取金额"
+                value={formatTokenValue(myPendingWithdrawValue)}
+                description="退出申请后等待提取的金额"
+              />
+              <SummaryMetricCard
+                icon={<Coins className="h-4 w-4" />}
+                label="待领奖励"
+                value={formatTokenValue(myPendingRewardsValue)}
+                description="当前可从 Treasury 领取的奖励"
+              />
+              <SummaryMetricCard
+                icon={<BookOpen className="h-4 w-4" />}
+                label="我的内容"
+                value={String(myContents.length)}
+                description={`正常 ${activeContents} 条，已删除 ${deletedContents} 条`}
+              />
+              <SummaryMetricCard
+                icon={<Gavel className="h-4 w-4" />}
+                label="我发起的提案"
+                value={String(myProposals.length)}
+                description="按创建区块倒序统计"
+              />
+            </div>
+          </SectionCard>
 
           <div className="grid gap-6 xl:grid-cols-2">
             <SectionCard
               title="我的内容"
+              description={`共 ${myContents.length} 条内容，可按状态筛选并切换排序方式。`}
               className="h-168"
               bodyClassName="flex min-h-0 flex-col"
-              description={`共 ${myContents.length} 条内容，其中正常内容 ${activeContents} 条。`}
             >
-              {loadingContents ? (
-                <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
-                  正在加载你的内容...
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-2">
+                  {CONTENT_FILTER_OPTIONS.map((option) => (
+                    <FilterButton
+                      key={option.value}
+                      active={contentFilter === option.value}
+                      onClick={() => setContentFilter(option.value)}
+                    >
+                      {option.label}
+                    </FilterButton>
+                  ))}
                 </div>
-              ) : myContents.length === 0 ? (
-                <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
-                  你还没有发布内容。
-                </div>
+
+                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                  <span className="shrink-0">排序</span>
+                  <select
+                    value={contentSort}
+                    onChange={(event) => setContentSort(event.target.value as ContentSort)}
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-400"
+                  >
+                    {CONTENT_SORT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              {contentError ? (
+                <InlineErrorState
+                  message={contentError}
+                  retryLabel="重新加载内容"
+                  onRetry={() => void refreshProfile()}
+                />
+              ) : null}
+
+              {loadingContents && myContents.length === 0 ? (
+                <CenteredState>正在加载你的内容...</CenteredState>
+              ) : visibleContents.length === 0 ? (
+                <CenteredState>
+                  {myContents.length === 0
+                    ? "你还没有发布过内容。"
+                    : "当前筛选条件下没有匹配的内容。"}
+                </CenteredState>
               ) : (
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-                  {myContents.map((item) => (
+                  {visibleContents.map((item) => (
                     <article
                       key={item.id.toString()}
                       className="rounded-3xl border border-slate-200 bg-slate-50 p-5 transition hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-slate-800/40 dark:hover:border-slate-700 dark:hover:bg-slate-900"
@@ -375,18 +540,36 @@ export default function ProfilePage() {
 
             <SectionCard
               title="我发起的提案"
+              description={`共 ${myProposals.length} 个提案，支持固定高度滚动查看。`}
               className="h-168"
               bodyClassName="flex min-h-0 flex-col"
-              description={`共 ${myProposals.length} 个提案，按创建区块倒序展示。`}
             >
-              {loadingProposals ? (
-                <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
-                  正在加载你的提案...
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="text-sm text-slate-500 dark:text-slate-400">
+                  最近创建的提案会优先显示在上方。
                 </div>
+                <button
+                  type="button"
+                  onClick={() => void loadMyProposals()}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  重新加载
+                </button>
+              </div>
+
+              {proposalError ? (
+                <InlineErrorState
+                  message={proposalError}
+                  retryLabel="重新加载提案"
+                  onRetry={() => void loadMyProposals()}
+                />
+              ) : null}
+
+              {loadingProposals && myProposals.length === 0 ? (
+                <CenteredState>正在加载你的提案...</CenteredState>
               ) : myProposals.length === 0 ? (
-                <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
-                  你还没有发起提案。
-                </div>
+                <CenteredState>你还没有发起过提案。</CenteredState>
               ) : (
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
                   {myProposals.map((proposal) => (
@@ -505,7 +688,7 @@ function ProfileProposalCard({ proposal }: { proposal: ProposalItem }) {
   );
 }
 
-function ProfileStatCard({
+function SummaryMetricCard({
   icon,
   label,
   value,
@@ -517,17 +700,73 @@ function ProfileStatCard({
   description: string;
 }) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-slate-500 dark:text-slate-400">{label}</div>
         <div className="text-slate-400 dark:text-slate-500">{icon}</div>
       </div>
-      <div className="mt-4 text-lg font-semibold text-slate-950 dark:text-slate-100">
+      <div className="mt-3 text-lg font-semibold text-slate-950 dark:text-slate-100">
         {value}
       </div>
-      <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+      <div className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
         {description}
       </div>
+    </div>
+  );
+}
+
+function FilterButton({
+  active,
+  onClick,
+  children,
+}: {
+  active?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+        active
+          ? "border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-950"
+          : "border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function InlineErrorState({
+  message,
+  retryLabel,
+  onRetry,
+}: {
+  message: string;
+  retryLabel: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
+      <span>{message}</span>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex items-center gap-2 rounded-xl border border-rose-300 px-3 py-2 font-medium transition hover:bg-rose-100 dark:border-rose-800 dark:hover:bg-rose-900/30"
+      >
+        <RefreshCw className="h-4 w-4" />
+        {retryLabel}
+      </button>
+    </div>
+  );
+}
+
+function CenteredState({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
+      {children}
     </div>
   );
 }
