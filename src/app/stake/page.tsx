@@ -66,6 +66,29 @@ function getScaledAmount(base: bigint, numerator: bigint, denominator: bigint) {
 	return scaled > 0n ? scaled : 0n;
 }
 
+const stakeFlowSteps = [
+	{
+		id: 1,
+		title: "Deposit",
+		description: "先存入原生币，形成待激活质押。",
+	},
+	{
+		id: 2,
+		title: "Activate",
+		description: "等待激活区块达到后启用投票权。",
+	},
+	{
+		id: 3,
+		title: "Request Withdraw",
+		description: "申请退出后，质押会进入冷却阶段。",
+	},
+	{
+		id: 4,
+		title: "Withdraw",
+		description: "冷却结束后提取原生币回到钱包。",
+	},
+] as const;
+
 export default function StakePage() {
 	const { address } = useAccount();
 	const publicClient = usePublicClient();
@@ -265,6 +288,28 @@ export default function StakePage() {
 			: withdrawRemainingSeconds > 0n
 				? `还需等待 ${formatDuration(withdrawRemainingSeconds)}，预计 ${formatTimestamp(withdrawAfterTimeValue)} 后可提取。`
 				: "当前待提取余额已满足条件，可以立即提取。";
+	const activeFlowStep = hasPendingWithdraw
+		? withdrawRemainingSeconds > 0n
+			? 3
+			: 4
+		: hasPendingStake
+			? 2
+			: stakedValue > 0n
+				? 3
+				: 1;
+	const currentStakeStageText = !address
+		? "当前未连接钱包"
+		: hasPendingWithdraw
+			? withdrawRemainingSeconds > 0n
+				? `当前处于退出冷却阶段，还需等待 ${formatDuration(withdrawRemainingSeconds)}`
+				: "当前已满足提现条件，可执行 Withdraw"
+			: hasPendingStake
+				? activateRemainingBlocks > 0n
+					? `当前等待 Activate，还需 ${activateRemainingBlocks.toString()} 个区块`
+					: "当前待激活质押已就绪，可执行 Activate"
+				: stakedValue > 0n
+					? "当前已持有生效投票权，可申请退出"
+					: "当前尚未开始质押，可先执行 Deposit";
 
 	const refreshStakeData = useCallback(async () => {
 		await Promise.all([
@@ -447,66 +492,69 @@ export default function StakePage() {
 	}
 
 	return (
-		<main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
+		<main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
 			<PageHeader
 				eyebrow="Staking · Voting Power"
 				title="Stake & Voting Power"
 				description="先质押原生币并激活投票权，再参与内容投票和 DAO 治理；退出质押需要先申请，再等待冷却期结束。"
 			/>
 
-			<section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-				<div className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">
-					操作流程
+			<section className="rounded-3xl border border-amber-200/70 bg-linear-to-r from-amber-50 via-white to-sky-50 p-3.5 shadow-sm dark:border-amber-900/40 dark:from-amber-950/20 dark:via-slate-900 dark:to-sky-950/10">
+				<div className="flex flex-col gap-2.5 md:flex-row md:items-start md:justify-between">
+					<div>
+						<div className="text-lg font-semibold text-slate-950 dark:text-slate-100">
+							Stake 操作路径
+						</div>
+					</div>
+					<div className="inline-flex w-fit items-center gap-2 rounded-full border border-amber-200 bg-white/85 px-3 py-1 text-xs font-medium text-amber-800 shadow-sm dark:border-amber-800/60 dark:bg-slate-900/75 dark:text-amber-300">
+						<span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-semibold text-white">
+							{activeFlowStep}
+						</span>
+						<span>当前步骤</span>
+						<span className="hidden h-1 w-1 rounded-full bg-amber-400 md:block dark:bg-amber-500" />
+						<span className="hidden md:block">{currentStakeStageText}</span>
+					</div>
 				</div>
-				<div className="grid gap-3 md:grid-cols-4">
-					<div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-800/50">
-						<div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-							Step 1
-						</div>
-						<div className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
-							Deposit
-						</div>
-						<div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-							先存入原生币，形成待激活质押。
-						</div>
-					</div>
-					<div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-800/50">
-						<div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-							Step 2
-						</div>
-						<div className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
-							Activate
-						</div>
-						<div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-							等待激活区块达到后启用投票权。
-						</div>
-					</div>
-					<div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-800/50">
-						<div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-							Step 3
-						</div>
-						<div className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
-							Request Withdraw
-						</div>
-						<div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-							申请退出后，质押会进入冷却阶段。
-						</div>
-					</div>
-					<div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-800/50">
-						<div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-							Step 4
-						</div>
-						<div className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
-							Withdraw
-						</div>
-						<div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-							冷却结束后提取原生币回到钱包。
-						</div>
-					</div>
+				<div className="mt-2.5 grid gap-2 md:grid-cols-4">
+					{stakeFlowSteps.map((step) => {
+						const isActive = step.id === activeFlowStep;
+						return (
+							<div
+								key={step.id}
+								className={`rounded-2xl border px-3.5 py-3 transition ${
+									isActive
+										? "border-amber-300 bg-white shadow-sm dark:border-amber-700 dark:bg-slate-900"
+										: "border-white/70 bg-white/60 dark:border-slate-800 dark:bg-slate-900/60"
+								}`}
+							>
+								<div className="flex items-center gap-2">
+									<div className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-slate-950 text-xs font-semibold text-white dark:bg-white dark:text-slate-950">
+										{step.id}
+									</div>
+									<div className="min-w-0">
+										<div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+											Step {step.id}
+										</div>
+										<div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
+											{step.title}
+										</div>
+									</div>
+								</div>
+								<div className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
+									{step.description}
+								</div>
+								{isActive ? (
+									<div className="mt-2 inline-flex rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+										当前阶段
+									</div>
+								) : null}
+							</div>
+						);
+					})}
 				</div>
 			</section>
 
-			<section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+			<section className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
 				<div className="flex h-28 flex-col rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
 					<div className="mb-2.5 flex items-center justify-between">
 						<div className="text-xs text-slate-500 dark:text-slate-400">投票权</div>
@@ -568,12 +616,13 @@ export default function StakePage() {
 				</div>
 			</section>
 
-			<div className="grid gap-6 lg:grid-cols-2">
+			<div className="grid gap-4 lg:grid-cols-2">
 				<SectionCard
 					title="质押与激活"
 					description="先发起 Deposit 锁定原生币；等激活区块数达到后，再执行 Activate 获得投票权。"
+					className="p-5"
 				>
-					<div className="space-y-4">
+					<div className="space-y-3">
 						<input
 							className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
 							value={depositAmount}
@@ -581,7 +630,7 @@ export default function StakePage() {
 							placeholder="输入质押数量，例如 1"
 						/>
 
-						<div className="grid gap-3 md:grid-cols-2">
+						<div className="grid gap-2.5 md:grid-cols-2">
 							<div className="space-y-2">
 								<div className="text-xs font-medium text-slate-500 dark:text-slate-400">
 									按钱包余额填充
@@ -659,8 +708,9 @@ export default function StakePage() {
 				<SectionCard
 					title="退出与提现"
 					description="先申请退出，系统会立即减少投票权；等冷却期结束后，再执行 Withdraw 提取原生币。"
+					className="p-5"
 				>
-					<div className="space-y-4">
+					<div className="space-y-3">
 						<input
 							className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
 							value={withdrawAmount}
@@ -668,7 +718,7 @@ export default function StakePage() {
 							placeholder="输入退出或提取数量，例如 1"
 						/>
 
-						<div className="grid gap-3 md:grid-cols-2">
+						<div className="grid gap-2.5 md:grid-cols-2">
 							<div className="space-y-2">
 								<div className="text-xs font-medium text-slate-500 dark:text-slate-400">
 									按已质押余额填充

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import {
   ArrowDown,
+  ArrowRight,
   ArrowUp,
   Clock3,
   ExternalLink,
@@ -72,22 +73,22 @@ const CATEGORY_LABELS: Record<GovernanceTemplateCategory, string> = {
 
 const GOVERNANCE_FLOW_STEPS = [
   {
-    step: "01",
+    step: 1,
     title: "配置提案动作",
     description: "从治理模板中组合链上动作，明确要修改的规则与参数。",
   },
   {
-    step: "02",
+    step: 2,
     title: "提交并进入投票",
     description: "提案达到门槛后发起，经过 voting delay 后进入投票阶段。",
   },
   {
-    step: "03",
+    step: 3,
     title: "通过后排队",
     description: "成功提案会进入 Timelock 队列，等待最小延迟结束。",
   },
   {
-    step: "04",
+    step: 4,
     title: "执行生效",
     description: "队列完成后执行提案，治理参数和系统配置正式更新。",
   },
@@ -142,14 +143,12 @@ function getCategoryOrder(category: GovernanceTemplateCategory) {
   switch (category) {
     case "content":
       return 0;
-    case "stake":
-      return 1;
     case "treasury":
-      return 2;
+      return 1;
     case "governor":
-      return 3;
+      return 2;
     case "timelock":
-      return 4;
+      return 3;
     default:
       return 999;
   }
@@ -173,6 +172,7 @@ export default function GovernancePage() {
   const [liveBlockNumber, setLiveBlockNumber] = useState<bigint | undefined>(
     typeof blockNumber === "bigint" ? blockNumber : undefined
   );
+  const latestProposal = proposals[0];
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -257,6 +257,22 @@ export default function GovernancePage() {
     functionName: "votingPeriod",
   });
 
+  const { data: latestProposalState, refetch: refetchLatestProposalState } = useReadContract({
+    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
+    abi: ABIS.KnowledgeGovernor,
+    functionName: "state",
+    args: latestProposal ? [latestProposal.proposalId] : undefined,
+    query: { enabled: !!latestProposal },
+  });
+
+  const { data: latestProposalEta, refetch: refetchLatestProposalEta } = useReadContract({
+    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
+    abi: ABIS.KnowledgeGovernor,
+    functionName: "proposalEta",
+    args: latestProposal ? [latestProposal.proposalId] : undefined,
+    query: { enabled: !!latestProposal },
+  });
+
   const draftStates = useMemo<DraftActionState[]>(() => {
     return draftActions.map((action) => {
       const template = getGovernanceTemplateById(action.templateId);
@@ -302,11 +318,102 @@ export default function GovernancePage() {
   ).length;
   const hasHighRiskAction = highRiskActionCount > 0;
   const trimmedDescription = description.trim();
+  const latestProposalStateValue = asBigInt(latestProposalState);
+  const latestProposalEtaValue = asBigInt(latestProposalEta);
+  const activeGovernanceStep = useMemo(() => {
+    if (!latestProposal) {
+      return 1;
+    }
+
+    switch (Number(latestProposalStateValue ?? -1)) {
+      case 0:
+      case 1:
+        return 2;
+      case 4:
+        return 3;
+      case 5:
+        return latestProposalEtaValue !== undefined &&
+          latestProposalEtaValue > 0n &&
+          BigInt(nowTs) >= latestProposalEtaValue
+          ? 4
+          : 3;
+      case 7:
+        return 4;
+      case 2:
+      case 3:
+      case 6:
+        return 2;
+      default:
+        return liveBlockNumber === undefined
+          ? 2
+          : latestProposal.voteEnd >= liveBlockNumber
+            ? 2
+            : 3;
+    }
+  }, [
+    latestProposal,
+    latestProposalEtaValue,
+    latestProposalStateValue,
+    liveBlockNumber,
+    nowTs,
+  ]);
+  const currentGovernanceStageText = useMemo(() => {
+    if (!latestProposal) {
+      return draftActions.length > 0 || trimmedDescription.length > 0
+        ? "当前处于提案配置阶段"
+        : "当前暂无提案，可先配置治理动作";
+    }
+
+    switch (Number(latestProposalStateValue ?? -1)) {
+      case 0:
+        return "当前提案已提交，等待投票开始";
+      case 1:
+        return "当前提案处于投票阶段";
+      case 4:
+        return "当前提案已通过，等待加入队列";
+      case 5:
+        return latestProposalEtaValue !== undefined &&
+          latestProposalEtaValue > 0n &&
+          BigInt(nowTs) >= latestProposalEtaValue
+          ? "当前提案已到执行时间"
+          : "当前提案已排队，等待执行时间";
+      case 7:
+        return "当前提案已执行完成";
+      case 2:
+        return "当前最新提案已取消";
+      case 3:
+        return "当前最新提案未通过";
+      case 6:
+        return "当前最新提案已过期";
+      default:
+        return "当前正在同步最新提案状态";
+    }
+  }, [
+    draftActions.length,
+    latestProposal,
+    latestProposalEtaValue,
+    latestProposalStateValue,
+    nowTs,
+    trimmedDescription.length,
+  ]);
   const canSubmitProposal =
     trimmedDescription.length > 0 &&
     draftActions.length > 0 &&
     allActionsValid &&
     (!hasHighRiskAction || highRiskConfirmed);
+
+  useEffect(() => {
+    if (!latestProposal || liveBlockNumber === undefined) {
+      return;
+    }
+
+    void Promise.all([refetchLatestProposalState(), refetchLatestProposalEta()]);
+  }, [
+    latestProposal,
+    liveBlockNumber,
+    refetchLatestProposalEta,
+    refetchLatestProposalState,
+  ]);
 
   useEffect(() => {
     if (!hasHighRiskAction && highRiskConfirmed) {
@@ -508,21 +615,65 @@ export default function GovernancePage() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_320px] xl:items-start">
         <div className="space-y-6">
-          <SectionCard
-            title="操作流程"
-            description="先配置治理动作，再发起提案并投票，成功后经 Timelock 排队，最终执行生效。"
-          >
-            <div className="grid gap-4 lg:grid-cols-4">
-              {GOVERNANCE_FLOW_STEPS.map((item) => (
-                <GovernanceFlowStep
-                  key={item.step}
-                  step={item.step}
-                  title={item.title}
-                  description={item.description}
-                />
-              ))}
+          <section className="rounded-3xl border border-amber-200/70 bg-linear-to-r from-amber-50 via-white to-sky-50 p-3.5 shadow-sm dark:border-amber-900/40 dark:from-amber-950/20 dark:via-slate-900 dark:to-sky-950/10">
+            <div className="flex flex-col gap-2.5 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="text-lg font-semibold text-slate-950 dark:text-slate-100">
+                  Governance 操作路径
+                </div>
+              </div>
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-amber-200 bg-white/85 px-3 py-1 text-xs font-medium text-amber-800 shadow-sm dark:border-amber-800/60 dark:bg-slate-900/75 dark:text-amber-300">
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-semibold text-white">
+                  {activeGovernanceStep}
+                </span>
+                <span>当前步骤</span>
+                <span className="hidden h-1 w-1 rounded-full bg-amber-400 md:block dark:bg-amber-500" />
+                <span className="hidden md:block">{currentGovernanceStageText}</span>
+              </div>
             </div>
-          </SectionCard>
+            <div className="mt-2.5 grid gap-2 md:grid-cols-4">
+              {GOVERNANCE_FLOW_STEPS.map((step, index) => {
+                const isActive = step.step === activeGovernanceStep;
+                return (
+                  <div
+                    key={step.step}
+                    className={`rounded-2xl border px-3.5 py-3 transition ${
+                      isActive
+                        ? "border-amber-300 bg-white shadow-sm dark:border-amber-700 dark:bg-slate-900"
+                        : "border-white/70 bg-white/60 dark:border-slate-800 dark:bg-slate-900/60"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-slate-950 text-xs font-semibold text-white dark:bg-white dark:text-slate-950">
+                          {step.step}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                            Step {step.step}
+                          </div>
+                          <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
+                            {step.title}
+                          </div>
+                        </div>
+                      </div>
+                      {index < GOVERNANCE_FLOW_STEPS.length - 1 ? (
+                        <ArrowRight className="hidden h-4 w-4 shrink-0 text-slate-300 md:block dark:text-slate-700" />
+                      ) : null}
+                    </div>
+                    <div className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                      {step.description}
+                    </div>
+                    {isActive ? (
+                      <div className="mt-2 inline-flex rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                        当前阶段
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
 
           <SectionCard
             title="提案列表"
@@ -734,35 +885,6 @@ export default function GovernancePage() {
         </div>
       </div>
     </main>
-  );
-}
-
-function GovernanceFlowStep({
-  step,
-  title,
-  description,
-}: {
-  step: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-linear-to-br from-white to-slate-50 p-5 shadow-sm dark:border-slate-800 dark:from-slate-900 dark:to-slate-950">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white dark:bg-white dark:text-slate-950">
-          {step}
-        </span>
-        <span className="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
-          Flow
-        </span>
-      </div>
-      <div className="text-base font-semibold text-slate-950 dark:text-slate-100">
-        {title}
-      </div>
-      <div className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-        {description}
-      </div>
-    </div>
   );
 }
 
@@ -1350,3 +1472,4 @@ function VoteStat({
     </div>
   );
 }
+
