@@ -271,6 +271,11 @@ export default function StakePage() {
 		hasPendingWithdraw ||
 		stakedValue <= 0n ||
 		withdrawAmountWei > stakedValue;
+	const cancelPendingDisabled =
+		!address ||
+		depositAmountWei === null ||
+		!hasPendingStake ||
+		depositAmountWei > pendingStakeValue;
 	const withdrawDisabled =
 		!address ||
 		withdrawAmountWei === null ||
@@ -283,8 +288,8 @@ export default function StakePage() {
 		: !hasPendingStake
 			? "暂无待激活质押，先存入后再激活。"
 			: activateRemainingBlocks > 0n
-				? `还需等待 ${activateRemainingBlocks.toString()} 个区块，预计在区块 #${activateAfterBlockValue.toString()} 后可激活。`
-				: "当前待激活质押已满足条件，可以立即激活。";
+				? `还需等待 ${activateRemainingBlocks.toString()} 个区块，预计在区块 #${activateAfterBlockValue.toString()} 后可激活；如需退出，也可直接撤回待激活质押。`
+				: "当前待激活质押已满足条件，可以立即激活，也可以直接撤回。";
 
 	const withdrawHelperText = !address
 		? "连接钱包后可查看提现冷却状态。"
@@ -310,8 +315,8 @@ export default function StakePage() {
 				: "当前已满足提现条件，可执行 Withdraw"
 			: hasPendingStake
 				? activateRemainingBlocks > 0n
-					? `当前等待 Activate，还需 ${activateRemainingBlocks.toString()} 个区块`
-					: "当前待激活质押已就绪，可执行 Activate"
+					? `当前存在待激活质押，还需 ${activateRemainingBlocks.toString()} 个区块后可 Activate`
+					: "当前待激活质押已就绪，可执行 Activate 或直接撤回"
 				: stakedValue > 0n
 					? "当前已持有生效投票权，可申请退出"
 					: "当前尚未开始质押，可先执行 Deposit";
@@ -409,6 +414,44 @@ export default function StakePage() {
 			loading: "正在提交激活交易...",
 			success: "激活交易已提交",
 			fail: "激活失败",
+		});
+
+		if (!hash) return;
+		await refreshAfterTx(hash, refreshStakeData, ["stake", "dashboard"]);
+	}
+
+	async function handleCancelPendingStake() {
+		if (!address) {
+			toast.error("请先连接钱包");
+			return;
+		}
+
+		const amount = parseAmount(depositAmount, "撤回数量");
+		if (amount === null) return;
+
+		if (!hasPendingStake) {
+			toast.error("当前没有可撤回的待激活质押");
+			return;
+		}
+
+		if (amount > pendingStakeValue) {
+			toast.error("撤回数量不能超过待激活质押");
+			return;
+		}
+
+		const hash = await writeTxToast({
+			publicClient,
+			writeContractAsync,
+			request: {
+				address: CONTRACTS.NativeVotes as `0x${string}`,
+				abi: ABIS.NativeVotes,
+				functionName: "cancelPendingStake",
+				args: [amount],
+				account: address,
+			},
+			loading: "正在提交待激活质押撤回交易...",
+			success: "待激活质押撤回交易已提交",
+			fail: "撤回待激活质押失败",
 		});
 
 		if (!hash) return;
@@ -628,8 +671,8 @@ export default function StakePage() {
 
 			<div className="grid gap-4 lg:grid-cols-2">
 				<SectionCard
-					title="质押与激活"
-					description="先发起 Deposit 锁定原生币；等激活区块数达到后，再执行 Activate 获得投票权。"
+					title="质押、激活与撤回待激活"
+					description="先发起 Deposit 锁定原生币；等激活区块数达到后执行 Activate 获得投票权。若尚未激活，也可以直接撤回。"
 					className="p-5"
 				>
 					<div className="space-y-3">
@@ -637,7 +680,7 @@ export default function StakePage() {
 							className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
 							value={depositAmount}
 							onChange={(event) => setDepositAmount(event.target.value)}
-							placeholder="输入质押数量，例如 1"
+							placeholder="输入质押或撤回待激活数量，例如 1"
 						/>
 
 						<div className="space-y-2">
@@ -665,6 +708,7 @@ export default function StakePage() {
 
 						<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
 							<div>钱包可用余额：{formatEther(walletBalanceValue)} {BRANDING.nativeTokenSymbol}</div>
+							<div>当前待激活质押：{formatEther(pendingStakeValue)} {BRANDING.nativeTokenSymbol}</div>
 							<div>默认激活等待：{activationBlocksValue.toString()} 个区块</div>
 							<div>{activateHelperText}</div>
 						</div>
@@ -685,6 +729,14 @@ export default function StakePage() {
 								className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
 							>
 								激活
+							</button>
+							<button
+								data-testid="stake-cancel-pending-button"
+								onClick={handleCancelPendingStake}
+								disabled={cancelPendingDisabled}
+								className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+							>
+								撤回待激活
 							</button>
 						</div>
 					</div>
