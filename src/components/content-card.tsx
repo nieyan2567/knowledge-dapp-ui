@@ -127,7 +127,12 @@ export function ContentCard({
         <div title={content.author}>作者: {shortenAddress(content.author)}</div>
         <div>票数: {content.voteCount.toString()}</div>
         <div>发布时间: {new Date(Number(content.timestamp) * 1000).toLocaleString()}</div>
-        <div>奖励状态: {content.rewardAccrued ? "已记过账" : "未记账"}</div>
+        <div>
+          奖励状态:{" "}
+          {content.rewardAccrualCount > 0n
+            ? `第 ${content.rewardAccrualCount.toString()} 次记账`
+            : "未记账"}
+        </div>
         <div>内容状态: {content.deleted ? "已删除" : "正常"}</div>
 
         <div

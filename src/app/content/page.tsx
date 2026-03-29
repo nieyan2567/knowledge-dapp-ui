@@ -36,10 +36,24 @@ type ContentSortKey =
   | "votes_desc"
   | "versions_desc";
 
-function parseContentResults(results: readonly unknown[]): ContentCardData[] {
+function parseContentResults(
+  results: readonly unknown[],
+  rewardAccrualCounts: readonly bigint[]
+): ContentCardData[] {
   return results
-    .map((item) => asContentData(item))
-    .filter((item): item is ContentCardData => !!item && !item.deleted)
+    .map((item, index) => {
+      const content = asContentData(item);
+
+      if (!content || content.deleted) {
+        return null;
+      }
+
+      return {
+        ...content,
+        rewardAccrualCount: rewardAccrualCounts[index] ?? 0n,
+      };
+    })
+    .filter((item): item is ContentCardData => !!item)
     .reverse();
 }
 
@@ -97,7 +111,7 @@ export default function ContentPage() {
       }
 
       const ids = Array.from({ length: total }, (_, index) => BigInt(index + 1));
-      const results: unknown[] = [];
+      const parsedContents: ContentCardData[] = [];
 
       for (let start = 0; start < ids.length; start += CONTENT_FETCH_CHUNK_SIZE) {
         const chunk = ids.slice(start, start + CONTENT_FETCH_CHUNK_SIZE);
@@ -111,11 +125,22 @@ export default function ContentPage() {
             })
           )
         );
+        const rewardAccrualCounts = (await Promise.all(
+          chunk.map((id) =>
+            publicClient.readContract({
+              address: CONTRACTS.KnowledgeContent as `0x${string}`,
+              abi: ABIS.KnowledgeContent,
+              functionName: "rewardAccrualCount",
+              args: [id],
+            })
+          )
+        )) as bigint[];
 
-        results.push(...chunkResults);
+        const parsedChunk = parseContentResults(chunkResults, rewardAccrualCounts);
+        parsedContents.push(...parsedChunk);
       }
 
-      return parseContentResults(results);
+      return parsedContents;
     },
     [publicClient]
   );

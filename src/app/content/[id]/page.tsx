@@ -143,6 +143,16 @@ export default function ContentDetailPage() {
     },
   });
 
+  const { data: rewardAccrualCountData } = useReadContract({
+    address: CONTRACTS.KnowledgeContent as `0x${string}`,
+    abi: ABIS.KnowledgeContent,
+    functionName: "rewardAccrualCount",
+    args: contentId ? [contentId] : undefined,
+    query: {
+      enabled: !!contentId,
+    },
+  });
+
   const { data: maxVersionsPerContentData } = useReadContract({
     address: CONTRACTS.KnowledgeContent as `0x${string}`,
     abi: ABIS.KnowledgeContent,
@@ -151,6 +161,8 @@ export default function ContentDetailPage() {
 
   const content = asContentData(contentData);
   const versionCount = typeof versionCountData === "bigint" ? versionCountData : 0n;
+  const rewardAccrualCount =
+    typeof rewardAccrualCountData === "bigint" ? rewardAccrualCountData : 0n;
   const maxVersionsPerContent =
     typeof maxVersionsPerContentData === "bigint" ? maxVersionsPerContentData : undefined;
 
@@ -771,7 +783,9 @@ export default function ContentDetailPage() {
               <InfoCard label="奖励状态">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                  {contentRecord.rewardAccrued ? "已记过账" : "未记账"}
+                  {rewardAccrualCount > 0n
+                    ? `第 ${rewardAccrualCount.toString()} 次记账`
+                    : "未记账"}
                 </div>
               </InfoCard>
             </div>

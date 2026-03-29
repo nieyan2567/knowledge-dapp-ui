@@ -22,4 +22,6 @@ export interface ContentVersionData {
   timestamp: bigint
 }
 
-export type ContentCardData = ContentData
+export type ContentCardData = ContentData & {
+  rewardAccrualCount: bigint
+}
