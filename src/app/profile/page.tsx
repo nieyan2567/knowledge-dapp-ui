@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { useAccount, usePublicClient, useReadContract } from "wagmi";
 
-import { AddressBadge } from "@/components/address-badge";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
@@ -70,6 +69,12 @@ function shortenCid(cid: string) {
   }
 
   return `${cid.slice(0, 8)}...${cid.slice(-8)}`;
+}
+
+function shortenAddress(address?: string | null) {
+  if (!address) return "未连接";
+  if (address.length < 12) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
 function formatTokenValue(amount: bigint) {
@@ -320,8 +325,8 @@ export default function ProfilePage() {
     <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
       <PageHeader
         eyebrow="Wallet · Content · Governance"
-        title="Profile"
-        description="查看当前钱包的内容记录、治理参与、质押状态与待领奖励。"
+        title="个人中心"
+        description="集中查看当前钱包的内容记录、治理参与、质押状态与待领奖励。"
         right={
           <button
             type="button"
@@ -346,16 +351,19 @@ export default function ProfilePage() {
         </SectionCard>
       ) : (
         <>
-          <SectionCard
-            title="账户摘要"
-            description="快速查看当前钱包在内容、质押、治理和奖励中的整体状态。"
-            className="p-5"
-          >
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
               <SummaryMetricCard
                 icon={<UserRound className="h-4 w-4" />}
                 label="当前地址"
-                value={<AddressBadge address={address} />}
+                value={
+                  <span
+                    title={address}
+                    className="block truncate text-sm font-medium text-slate-950 dark:text-slate-100"
+                  >
+                    {shortenAddress(address)}
+                  </span>
+                }
                 description="当前连接的钱包地址"
               />
               <SummaryMetricCard
@@ -401,7 +409,7 @@ export default function ProfilePage() {
                 description="按创建区块倒序统计"
               />
             </div>
-          </SectionCard>
+          </section>
 
           <div className="grid gap-6 xl:grid-cols-2">
             <SectionCard
@@ -700,15 +708,15 @@ function SummaryMetricCard({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+    <div className="flex h-24 flex-col rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/40">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-slate-500 dark:text-slate-400">{label}</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
         <div className="text-slate-400 dark:text-slate-500">{icon}</div>
       </div>
-      <div className="mt-3 text-lg font-semibold text-slate-950 dark:text-slate-100">
+      <div className="mt-2 text-lg font-semibold leading-tight text-slate-950 dark:text-slate-100">
         {value}
       </div>
-      <div className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+      <div className="mt-auto line-clamp-1 pt-1 text-xs text-slate-500 dark:text-slate-400">
         {description}
       </div>
     </div>
