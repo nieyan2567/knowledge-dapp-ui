@@ -22,17 +22,15 @@ import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
-import { collectByBlockRange } from "@/lib/block-range";
 import { BRANDING } from "@/lib/branding";
 import {
   formatProposalBlockRange,
   governanceStateBadgeClass,
   governanceStateLabel,
-  parseProposalCreatedLog,
-  proposalCreatedEvent,
   summarizeProposalActions,
 } from "@/lib/governance";
 import { getIpfsFileUrl } from "@/lib/ipfs";
+import { fetchProposalsByProposer } from "@/lib/proposal-events";
 import { asBigInt, asContentData } from "@/lib/web3-types";
 import type { ContentData } from "@/types/content";
 import type { ProposalItem } from "@/types/governance";
@@ -287,25 +285,7 @@ export default function ProfilePage() {
     setProposalError(null);
 
     try {
-      const latestBlock = await publicClient.getBlockNumber();
-      const logs = await collectByBlockRange({
-        toBlock: latestBlock,
-        fetchRange: ({ fromBlock, toBlock }) =>
-          publicClient.getLogs({
-            address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-            event: proposalCreatedEvent,
-            fromBlock,
-            toBlock,
-          }),
-      });
-
-      const proposals = logs
-        .map((log) => parseProposalCreatedLog(log))
-        .filter(
-          (proposal) => proposal.proposer.toLowerCase() === address.toLowerCase()
-        )
-        .sort((left, right) => Number(right.blockNumber - left.blockNumber));
-
+      const proposals = await fetchProposalsByProposer(publicClient, address);
       setMyProposals(proposals);
     } catch (error) {
       setProposalError(getErrorMessage(error, "加载我发起的提案失败"));
@@ -333,7 +313,7 @@ export default function ProfilePage() {
   return (
     <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
       <PageHeader
-        eyebrow="Wallet · Content · Governance"
+        eyebrow="Wallet / Content / Governance"
         title="个人中心"
         description="集中查看当前钱包的内容记录、治理参与、质押状态与待领奖励。"
         right={

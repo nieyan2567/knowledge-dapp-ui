@@ -7,687 +7,535 @@ import { toast } from "sonner";
 import { formatEther } from "viem";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 
-import { rewardAccrueRequestedEvent, rewardClaimedEvent } from "@/contracts/events";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
-import { collectByBlockRange } from "@/lib/block-range";
 import { BRANDING } from "@/lib/branding";
 import { reportClientError } from "@/lib/observability/client";
+import {
+  type RewardHistoryItem,
+  type RewardSourceItem,
+  fetchRewardActivity,
+} from "@/lib/reward-events";
 import { writeTxToast } from "@/lib/tx-toast";
-import { asBigInt, asContentData } from "@/lib/web3-types";
+import { asBigInt } from "@/lib/web3-types";
 
 const PAGE_SIZE_OPTIONS = [3, 5, 10] as const;
 const HISTORY_FILTERS = ["all", "accrued", "claimed"] as const;
 
 type HistoryFilter = (typeof HISTORY_FILTERS)[number];
 
-type RewardHistoryItem = {
-	id: string;
-	kind: "accrued" | "claimed";
-	amount: bigint;
-	blockNumber: bigint;
-	timestamp?: bigint;
-	contentId?: bigint;
-	contentTitle?: string;
-	txHash?: `0x${string}`;
-};
-
-type RewardSourceItem = {
-	contentId: bigint;
-	title: string;
-	totalAmount: bigint;
-	accrualCount: number;
-	latestBlock: bigint;
-};
-
 function reportRewardsPageError(message: string, error: unknown) {
-	void reportClientError({
-		message,
-		source: "rewards.page",
-		severity: "error",
-		handled: true,
-		error,
-	});
+  void reportClientError({
+    message,
+    source: "rewards.page",
+    severity: "error",
+    handled: true,
+    error,
+  });
 }
 
 function formatRewardDate(timestamp?: bigint) {
-	if (timestamp === undefined) {
-		return "时间未知";
-	}
+  if (timestamp === undefined) {
+    return "时间未知";
+  }
 
-	return new Date(Number(timestamp) * 1000).toLocaleString("zh-CN", {
-		hour12: false,
-	});
+  return new Date(Number(timestamp) * 1000).toLocaleString("zh-CN", {
+    hour12: false,
+  });
 }
 
 function explorerTxUrl(txHash?: `0x${string}`) {
-	if (!txHash) return "#";
-	return `${BRANDING.explorerUrl}/tx/${txHash}`;
+  if (!txHash) return "#";
+  return `${BRANDING.explorerUrl}/tx/${txHash}`;
 }
 
 export default function RewardsPage() {
-	const { address } = useAccount();
-	const publicClient = usePublicClient();
-	const { writeContractAsync } = useWriteContract();
-	const refreshAfterTx = useRefreshOnTxConfirmed();
-
-	const [loading, setLoading] = useState(false);
-	const [loadingRewardActivity, setLoadingRewardActivity] = useState(false);
-	const [rewardHistory, setRewardHistory] = useState<RewardHistoryItem[]>([]);
-	const [rewardSources, setRewardSources] = useState<RewardSourceItem[]>([]);
-	const [historyPage, setHistoryPage] = useState(1);
-	const [historyPageSize, setHistoryPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(3);
-	const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
-	const [sourcePage, setSourcePage] = useState(1);
-	const [sourcePageSize, setSourcePageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(3);
-
-	const { data: pendingRewards, refetch: refetchPendingRewards } = useReadContract({
-		address: CONTRACTS.TreasuryNative as `0x${string}`,
-		abi: ABIS.TreasuryNative,
-		functionName: "pendingRewards",
-		args: address ? [address] : undefined,
-		query: { enabled: !!address },
-	});
-
-	const { data: epochBudget, refetch: refetchEpochBudget } = useReadContract({
-		address: CONTRACTS.TreasuryNative as `0x${string}`,
-		abi: ABIS.TreasuryNative,
-		functionName: "epochBudget",
-	});
-
-	const { data: epochSpent, refetch: refetchEpochSpent } = useReadContract({
-		address: CONTRACTS.TreasuryNative as `0x${string}`,
-		abi: ABIS.TreasuryNative,
-		functionName: "epochSpent",
-	});
-
-	const pendingValue = asBigInt(pendingRewards);
-	const budgetValue = asBigInt(epochBudget);
-	const spentValue = asBigInt(epochSpent);
-
-	const pending = pendingValue ? Number(formatEther(pendingValue)) : 0;
-	const budget = budgetValue ? Number(formatEther(budgetValue)) : 0;
-	const spent = spentValue ? Number(formatEther(spentValue)) : 0;
-	const progress = budget ? Math.min((spent / budget) * 100, 100) : 0;
-
-	const loadRewardActivity = useCallback(async () => {
-		if (!publicClient || !address) {
-			setRewardHistory([]);
-			setRewardSources([]);
-			return;
-		}
-
-		setLoadingRewardActivity(true);
-
-		try {
-			const latestBlock = await publicClient.getBlockNumber();
-			const [accrualLogs, claimLogs] = await Promise.all([
-				collectByBlockRange({
-					toBlock: latestBlock,
-					fetchRange: ({ fromBlock, toBlock }) =>
-						publicClient.getLogs({
-							address: CONTRACTS.KnowledgeContent as `0x${string}`,
-							event: rewardAccrueRequestedEvent,
-							args: { author: address },
-							fromBlock,
-							toBlock,
-						}),
-				}),
-				collectByBlockRange({
-					toBlock: latestBlock,
-					fetchRange: ({ fromBlock, toBlock }) =>
-						publicClient.getLogs({
-							address: CONTRACTS.TreasuryNative as `0x${string}`,
-							event: rewardClaimedEvent,
-							args: { beneficiary: address },
-							fromBlock,
-							toBlock,
-						}),
-				}),
-			]);
-
-			const contentIds = Array.from(
-				new Set(
-					accrualLogs
-						.map((log) => log.args.contentId)
-						.filter((contentId): contentId is bigint => typeof contentId === "bigint")
-				)
-			);
-
-			const blockNumbers = Array.from(
-				new Set(
-					[...accrualLogs, ...claimLogs]
-						.map((log) => log.blockNumber)
-						.filter((blockNumber): blockNumber is bigint => typeof blockNumber === "bigint")
-				)
-			);
-
-			const [contentEntries, blockEntries] = await Promise.all([
-				Promise.all(
-					contentIds.map(async (contentId) => {
-						const result = await publicClient.readContract({
-							address: CONTRACTS.KnowledgeContent as `0x${string}`,
-							abi: ABIS.KnowledgeContent,
-							functionName: "contents",
-							args: [contentId],
-						});
-
-						return [contentId.toString(), asContentData(result)] as const;
-					})
-				),
-				Promise.all(
-					blockNumbers.map(async (blockNumber) => {
-						const block = await publicClient.getBlock({ blockNumber });
-						return [blockNumber.toString(), block.timestamp] as const;
-					})
-				),
-			]);
-
-			const contentMap = new Map(contentEntries);
-			const blockTimestampMap = new Map(blockEntries);
-
-			const historyItems: RewardHistoryItem[] = [
-				...accrualLogs.map((log) => {
-					const contentId = log.args.contentId;
-					const blockNumber = log.blockNumber ?? 0n;
-					const content = contentId
-						? contentMap.get(contentId.toString())
-						: undefined;
-
-					return {
-						id: `${log.transactionHash ?? "0x"}-accrued-${contentId?.toString() ?? "0"}`,
-						kind: "accrued" as const,
-						amount: log.args.amount ?? 0n,
-						blockNumber,
-						timestamp: blockTimestampMap.get(blockNumber.toString()),
-						contentId,
-						contentTitle: content?.title,
-						txHash: log.transactionHash ?? undefined,
-					};
-				}),
-				...claimLogs.map((log) => {
-					const blockNumber = log.blockNumber ?? 0n;
-
-					return {
-						id: `${log.transactionHash ?? "0x"}-claimed`,
-						kind: "claimed" as const,
-						amount: log.args.amount ?? 0n,
-						blockNumber,
-						timestamp: blockTimestampMap.get(blockNumber.toString()),
-						txHash: log.transactionHash ?? undefined,
-					};
-				}),
-			].sort((left, right) => Number(right.blockNumber - left.blockNumber));
-
-			const sourceMap = new Map<string, RewardSourceItem>();
-
-			for (const log of accrualLogs) {
-				const contentId = log.args.contentId;
-				if (contentId === undefined) {
-					continue;
-				}
-
-				const key = contentId.toString();
-				const content = contentMap.get(key);
-				const existing = sourceMap.get(key);
-
-				if (existing) {
-					existing.totalAmount += log.args.amount ?? 0n;
-					existing.accrualCount += 1;
-					if ((log.blockNumber ?? 0n) > existing.latestBlock) {
-						existing.latestBlock = log.blockNumber ?? 0n;
-					}
-					continue;
-				}
-
-				sourceMap.set(key, {
-					contentId,
-					title: content?.title || `内容 #${contentId.toString()}`,
-					totalAmount: log.args.amount ?? 0n,
-					accrualCount: 1,
-					latestBlock: log.blockNumber ?? 0n,
-				});
-			}
-
-			setRewardHistory(historyItems);
-			setRewardSources(
-				Array.from(sourceMap.values()).sort((left, right) =>
-					Number(right.latestBlock - left.latestBlock)
-				)
-			);
-		} catch (error) {
-			reportRewardsPageError("Failed to load reward activity", error);
-			toast.error("加载奖励记录失败");
-		} finally {
-			setLoadingRewardActivity(false);
-		}
-	}, [address, publicClient]);
-
-	const refreshRewardsData = useCallback(async () => {
-		await Promise.all([
-			refetchPendingRewards(),
-			refetchEpochBudget(),
-			refetchEpochSpent(),
-			loadRewardActivity(),
-		]);
-	}, [loadRewardActivity, refetchEpochBudget, refetchEpochSpent, refetchPendingRewards]);
-
-	const rewardRefreshDomains = useMemo(
-		() => ["rewards", "content", "dashboard", "system"] as const,
-		[]
-	);
-	const rewardRefetchers = useMemo(() => [refreshRewardsData], [refreshRewardsData]);
-
-	useTxEventRefetch(rewardRefreshDomains, rewardRefetchers);
-
-	useEffect(() => {
-		void loadRewardActivity();
-	}, [loadRewardActivity]);
-
-	useEffect(() => {
-		if (!address) return;
-
-		const timer = window.setInterval(() => {
-			void refreshRewardsData();
-		}, 30000);
-
-		return () => window.clearInterval(timer);
-	}, [address, refreshRewardsData]);
-
-	const filteredRewardHistory = useMemo(
-		() =>
-			historyFilter === "all"
-				? rewardHistory
-				: rewardHistory.filter((item) => item.kind === historyFilter),
-		[historyFilter, rewardHistory]
-	);
-
-	const historyTotalPages = Math.max(1, Math.ceil(filteredRewardHistory.length / historyPageSize));
-	const sourceTotalPages = Math.max(1, Math.ceil(rewardSources.length / sourcePageSize));
-
-	useEffect(() => {
-		if (historyPage > historyTotalPages) {
-			setHistoryPage(historyTotalPages);
-		}
-	}, [historyPage, historyTotalPages]);
-
-	useEffect(() => {
-		if (sourcePage > sourceTotalPages) {
-			setSourcePage(sourceTotalPages);
-		}
-	}, [sourcePage, sourceTotalPages]);
-
-	useEffect(() => {
-		setHistoryPage(1);
-	}, [historyFilter]);
-
-	const pagedRewardHistory = filteredRewardHistory.slice(
-		(historyPage - 1) * historyPageSize,
-		historyPage * historyPageSize
-	);
-
-	const pagedRewardSources = rewardSources.slice(
-		(sourcePage - 1) * sourcePageSize,
-		sourcePage * sourcePageSize
-	);
-
-	async function handleClaim() {
-		if (!address) {
-			toast.error("请先连接钱包");
-			return;
-		}
-
-		if (!pending) {
-			toast.error("暂无可领取奖励");
-			return;
-		}
-
-		try {
-			setLoading(true);
-
-			const hash = await writeTxToast({
-				publicClient,
-				writeContractAsync,
-				request: {
-					address: CONTRACTS.TreasuryNative as `0x${string}`,
-					abi: ABIS.TreasuryNative,
-					functionName: "claim",
-					account: address,
-				},
-				loading: "正在提交领取奖励交易...",
-				success: "领取奖励交易已提交",
-				fail: "领取奖励失败",
-			});
-
-			if (!hash) {
-				return;
-			}
-
-			await refreshAfterTx(hash, refreshRewardsData, ["rewards", "dashboard", "system"]);
-		} finally {
-			setLoading(false);
-		}
-	}
-
-	return (
-		<main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
-			<PageHeader
-				eyebrow="Treasury · Claimable Rewards"
-				title="Rewards Center"
-				description="领取当前连接钱包在金库中累计的奖励。"
-			/>
-
-			<section className="grid gap-3 md:grid-cols-3">
-				<div className="flex h-28 flex-col rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-					<div className="mb-2.5 flex items-center justify-between">
-						<div className="text-xs text-slate-500 dark:text-slate-400">待领取奖励</div>
-						<Wallet className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
-					</div>
-
-					<div className="flex items-end justify-between gap-3">
-						<div className="text-xl font-semibold leading-none text-slate-950 dark:text-slate-100">
-							{pending} {BRANDING.nativeTokenSymbol}
-						</div>
-						<button
-							onClick={handleClaim}
-							disabled={loading || !pending}
-							className="rounded-full bg-slate-950 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-						>
-							{loading ? "领取中..." : "领取"}
-						</button>
-					</div>
-
-					<div className="mt-auto pt-1.5 text-xs text-slate-500 dark:text-slate-400">
-						当前可领取的奖励。
-					</div>
-				</div>
-
-				<div className="flex h-28 flex-col rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-					<div className="mb-2.5 flex items-center justify-between">
-						<div className="text-xs text-slate-500 dark:text-slate-400">周期预算使用</div>
-						<Coins className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
-					</div>
-
-					<div className="text-lg font-semibold leading-none text-slate-950 dark:text-slate-100">
-						{progress.toFixed(1)}%
-					</div>
-
-					<div className="mt-auto space-y-1 pt-1.5">
-						<div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-							<div
-								className="h-full bg-blue-500 transition-all"
-								style={{ width: `${progress}%` }}
-							/>
-						</div>
-
-						<div className="text-xs text-slate-500 dark:text-slate-400">
-							已使用 {spent} / {budget} {BRANDING.nativeTokenSymbol}
-						</div>
-					</div>
-				</div>
-
-				<div className="flex h-28 flex-col rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-					<div className="mb-2.5 flex items-center justify-between">
-						<div className="text-xs text-slate-500 dark:text-slate-400">周期已发放</div>
-						<ShieldCheck className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
-					</div>
-
-					<div className="text-lg font-semibold leading-none text-slate-950 dark:text-slate-100">
-						{spent} {BRANDING.nativeTokenSymbol}
-					</div>
-
-					<div className="mt-auto pt-1.5 text-xs text-slate-500 dark:text-slate-400">
-						当前周期已分配的奖励。
-					</div>
-				</div>
-			</section>
-
-			<div className="grid gap-6 lg:grid-cols-2">
-				<SectionCard
-					title="历史奖励记录"
-					description="查看最近的奖励记账和领取记录。"
-				>
-					{!address ? (
-						<div className="text-sm text-slate-500 dark:text-slate-400">
-							连接钱包后即可查看你的历史奖励记录。
-						</div>
-					) : loadingRewardActivity ? (
-						<div className="text-sm text-slate-500 dark:text-slate-400">
-							正在加载奖励记录...
-						</div>
-					) : rewardHistory.length === 0 ? (
-						<div className="text-sm text-slate-500 dark:text-slate-400">
-							暂无奖励历史记录。
-						</div>
-					) : (
-						<div className="space-y-3">
-							<div className="flex flex-wrap gap-2">
-								{HISTORY_FILTERS.map((filter) => (
-									<button
-										key={filter}
-										type="button"
-										onClick={() => setHistoryFilter(filter)}
-										className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-											historyFilter === filter
-												? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
-												: "border border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-										}`}
-									>
-										{filter === "all"
-											? "全部"
-											: filter === "accrued"
-												? "仅记账"
-												: "仅领取"}
-									</button>
-								))}
-							</div>
-
-							{pagedRewardHistory.map((item) => (
-								<div
-									key={item.id}
-									className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50"
-								>
-									<div className="flex items-start justify-between gap-4">
-										<div className="min-w-0">
-											<div className="flex items-center gap-2">
-												<span
-													className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
-														item.kind === "accrued"
-															? "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300"
-															: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-													}`}
-												>
-													{item.kind === "accrued" ? "已记账" : "已领取"}
-												</span>
-												<span className="text-xs text-slate-500 dark:text-slate-400">
-													区块 #{item.blockNumber.toString()}
-												</span>
-											</div>
-
-											<div className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">
-												{item.kind === "accrued"
-													? item.contentTitle || `内容 #${item.contentId?.toString() ?? "-"}`
-													: "领取到当前钱包"}
-											</div>
-
-											<div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-												<div className="flex flex-wrap items-center gap-3">
-													{item.kind === "accrued" && item.contentId !== undefined ? (
-														<Link
-															href={`/content/${item.contentId.toString()}`}
-															className="hover:text-slate-700 dark:hover:text-slate-200"
-														>
-															查看内容详情
-														</Link>
-													) : null}
-													{item.txHash ? (
-														<a
-															href={explorerTxUrl(item.txHash)}
-															target="_blank"
-															rel="noreferrer"
-															className="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200"
-														>
-															查看交易
-															<ExternalLink className="h-3.5 w-3.5" />
-														</a>
-													) : null}
-													<span>{formatRewardDate(item.timestamp)}</span>
-												</div>
-											</div>
-										</div>
-
-										<div className="text-right">
-											<div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
-												{formatEther(item.amount)} {BRANDING.nativeTokenSymbol}
-											</div>
-											<div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-												{formatRewardDate(item.timestamp)}
-											</div>
-										</div>
-									</div>
-								</div>
-							))}
-
-							<PaginationControls
-								page={historyPage}
-								totalPages={historyTotalPages}
-								pageSize={historyPageSize}
-								totalItems={filteredRewardHistory.length}
-								onPageChange={setHistoryPage}
-								onPageSizeChange={(size) => {
-									setHistoryPageSize(size);
-									setHistoryPage(1);
-								}}
-							/>
-						</div>
-					)}
-				</SectionCard>
-
-				<SectionCard
-					title="奖励来源"
-					description="按内容查看奖励来自哪篇内容。"
-				>
-					{!address ? (
-						<div className="text-sm text-slate-500 dark:text-slate-400">
-							连接钱包后即可查看奖励来源。
-						</div>
-					) : loadingRewardActivity ? (
-						<div className="text-sm text-slate-500 dark:text-slate-400">
-							正在加载奖励来源...
-						</div>
-					) : rewardSources.length === 0 ? (
-						<div className="text-sm text-slate-500 dark:text-slate-400">
-							暂无内容奖励来源。
-						</div>
-					) : (
-						<div className="space-y-3">
-							{pagedRewardSources.map((source) => (
-								<Link
-									key={source.contentId.toString()}
-									href={`/content/${source.contentId.toString()}`}
-									className="block rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-slate-800/50 dark:hover:border-slate-700 dark:hover:bg-slate-900"
-								>
-									<div className="flex items-start justify-between gap-4">
-										<div className="min-w-0">
-											<div className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-												{source.title}
-											</div>
-											<div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-												内容 #{source.contentId.toString()} · 累计记账 {source.accrualCount} 次
-											</div>
-										</div>
-
-										<div className="text-right">
-											<div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
-												{formatEther(source.totalAmount)} {BRANDING.nativeTokenSymbol}
-											</div>
-											<div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-												最近区块 #{source.latestBlock.toString()}
-											</div>
-										</div>
-									</div>
-								</Link>
-							))}
-
-							<PaginationControls
-								page={sourcePage}
-								totalPages={sourceTotalPages}
-								pageSize={sourcePageSize}
-								totalItems={rewardSources.length}
-								onPageChange={setSourcePage}
-								onPageSizeChange={(size) => {
-									setSourcePageSize(size);
-									setSourcePage(1);
-								}}
-							/>
-						</div>
-					)}
-				</SectionCard>
-			</div>
-
-		</main>
-	);
+  const { address } = useAccount();
+  const publicClient = usePublicClient();
+  const { writeContractAsync } = useWriteContract();
+  const refreshAfterTx = useRefreshOnTxConfirmed();
+
+  const [loading, setLoading] = useState(false);
+  const [loadingRewardActivity, setLoadingRewardActivity] = useState(false);
+  const [rewardHistory, setRewardHistory] = useState<RewardHistoryItem[]>([]);
+  const [rewardSources, setRewardSources] = useState<RewardSourceItem[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(3);
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
+  const [sourcePage, setSourcePage] = useState(1);
+  const [sourcePageSize, setSourcePageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(3);
+
+  const { data: pendingRewards, refetch: refetchPendingRewards } = useReadContract({
+    address: CONTRACTS.TreasuryNative as `0x${string}`,
+    abi: ABIS.TreasuryNative,
+    functionName: "pendingRewards",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const { data: epochBudget, refetch: refetchEpochBudget } = useReadContract({
+    address: CONTRACTS.TreasuryNative as `0x${string}`,
+    abi: ABIS.TreasuryNative,
+    functionName: "epochBudget",
+  });
+
+  const { data: epochSpent, refetch: refetchEpochSpent } = useReadContract({
+    address: CONTRACTS.TreasuryNative as `0x${string}`,
+    abi: ABIS.TreasuryNative,
+    functionName: "epochSpent",
+  });
+
+  const pendingValue = asBigInt(pendingRewards);
+  const budgetValue = asBigInt(epochBudget);
+  const spentValue = asBigInt(epochSpent);
+
+  const pending = pendingValue ? Number(formatEther(pendingValue)) : 0;
+  const budget = budgetValue ? Number(formatEther(budgetValue)) : 0;
+  const spent = spentValue ? Number(formatEther(spentValue)) : 0;
+  const progress = budget ? Math.min((spent / budget) * 100, 100) : 0;
+
+  const loadRewardActivity = useCallback(async () => {
+    if (!publicClient || !address) {
+      setRewardHistory([]);
+      setRewardSources([]);
+      return;
+    }
+
+    setLoadingRewardActivity(true);
+
+    try {
+      const { historyItems, rewardSources } = await fetchRewardActivity(publicClient, {
+        author: address,
+        beneficiary: address,
+      });
+
+      setRewardHistory(historyItems);
+      setRewardSources(rewardSources);
+    } catch (error) {
+      reportRewardsPageError("Failed to load reward activity", error);
+      toast.error("加载奖励记录失败");
+    } finally {
+      setLoadingRewardActivity(false);
+    }
+  }, [address, publicClient]);
+
+  const refreshRewardsData = useCallback(async () => {
+    await Promise.all([
+      refetchPendingRewards(),
+      refetchEpochBudget(),
+      refetchEpochSpent(),
+      loadRewardActivity(),
+    ]);
+  }, [loadRewardActivity, refetchEpochBudget, refetchEpochSpent, refetchPendingRewards]);
+
+  const rewardRefreshDomains = useMemo(
+    () => ["rewards", "content", "dashboard", "system"] as const,
+    []
+  );
+  const rewardRefetchers = useMemo(() => [refreshRewardsData], [refreshRewardsData]);
+
+  useTxEventRefetch(rewardRefreshDomains, rewardRefetchers);
+
+  useEffect(() => {
+    void loadRewardActivity();
+  }, [loadRewardActivity]);
+
+  useEffect(() => {
+    if (!address) return;
+
+    const timer = window.setInterval(() => {
+      void refreshRewardsData();
+    }, 30000);
+
+    return () => window.clearInterval(timer);
+  }, [address, refreshRewardsData]);
+
+  const filteredRewardHistory = useMemo(
+    () =>
+      historyFilter === "all"
+        ? rewardHistory
+        : rewardHistory.filter((item) => item.kind === historyFilter),
+    [historyFilter, rewardHistory]
+  );
+
+  const historyTotalPages = Math.max(1, Math.ceil(filteredRewardHistory.length / historyPageSize));
+  const sourceTotalPages = Math.max(1, Math.ceil(rewardSources.length / sourcePageSize));
+
+  useEffect(() => {
+    if (historyPage > historyTotalPages) {
+      setHistoryPage(historyTotalPages);
+    }
+  }, [historyPage, historyTotalPages]);
+
+  useEffect(() => {
+    if (sourcePage > sourceTotalPages) {
+      setSourcePage(sourceTotalPages);
+    }
+  }, [sourcePage, sourceTotalPages]);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [historyFilter]);
+
+  const pagedRewardHistory = filteredRewardHistory.slice(
+    (historyPage - 1) * historyPageSize,
+    historyPage * historyPageSize
+  );
+
+  const pagedRewardSources = rewardSources.slice(
+    (sourcePage - 1) * sourcePageSize,
+    sourcePage * sourcePageSize
+  );
+
+  async function handleClaim() {
+    if (!address) {
+      toast.error("请先连接钱包");
+      return;
+    }
+
+    if (!pending) {
+      toast.error("暂无可领取奖励");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const hash = await writeTxToast({
+        publicClient,
+        writeContractAsync,
+        request: {
+          address: CONTRACTS.TreasuryNative as `0x${string}`,
+          abi: ABIS.TreasuryNative,
+          functionName: "claim",
+          account: address,
+        },
+        loading: "正在提交领取奖励交易...",
+        success: "领取奖励交易已提交",
+        fail: "领取奖励失败",
+      });
+
+      if (!hash) {
+        return;
+      }
+
+      await refreshAfterTx(hash, refreshRewardsData, ["rewards", "dashboard", "system"]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
+      <PageHeader
+        eyebrow="Treasury / Claimable Rewards"
+        title="Rewards Center"
+        description="查看当前钱包的可领取奖励、奖励历史和奖励来源。"
+      />
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <div className="flex h-28 flex-col rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="mb-2.5 flex items-center justify-between">
+            <div className="text-xs text-slate-500 dark:text-slate-400">待领取奖励</div>
+            <Wallet className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+          </div>
+
+          <div className="flex items-end justify-between gap-3">
+            <div className="text-xl font-semibold leading-none text-slate-950 dark:text-slate-100">
+              {pending} {BRANDING.nativeTokenSymbol}
+            </div>
+            <button
+              onClick={() => void handleClaim()}
+              disabled={loading || !pending}
+              className="rounded-full bg-slate-950 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+            >
+              {loading ? "领取中..." : "领取"}
+            </button>
+          </div>
+
+          <div className="mt-auto pt-1.5 text-xs text-slate-500 dark:text-slate-400">
+            当前钱包可从金库领取的累计奖励。
+          </div>
+        </div>
+
+        <div className="flex h-28 flex-col rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="mb-2.5 flex items-center justify-between">
+            <div className="text-xs text-slate-500 dark:text-slate-400">周期预算使用</div>
+            <Coins className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+          </div>
+
+          <div className="text-lg font-semibold leading-none text-slate-950 dark:text-slate-100">
+            {progress.toFixed(1)}%
+          </div>
+
+          <div className="mt-auto space-y-1 pt-1.5">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+              <div className="h-full bg-blue-500 transition-all" style={{ width: `${progress}%` }} />
+            </div>
+
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              已使用 {spent} / {budget} {BRANDING.nativeTokenSymbol}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex h-28 flex-col rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="mb-2.5 flex items-center justify-between">
+            <div className="text-xs text-slate-500 dark:text-slate-400">周期已发放</div>
+            <ShieldCheck className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+          </div>
+
+          <div className="text-lg font-semibold leading-none text-slate-950 dark:text-slate-100">
+            {spent} {BRANDING.nativeTokenSymbol}
+          </div>
+
+          <div className="mt-auto pt-1.5 text-xs text-slate-500 dark:text-slate-400">
+            当前预算周期内已经发放的奖励。
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <SectionCard
+          title="历史奖励记录"
+          description="查看最近的奖励记账和奖励领取记录。"
+        >
+          {!address ? (
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              连接钱包后即可查看你的奖励历史记录。
+            </div>
+          ) : loadingRewardActivity ? (
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              正在加载奖励记录...
+            </div>
+          ) : rewardHistory.length === 0 ? (
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              暂无奖励历史记录。
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {HISTORY_FILTERS.map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setHistoryFilter(filter)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                      historyFilter === filter
+                        ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
+                        : "border border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    {filter === "all" ? "全部" : filter === "accrued" ? "仅记账" : "仅领取"}
+                  </button>
+                ))}
+              </div>
+
+              {pagedRewardHistory.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                            item.kind === "accrued"
+                              ? "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300"
+                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                          }`}
+                        >
+                          {item.kind === "accrued" ? "已记账" : "已领取"}
+                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          区块 #{item.blockNumber.toString()}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">
+                        {item.kind === "accrued"
+                          ? item.contentTitle || `内容 #${item.contentId?.toString() ?? "-"}`
+                          : "奖励已领取到当前钱包"}
+                      </div>
+
+                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        <div className="flex flex-wrap items-center gap-3">
+                          {item.kind === "accrued" && item.contentId !== undefined ? (
+                            <Link
+                              href={`/content/${item.contentId.toString()}`}
+                              className="hover:text-slate-700 dark:hover:text-slate-200"
+                            >
+                              查看内容详情
+                            </Link>
+                          ) : null}
+                          {item.txHash ? (
+                            <a
+                              href={explorerTxUrl(item.txHash)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200"
+                            >
+                              查看交易
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          ) : null}
+                          <span>{formatRewardDate(item.timestamp)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
+                        {formatEther(item.amount)} {BRANDING.nativeTokenSymbol}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {formatRewardDate(item.timestamp)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <PaginationControls
+                page={historyPage}
+                totalPages={historyTotalPages}
+                pageSize={historyPageSize}
+                totalItems={filteredRewardHistory.length}
+                onPageChange={setHistoryPage}
+                onPageSizeChange={(size) => {
+                  setHistoryPageSize(size);
+                  setHistoryPage(1);
+                }}
+              />
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="奖励来源"
+          description="按内容查看奖励来自哪篇内容。"
+        >
+          {!address ? (
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              连接钱包后即可查看奖励来源。
+            </div>
+          ) : loadingRewardActivity ? (
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              正在加载奖励来源...
+            </div>
+          ) : rewardSources.length === 0 ? (
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              暂无内容奖励来源。
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pagedRewardSources.map((source) => (
+                <Link
+                  key={source.contentId.toString()}
+                  href={`/content/${source.contentId.toString()}`}
+                  className="block rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-slate-800/50 dark:hover:border-slate-700 dark:hover:bg-slate-900"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+                        {source.title}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        内容 #{source.contentId.toString()} · 累计记账 {source.accrualCount} 次
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
+                        {formatEther(source.totalAmount)} {BRANDING.nativeTokenSymbol}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        最近区块 #{source.latestBlock.toString()}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+
+              <PaginationControls
+                page={sourcePage}
+                totalPages={sourceTotalPages}
+                pageSize={sourcePageSize}
+                totalItems={rewardSources.length}
+                onPageChange={setSourcePage}
+                onPageSizeChange={(size) => {
+                  setSourcePageSize(size);
+                  setSourcePage(1);
+                }}
+              />
+            </div>
+          )}
+        </SectionCard>
+      </div>
+    </main>
+  );
 }
 
 function PaginationControls({
-	page,
-	totalPages,
-	pageSize,
-	totalItems,
-	onPageChange,
-	onPageSizeChange,
+  page,
+  totalPages,
+  pageSize,
+  totalItems,
+  onPageChange,
+  onPageSizeChange,
 }: {
-	page: number;
-	totalPages: number;
-	pageSize: (typeof PAGE_SIZE_OPTIONS)[number];
-	totalItems: number;
-	onPageChange: (page: number) => void;
-	onPageSizeChange: (size: (typeof PAGE_SIZE_OPTIONS)[number]) => void;
+  page: number;
+  totalPages: number;
+  pageSize: (typeof PAGE_SIZE_OPTIONS)[number];
+  totalItems: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: (typeof PAGE_SIZE_OPTIONS)[number]) => void;
 }) {
-	return (
-		<div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3 dark:border-slate-800">
-			<div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-				<span>每页</span>
-				<div className="flex items-center gap-1">
-					{PAGE_SIZE_OPTIONS.map((size) => (
-						<button
-							key={size}
-							onClick={() => onPageSizeChange(size)}
-							className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
-								pageSize === size
-									? "bg-slate-950 text-white dark:bg-white dark:text-slate-900"
-									: "border border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-							}`}
-						>
-							{size}
-						</button>
-					))}
-				</div>
-				<span>共 {totalItems} 条</span>
-			</div>
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+      <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+        <span>每页</span>
+        <div className="flex items-center gap-1">
+          {PAGE_SIZE_OPTIONS.map((size) => (
+            <button
+              key={size}
+              onClick={() => onPageSizeChange(size)}
+              className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
+                pageSize === size
+                  ? "bg-slate-950 text-white dark:bg-white dark:text-slate-900"
+                  : "border border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              }`}
+            >
+              {size}
+            </button>
+          ))}
+        </div>
+        <span>共 {totalItems} 条</span>
+      </div>
 
-			<div className="flex items-center gap-2">
-				<button
-					onClick={() => onPageChange(page - 1)}
-					disabled={page <= 1}
-					className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-				>
-					上一页
-				</button>
-				<span className="text-xs text-slate-500 dark:text-slate-400">
-					第 {page} / {totalPages} 页
-				</span>
-				<button
-					onClick={() => onPageChange(page + 1)}
-					disabled={page >= totalPages}
-					className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-				>
-					下一页
-				</button>
-			</div>
-		</div>
-	);
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          上一页
+        </button>
+        <span className="text-xs text-slate-500 dark:text-slate-400">
+          第 {page} / {totalPages} 页
+        </span>
+        <button
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          下一页
+        </button>
+      </div>
+    </div>
+  );
 }

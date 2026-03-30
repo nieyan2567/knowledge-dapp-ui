@@ -10,18 +10,13 @@ import {
 import { formatEther } from "viem";
 import { usePublicClient, useReadContract } from "wagmi";
 
-import {
-  proposalCreatedEvent,
-  rewardAccrueRequestedEvent,
-  rewardClaimedEvent,
-} from "@/contracts/events";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
-import { collectByBlockRange } from "@/lib/block-range";
 import { BRANDING } from "@/lib/branding";
-import { parseProposalCreatedLog } from "@/lib/governance";
+import { fetchLatestProposal } from "@/lib/proposal-events";
+import { fetchRewardActivity } from "@/lib/reward-events";
 import { asBigInt, asContentData } from "@/lib/web3-types";
 import type { ContentCardData } from "@/types/content";
 import type { ProposalItem } from "@/types/governance";
@@ -210,21 +205,7 @@ export default function HomePage() {
     setLatestProposalError(null);
 
     try {
-      const latestBlock = await publicClient.getBlockNumber();
-      const logs = await collectByBlockRange({
-        toBlock: latestBlock,
-        fetchRange: ({ fromBlock, toBlock }) =>
-          publicClient.getLogs({
-            address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-            event: proposalCreatedEvent,
-            fromBlock,
-            toBlock,
-          }),
-      });
-
-      const newest = logs
-        .map((log) => parseProposalCreatedLog(log))
-        .sort((left, right) => Number(right.blockNumber - left.blockNumber))[0];
+      const newest = await fetchLatestProposal(publicClient);
 
       setLatestProposal(newest ?? null);
       if (newest) {
@@ -255,103 +236,21 @@ export default function HomePage() {
     setRecentRewardsError(null);
 
     try {
-      const latestBlock = await publicClient.getBlockNumber();
-      const [accrualLogs, claimLogs] = await Promise.all([
-        collectByBlockRange({
-          toBlock: latestBlock,
-          fetchRange: ({ fromBlock, toBlock }) =>
-            publicClient.getLogs({
-              address: CONTRACTS.KnowledgeContent as `0x${string}`,
-              event: rewardAccrueRequestedEvent,
-              fromBlock,
-              toBlock,
-            }),
-        }),
-        collectByBlockRange({
-          toBlock: latestBlock,
-          fetchRange: ({ fromBlock, toBlock }) =>
-            publicClient.getLogs({
-              address: CONTRACTS.TreasuryNative as `0x${string}`,
-              event: rewardClaimedEvent,
-              fromBlock,
-              toBlock,
-            }),
-        }),
-      ]);
+      const { historyItems } = await fetchRewardActivity(publicClient);
 
-      const contentIds = Array.from(
-        new Set(
-          accrualLogs
-            .map((log) => log.args.contentId)
-            .filter((contentId): contentId is bigint => typeof contentId === "bigint")
-        )
-      );
-
-      const blockNumbers = Array.from(
-        new Set(
-          [...accrualLogs, ...claimLogs]
-            .map((log) => log.blockNumber)
-            .filter((block): block is bigint => typeof block === "bigint")
-        )
-      );
-
-      const [contentEntries, blockEntries] = await Promise.all([
-        Promise.all(
-          contentIds.map(async (contentId) => {
-            const result = await publicClient.readContract({
-              address: CONTRACTS.KnowledgeContent as `0x${string}`,
-              abi: ABIS.KnowledgeContent,
-              functionName: "contents",
-              args: [contentId],
-            });
-
-            return [contentId.toString(), asContentData(result)] as const;
-          })
-        ),
-        Promise.all(
-          blockNumbers.map(async (block) => {
-            const blockData = await publicClient.getBlock({ blockNumber: block });
-            return [block.toString(), blockData.timestamp] as const;
-          })
-        ),
-      ]);
-
-      const contentMap = new Map(contentEntries);
-      const blockMap = new Map(blockEntries);
-
-      const items: DashboardRewardItem[] = [
-        ...accrualLogs.map((log) => {
-          const contentId = log.args.contentId;
-          const block = log.blockNumber ?? 0n;
-          const content = contentId ? contentMap.get(contentId.toString()) : undefined;
-
-          return {
-            id: `${log.transactionHash ?? "0x"}-accrued-${contentId?.toString() ?? "0"}`,
-            kind: "accrued" as const,
-            amount: log.args.amount ?? 0n,
-            blockNumber: block,
-            timestamp: blockMap.get(block.toString()),
-            contentId,
-            contentTitle: content?.title,
-            voteCountAtAccrual: log.args.voteCountAtAccrual ?? undefined,
-            author: content?.author,
-            txHash: log.transactionHash ?? undefined,
-          };
-        }),
-        ...claimLogs.map((log) => {
-          const block = log.blockNumber ?? 0n;
-
-          return {
-            id: `${log.transactionHash ?? "0x"}-claimed`,
-            kind: "claimed" as const,
-            amount: log.args.amount ?? 0n,
-            blockNumber: block,
-            timestamp: blockMap.get(block.toString()),
-            author: log.args.beneficiary ?? undefined,
-            txHash: log.transactionHash ?? undefined,
-          };
-        }),
-      ]
+      const items: DashboardRewardItem[] = historyItems
+        .map((item) => ({
+          id: item.id,
+          kind: item.kind,
+          amount: item.amount,
+          blockNumber: item.blockNumber,
+          timestamp: item.timestamp,
+          contentId: item.contentId,
+          contentTitle: item.contentTitle,
+          voteCountAtAccrual: item.voteCountAtAccrual,
+          author: item.kind === "accrued" ? item.author : item.beneficiary,
+          txHash: item.txHash,
+        }))
         .sort((left, right) => Number(right.blockNumber - left.blockNumber))
         .slice(0, RECENT_REWARD_LIMIT);
 

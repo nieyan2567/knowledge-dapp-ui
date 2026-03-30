@@ -28,7 +28,6 @@ import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
-import { collectByBlockRange } from "@/lib/block-range";
 import {
   createGovernanceDraftAction,
   encodeGovernanceActionDraft,
@@ -44,12 +43,11 @@ import {
   getProposalStageCountdown,
   governanceStateBadgeClass as stateBadgeClass,
   governanceStateLabel as stateLabel,
-  parseProposalCreatedLog,
-  proposalCreatedEvent,
   summarizeProposalActions,
 } from "@/lib/governance";
 import { BRANDING } from "@/lib/branding";
 import { reportClientError } from "@/lib/observability/client";
+import { fetchParsedProposals } from "@/lib/proposal-events";
 import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt, asProposalVotes } from "@/lib/web3-types";
 import type {
@@ -426,19 +424,7 @@ export default function GovernancePage() {
 
     setLoadingProposals(true);
     try {
-      const latestBlock = await publicClient.getBlockNumber();
-      const logs = await collectByBlockRange({
-        toBlock: latestBlock,
-        fetchRange: ({ fromBlock, toBlock }) =>
-          publicClient.getLogs({
-            address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-            event: proposalCreatedEvent,
-            fromBlock,
-            toBlock,
-          }),
-      });
-
-      const parsed = logs.map((log) => parseProposalCreatedLog(log)).reverse();
+      const parsed = (await fetchParsedProposals(publicClient)).reverse();
       setProposals(parsed);
     } catch (error) {
       reportGovernancePageError("Failed to load governance proposals", error);
