@@ -314,7 +314,7 @@ export default function ProfilePage() {
     <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
       <PageHeader
         eyebrow="Wallet / Content / Governance"
-        title="个人中心"
+        title="Profile"
         description="集中查看当前钱包的内容记录、治理参与、质押状态与待领奖励。"
         right={
           <button

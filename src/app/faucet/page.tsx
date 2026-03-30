@@ -96,7 +96,7 @@ function ConnectAction() {
               className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-400 opacity-70 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500"
               disabled
             >
-              加载钱包中...
+              Loading wallet...
             </button>
           );
         }
@@ -106,7 +106,7 @@ function ConnectAction() {
             <button
               type="button"
               onClick={openConnectModal}
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-950 px-4 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               连接钱包
             </button>
@@ -120,7 +120,7 @@ function ConnectAction() {
               onClick={openChainModal}
               className="inline-flex h-11 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/50"
             >
-              网络错误
+              Wrong network
             </button>
           );
         }
@@ -264,23 +264,24 @@ export default function FaucetPage() {
             <div className="space-y-5">
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
                 <Droplets className="h-4 w-4" />
-                {BRANDING.chainName} 启动资金 Faucet
+                {BRANDING.chainName} Starter Faucet
               </div>
 
               <div className="space-y-4">
                 <h1 className="max-w-3xl text-5xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-6xl">
-                  领取启动资金，完成你的第一次链上操作
+                  Get starter funds and complete your first onchain action.
                 </h1>
                 <p className="max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-                  这个 Faucet 会为新钱包发放少量 {BRANDING.nativeTokenSymbol}
-                  ，用于支付 Gas，并完成 {BRANDING.appName} 中的首次上传、投票、领取奖励或质押操作。
+                  这个 Faucet 会为新钱包发放少量 {BRANDING.nativeTokenSymbol}，
+                  用于支付 Gas，并完成 {BRANDING.appName}
+                  中的首次上传、投票、领取奖励或质押操作。
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-3">
                 <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-700 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200">
                   <Wallet className="h-4 w-4 text-slate-400" />
-                  钱包余额：{walletBalanceText}
+                  Wallet balance: {walletBalanceText}
                 </div>
                 <a
                   href={BRANDING.explorerUrl}
@@ -288,7 +289,7 @@ export default function FaucetPage() {
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-700 backdrop-blur transition hover:bg-white dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-900"
                 >
-                  打开浏览器
+                  Open explorer
                   <ExternalLink className="h-4 w-4" />
                 </a>
               </div>
@@ -301,8 +302,7 @@ export default function FaucetPage() {
                   仅需钱包签名
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  你只需要签名一条请求消息，真正的启动资金由 Faucet
-                  服务端发出。
+                  你只需要签署一条请求消息，真正的启动资金由 Faucet 服务端发起发放。
                 </p>
               </div>
 
@@ -322,7 +322,7 @@ export default function FaucetPage() {
                   受冷却期保护
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  重复领取会受到频率限制，余额已经足够的钱包也可能被拒绝。
+                  重复领取会受到频率限制，余额已经足够的钱包也可能会被拒绝。
                 </p>
               </div>
             </div>
@@ -376,14 +376,14 @@ export default function FaucetPage() {
               </button>
 
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-slate-500 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-400">
-                这个 Faucet 面向需要初始 Gas 的新钱包。如果你的钱包已经持有足够的
+                这个 Faucet 面向需要初始 Gas 的新钱包。如果你的钱包已经持有足够的{" "}
                 {BRANDING.nativeTokenSymbol}，申请可能会被拒绝。
               </div>
 
               {txHash ? (
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30">
                   <div className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
-                    启动资金已发放{claimAmount ? `：${claimAmount}` : ""}
+                    启动资金已发放{claimAmount ? `，${claimAmount}` : ""}
                   </div>
                   <a
                     href={`${BRANDING.explorerUrl}/tx/${txHash}`}
@@ -409,7 +409,7 @@ export default function FaucetPage() {
             <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
               <li>用这笔资金支付首次投票所需的 Gas。</li>
               <li>上传内容到 IPFS，并完成链上登记。</li>
-              <li>领取已累计奖励，或激活你的第一笔质押。</li>
+              <li>领取已累积奖励，或激活你的第一笔质押。</li>
             </ul>
           </div>
 
