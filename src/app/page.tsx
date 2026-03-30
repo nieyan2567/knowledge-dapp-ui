@@ -7,27 +7,24 @@ import {
   ExternalLink,
   RefreshCw,
 } from "lucide-react";
-import { formatEther, parseAbiItem } from "viem";
+import { formatEther } from "viem";
 import { usePublicClient, useReadContract } from "wagmi";
 
+import {
+  proposalCreatedEvent,
+  rewardAccrueRequestedEvent,
+  rewardClaimedEvent,
+} from "@/contracts/events";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 import { collectByBlockRange } from "@/lib/block-range";
 import { BRANDING } from "@/lib/branding";
-import { parseProposalCreatedLog, proposalCreatedEvent } from "@/lib/governance";
+import { parseProposalCreatedLog } from "@/lib/governance";
 import { asBigInt, asContentData } from "@/lib/web3-types";
 import type { ContentCardData } from "@/types/content";
 import type { ProposalItem } from "@/types/governance";
-
-const rewardAccrueRequestedEvent = parseAbiItem(
-  "event RewardAccrueRequested(uint256 indexed contentId, address indexed author, uint256 amount, uint256 voteCountAtAccrual)"
-);
-
-const rewardClaimedEvent = parseAbiItem(
-  "event RewardClaimed(address indexed beneficiary, uint256 amount)"
-);
 
 const RECENT_CONTENT_SCAN = 10;
 const RECENT_CONTENT_LIMIT = 4;

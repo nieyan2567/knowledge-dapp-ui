@@ -54,7 +54,10 @@ export async function POST(req: NextRequest) {
     const challenge = await takeFaucetAuthChallenge(body.nonce);
 
     if (!challenge) {
-      return NextResponse.json({ error: "签名挑战已过期或已被使用" }, { status: 401 });
+      return NextResponse.json(
+        { error: "签名挑战已过期或已被使用" },
+        { status: 401 }
+      );
     }
 
     const { domain, origin } = getRequestSite(req);
@@ -65,7 +68,10 @@ export async function POST(req: NextRequest) {
       challenge.chainId !== knowledgeChain.id ||
       challenge.address.toLowerCase() !== address.toLowerCase()
     ) {
-      return NextResponse.json({ error: "签名挑战与当前请求不匹配" }, { status: 401 });
+      return NextResponse.json(
+        { error: "签名挑战与当前请求不匹配" },
+        { status: 401 }
+      );
     }
 
     const ip = getRequestIp(req.headers);
@@ -79,7 +85,10 @@ export async function POST(req: NextRequest) {
       challenge.ipHash !== contextHashes.ipHash ||
       challenge.userAgentHash !== contextHashes.userAgentHash
     ) {
-      return NextResponse.json({ error: "签名挑战与当前设备环境不匹配" }, { status: 401 });
+      return NextResponse.json(
+        { error: "签名挑战与当前设备环境不匹配" },
+        { status: 401 }
+      );
     }
 
     const isValidSignature = await verifyMessage({

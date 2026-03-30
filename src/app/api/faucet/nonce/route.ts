@@ -10,9 +10,9 @@ import {
   checkFaucetClaimEligibility,
   createRequestContextHashes,
   enforceFaucetRateLimit,
+  getRequestIp,
   getRequestUserAgent,
   isFaucetError,
-  getRequestIp,
 } from "@/lib/faucet/utils";
 import { createFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
 import { captureServerException } from "@/lib/observability/server";

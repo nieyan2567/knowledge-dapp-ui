@@ -113,7 +113,10 @@ function getIpLockKey(ip: string) {
   return `faucet_lock:ip:${ip}`;
 }
 
-async function getPositiveTtl(redis: Awaited<ReturnType<typeof getRedis>>, key: string) {
+async function getPositiveTtl(
+  redis: Awaited<ReturnType<typeof getRedis>>,
+  key: string
+) {
   if (!redis) {
     throw new FaucetInfraError();
   }
@@ -158,7 +161,9 @@ function getRateLimitWindowSeconds(kind: "nonce" | "claim") {
       : env.FAUCET_CLAIM_RATE_LIMIT_WINDOW_SECONDS;
 
   if (!Number.isFinite(value) || value <= 0) {
-    throw new Error(`FAUCET_${kind.toUpperCase()}_RATE_LIMIT_WINDOW_SECONDS must be a positive number`);
+    throw new Error(
+      `FAUCET_${kind.toUpperCase()}_RATE_LIMIT_WINDOW_SECONDS must be a positive number`
+    );
   }
 
   return Math.floor(value);
@@ -172,7 +177,9 @@ function getRateLimitMax(kind: "nonce" | "claim") {
       : env.FAUCET_CLAIM_RATE_LIMIT_MAX;
 
   if (!Number.isFinite(value) || value <= 0) {
-    throw new Error(`FAUCET_${kind.toUpperCase()}_RATE_LIMIT_MAX must be a positive number`);
+    throw new Error(
+      `FAUCET_${kind.toUpperCase()}_RATE_LIMIT_MAX must be a positive number`
+    );
   }
 
   return Math.floor(value);
@@ -279,8 +286,12 @@ export async function getCooldownRemainingSeconds(
   const ttlValues = await Promise.all([
     getPositiveTtl(redis, getAddressClaimKey(address)),
     getPositiveTtl(redis, getAddressLockKey(address)),
-    normalizedIp ? getPositiveTtl(redis, getIpClaimKey(normalizedIp)) : Promise.resolve(0),
-    normalizedIp ? getPositiveTtl(redis, getIpLockKey(normalizedIp)) : Promise.resolve(0),
+    normalizedIp
+      ? getPositiveTtl(redis, getIpClaimKey(normalizedIp))
+      : Promise.resolve(0),
+    normalizedIp
+      ? getPositiveTtl(redis, getIpLockKey(normalizedIp))
+      : Promise.resolve(0),
   ]);
 
   return Math.max(...ttlValues, 0);
@@ -338,7 +349,9 @@ export async function acquireFaucetClaimLock(
   const lockSeconds = getFaucetLockTtlSeconds();
   const entries = [
     { key: getAddressLockKey(address), token: crypto.randomUUID() },
-    ...(normalizedIp ? [{ key: getIpLockKey(normalizedIp), token: crypto.randomUUID() }] : []),
+    ...(normalizedIp
+      ? [{ key: getIpLockKey(normalizedIp), token: crypto.randomUUID() }]
+      : []),
   ];
 
   const acquired: FaucetClaimLock["entries"] = [];
@@ -392,7 +405,11 @@ export function formatFaucetAmount(value: bigint) {
   return `${formatEther(value)} ${knowledgeChain.nativeCurrency.symbol}`;
 }
 
-function getRateLimitKey(kind: "nonce" | "claim", scope: "address" | "ip", value: string) {
+function getRateLimitKey(
+  kind: "nonce" | "claim",
+  scope: "address" | "ip",
+  value: string
+) {
   return `faucet_rate:${kind}:${scope}:${value}`;
 }
 
@@ -416,9 +433,7 @@ async function incrementRateLimitCounter(
   }
 
   const ttl = await getPositiveTtl(redis, key);
-  throw new FaucetRateLimitError(
-    `请求过于频繁，请在 ${ttl} 秒后重试。`
-  );
+  throw new FaucetRateLimitError(`请求过于频繁，请在 ${ttl} 秒后重试。`);
 }
 
 export async function enforceFaucetRateLimit(

@@ -2,19 +2,17 @@ import {
   decodeFunctionData,
   formatEther,
   keccak256,
-  parseAbiItem,
   stringToBytes,
   toHex,
 } from "viem";
 
 import { ABIS, CONTRACTS } from "@/contracts";
+import { proposalCreatedEvent } from "@/contracts/events";
 import { BRANDING } from "@/lib/branding";
 import type { Address, HexString } from "@/types/contracts";
 import type { ProposalActionSummary, ProposalItem } from "@/types/governance";
 
-export const proposalCreatedEvent = parseAbiItem(
-  "event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)"
-);
+export { proposalCreatedEvent };
 
 type ProposalCreatedArgs = {
   proposalId?: bigint;

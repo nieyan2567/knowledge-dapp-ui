@@ -57,6 +57,18 @@ const localizedKnownMessages = [
     message: "当前票数不足，暂时不能发放奖励",
   },
   {
+    pattern: "no new votes",
+    message: "当前没有新增票数可记账",
+  },
+  {
+    pattern: "not author",
+    message: "只有内容作者可以执行该操作",
+  },
+  {
+    pattern: "content deleted",
+    message: "内容已删除，当前操作不可用",
+  },
+  {
     pattern: "insufficient pending",
     message: "待提取余额不足，无法提取",
   },
@@ -332,7 +344,9 @@ export function classifyTransactionError(
       category: "simulation_failed",
       phase,
       message:
-        message === fallback ? "交易预检查失败，请确认参数和链上状态" : message,
+        message === fallback
+          ? "交易预检查失败，请确认参数和链上状态"
+          : message,
       rawMessage,
       report: true,
       severity: "warn",
@@ -423,12 +437,7 @@ export async function writeTxToast({
   }
 
   try {
-    return await txToast(
-      writeContractAsync(request),
-      loading,
-      success,
-      fail
-    );
+    return await txToast(writeContractAsync(request), loading, success, fail);
   } catch {
     return null;
   }

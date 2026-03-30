@@ -4,9 +4,10 @@ import Link from "next/link";
 import { Coins, ExternalLink, ShieldCheck, Wallet } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { formatEther, parseAbiItem } from "viem";
+import { formatEther } from "viem";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 
+import { rewardAccrueRequestedEvent, rewardClaimedEvent } from "@/contracts/events";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
@@ -17,14 +18,6 @@ import { BRANDING } from "@/lib/branding";
 import { reportClientError } from "@/lib/observability/client";
 import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt, asContentData } from "@/lib/web3-types";
-
-const rewardAccrueRequestedEvent = parseAbiItem(
-	"event RewardAccrueRequested(uint256 indexed contentId, address indexed author, uint256 amount, uint256 voteCountAtAccrual)"
-);
-
-const rewardClaimedEvent = parseAbiItem(
-	"event RewardClaimed(address indexed beneficiary, uint256 amount)"
-);
 
 const PAGE_SIZE_OPTIONS = [3, 5, 10] as const;
 const HISTORY_FILTERS = ["all", "accrued", "claimed"] as const;
