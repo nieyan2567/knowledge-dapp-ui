@@ -15,6 +15,7 @@ import {
   ArrowDown,
   ArrowRight,
   ArrowUp,
+  Coins,
   Clock3,
   ExternalLink,
   Gavel,
@@ -255,6 +256,12 @@ export default function GovernancePage() {
     functionName: "votingPeriod",
   });
 
+  const { data: proposalFee, refetch: refetchProposalFee } = useReadContract({
+    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
+    abi: ABIS.KnowledgeGovernor,
+    functionName: "proposalFee",
+  });
+
   const { data: latestProposalState, refetch: refetchLatestProposalState } = useReadContract({
     address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
     abi: ABIS.KnowledgeGovernor,
@@ -398,6 +405,7 @@ export default function GovernancePage() {
     trimmedDescription.length > 0 &&
     draftActions.length > 0 &&
     allActionsValid &&
+    proposalFee !== undefined &&
     (!hasHighRiskAction || highRiskConfirmed);
 
   useEffect(() => {
@@ -447,10 +455,17 @@ export default function GovernancePage() {
     () => [
       loadProposals,
       refetchProposalThreshold,
+      refetchProposalFee,
       refetchVotingDelay,
       refetchVotingPeriod,
     ],
-    [loadProposals, refetchProposalThreshold, refetchVotingDelay, refetchVotingPeriod]
+    [
+      loadProposals,
+      refetchProposalFee,
+      refetchProposalThreshold,
+      refetchVotingDelay,
+      refetchVotingPeriod,
+    ]
   );
 
   useTxEventRefetch(governanceRefreshDomains, governanceRefetchers);
@@ -555,21 +570,27 @@ export default function GovernancePage() {
       return;
     }
 
+    if (proposalFee === undefined) {
+      toast.error("提案费用尚未加载完成");
+      return;
+    }
+
     const hash = await writeTxToast({
       publicClient,
       writeContractAsync,
-      request: {
-        address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-        abi: ABIS.KnowledgeGovernor,
-        functionName: "propose",
-        args: [
-          encodedActions.map((item) => item.target),
-          encodedActions.map((item) => item.value),
-          encodedActions.map((item) => item.calldata),
-          trimmedDescription,
-        ],
-        account: address,
-      },
+        request: {
+          address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
+          abi: ABIS.KnowledgeGovernor,
+          functionName: "proposeWithFee",
+          args: [
+            encodedActions.map((item) => item.target),
+            encodedActions.map((item) => item.value),
+            encodedActions.map((item) => item.calldata),
+            trimmedDescription,
+          ],
+          value: typeof proposalFee === "bigint" ? proposalFee : 0n,
+          account: address,
+        },
       loading: "正在提交提案...",
       success: "提案交易已提交",
       fail: "提案提交失败",
@@ -764,6 +785,22 @@ export default function GovernancePage() {
                   </label>
                 ) : null}
 
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
+                  <div className="font-medium text-slate-900 dark:text-slate-100">
+                    提案费用
+                  </div>
+                  <div className="mt-1">
+                    {typeof proposalFee === "bigint"
+                      ? proposalFee > 0n
+                        ? `${formatEther(proposalFee)} ${BRANDING.nativeTokenSymbol}`
+                        : "当前免费"
+                      : "正在读取费用..."}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    发起提案时会将这笔费用转入协议金库，用于抑制低成本垃圾提案。
+                  </div>
+                </div>
+
                 <button
                   data-testid="governance-propose-button"
                   onClick={handlePropose}
@@ -833,6 +870,19 @@ export default function GovernancePage() {
                     : "-"
                 }
                 description="创建提案所需的最低投票权。"
+              />
+
+              <GovernanceMetricCard
+                icon={<Coins className="h-5 w-5 text-slate-500 dark:text-slate-400" />}
+                label="提案费用"
+                value={
+                  typeof proposalFee === "bigint"
+                    ? proposalFee > 0n
+                      ? `${formatEther(proposalFee)} ${BRANDING.nativeTokenSymbol}`
+                      : "当前免费"
+                    : "-"
+                }
+                description="提交提案时需要附带的协议费用，会直接转入 Revenue Vault。"
               />
 
               <GovernanceMetricCard

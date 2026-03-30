@@ -55,6 +55,25 @@
         {
           "indexed": false,
           "internalType": "uint256",
+          "name": "registerFee",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "updateFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "ContentFeesUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
           "name": "editLockVotes",
           "type": "uint256"
         },
@@ -240,6 +259,19 @@
         }
       ],
       "name": "Paused",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "revenueVault",
+          "type": "address"
+        }
+      ],
+      "name": "RevenueVaultUpdated",
       "type": "event"
     },
     {
@@ -684,7 +716,20 @@
       ],
       "name": "registerContent",
       "outputs": [],
-      "stateMutability": "nonpayable",
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "registerFee",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -705,6 +750,19 @@
       "name": "restoreContent",
       "outputs": [],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "revenueVault",
+      "outputs": [
+        {
+          "internalType": "address payable",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -780,6 +838,24 @@
       "inputs": [
         {
           "internalType": "uint256",
+          "name": "_registerFee",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_updateFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "setContentFees",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
           "name": "_editLockVotes",
           "type": "uint256"
         },
@@ -795,6 +871,19 @@
         }
       ],
       "name": "setContentPolicy",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address payable",
+          "name": "_revenueVault",
+          "type": "address"
+        }
+      ],
+      "name": "setRevenueVault",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -888,7 +977,20 @@
       ],
       "name": "updateContent",
       "outputs": [],
-      "stateMutability": "nonpayable",
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "updateFee",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {

@@ -107,6 +107,28 @@ function parseRequiredTokenAmount(
   }
 }
 
+function parseRequiredNonNegativeTokenAmount(
+  values: Record<string, string | boolean>,
+  key: string,
+  label: string
+): bigint | FailedValidation {
+  const value = readString(values, key);
+
+  if (!value) {
+    return fail(`请输入${label}`);
+  }
+
+  try {
+    const parsed = parseEther(value);
+    if (parsed < 0n) {
+      return fail(`${label}必须大于或等于 0`);
+    }
+    return parsed;
+  } catch {
+    return fail(`${label}格式不正确`);
+  }
+}
+
 function formatAddress(address: Address) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
@@ -202,6 +224,34 @@ const GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
     ],
   },
   {
+    id: "content.setContentFees",
+    category: "content",
+    label: "更新内容费用",
+    description: "调整内容发布费与新版本更新费。",
+    riskLevel: "medium",
+    target: CONTRACTS.KnowledgeContent as Address,
+    functionName: "setContentFees",
+    valueMode: "fixedZero",
+    fields: [
+      {
+        key: "registerFee",
+        label: "发布费用",
+        type: "tokenAmount",
+        required: true,
+        placeholder: "例如 0.01",
+        defaultValue: "0.01",
+      },
+      {
+        key: "updateFee",
+        label: "更新费用",
+        type: "tokenAmount",
+        required: true,
+        placeholder: "例如 0.005",
+        defaultValue: "0.005",
+      },
+    ],
+  },
+  {
     id: "stake.setCooldownSeconds",
     category: "stake",
     label: "更新退出冷却期",
@@ -286,6 +336,26 @@ const GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
         required: true,
         placeholder: "例如 100",
         defaultValue: "100",
+      },
+    ],
+  },
+  {
+    id: "governor.setProposalFee",
+    category: "governor",
+    label: "更新提案费用",
+    description: "调整发起治理提案时需要附带的协议费用。",
+    riskLevel: "medium",
+    target: CONTRACTS.KnowledgeGovernor as Address,
+    functionName: "setProposalFee",
+    valueMode: "fixedZero",
+    fields: [
+      {
+        key: "proposalFee",
+        label: "提案费用",
+        type: "tokenAmount",
+        required: true,
+        placeholder: "例如 0.05",
+        defaultValue: "0.05",
       },
     ],
   },
@@ -486,6 +556,52 @@ const templateCodecs: Record<string, TemplateCodec> = {
       });
     },
   },
+  "content.setContentFees": {
+    validate(values) {
+      const registerFee = parseRequiredNonNegativeTokenAmount(
+        values,
+        "registerFee",
+        "发布费用"
+      );
+      if (isFailed(registerFee)) return registerFee;
+
+      const updateFee = parseRequiredNonNegativeTokenAmount(
+        values,
+        "updateFee",
+        "更新费用"
+      );
+      if (isFailed(updateFee)) return updateFee;
+
+      return ok();
+    },
+    encode(values) {
+      const registerFee = parseRequiredNonNegativeTokenAmount(
+        values,
+        "registerFee",
+        "发布费用"
+      );
+      const updateFee = parseRequiredNonNegativeTokenAmount(
+        values,
+        "updateFee",
+        "更新费用"
+      );
+
+      if (isFailed(registerFee) || isFailed(updateFee)) {
+        throw new Error("无效的内容费用提案");
+      }
+
+      return buildEncodedAction({
+        templateId: "content.setContentFees",
+        target: CONTRACTS.KnowledgeContent as Address,
+        abi: ABIS.KnowledgeContent,
+        functionName: "setContentFees",
+        args: [registerFee, updateFee],
+        title: "更新内容费用",
+        description: `将发布费用设为 ${formatEther(registerFee)} ${BRANDING.nativeTokenSymbol}，更新费用设为 ${formatEther(updateFee)} ${BRANDING.nativeTokenSymbol}`,
+        riskLevel: "medium",
+      });
+    },
+  },
   "stake.setCooldownSeconds": {
     validate(values) {
       const cooldownSeconds = parseRequiredUint(
@@ -605,6 +721,38 @@ const templateCodecs: Record<string, TemplateCodec> = {
         args: [proposalThreshold],
         title: "更新提案门槛",
         description: `将提案门槛更新为 ${formatEther(proposalThreshold)} ${BRANDING.nativeTokenSymbol}`,
+        riskLevel: "medium",
+      });
+    },
+  },
+  "governor.setProposalFee": {
+    validate(values) {
+      const proposalFee = parseRequiredNonNegativeTokenAmount(
+        values,
+        "proposalFee",
+        "提案费用"
+      );
+      return isFailed(proposalFee) ? proposalFee : ok();
+    },
+    encode(values) {
+      const proposalFee = parseRequiredNonNegativeTokenAmount(
+        values,
+        "proposalFee",
+        "提案费用"
+      );
+
+      if (isFailed(proposalFee)) {
+        throw new Error("无效的提案费用提案");
+      }
+
+      return buildEncodedAction({
+        templateId: "governor.setProposalFee",
+        target: CONTRACTS.KnowledgeGovernor as Address,
+        abi: ABIS.KnowledgeGovernor,
+        functionName: "setProposalFee",
+        args: [proposalFee],
+        title: "更新提案费用",
+        description: `将提案费用更新为 ${formatEther(proposalFee)} ${BRANDING.nativeTokenSymbol}`,
         riskLevel: "medium",
       });
     },

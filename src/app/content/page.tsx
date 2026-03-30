@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { formatEther } from "viem";
 import {
   useAccount,
   usePublicClient,
@@ -17,6 +18,7 @@ import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useUploadAuth } from "@/hooks/useUploadAuth";
+import { BRANDING } from "@/lib/branding";
 import { reportClientError } from "@/lib/observability/client";
 import { txToast, writeTxToast } from "@/lib/tx-toast";
 import {
@@ -102,6 +104,12 @@ export default function ContentPage() {
     address: CONTRACTS.KnowledgeContent as `0x${string}`,
     abi: ABIS.KnowledgeContent,
     functionName: "contentCount",
+  });
+
+  const { data: registerFee } = useReadContract({
+    address: CONTRACTS.KnowledgeContent as `0x${string}`,
+    abi: ABIS.KnowledgeContent,
+    functionName: "registerFee",
   });
 
   const readContents = useCallback(
@@ -351,6 +359,11 @@ export default function ContentPage() {
       return;
     }
 
+    if (registerFee === undefined) {
+      toast.error("发布费用尚未加载完成");
+      return;
+    }
+
     setRegistering(true);
 
     try {
@@ -362,6 +375,7 @@ export default function ContentPage() {
           abi: ABIS.KnowledgeContent,
           functionName: "registerContent",
           args: [uploadedCid, title.trim(), desc.trim()],
+          value: typeof registerFee === "bigint" ? registerFee : 0n,
           account: address,
         },
         loading: "正在提交链上登记交易...",
@@ -515,6 +529,22 @@ export default function ContentPage() {
                 HTML、JS、SVG、EXE、BAT、PS1、SH 等文件。服务端会重新识别文件真实类型，并对文本内容做风险扫描。
               </div>
 
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
+                <div className="font-medium text-slate-900 dark:text-slate-100">
+                  发布费用
+                </div>
+                <div className="mt-1">
+                  {typeof registerFee === "bigint"
+                    ? registerFee > 0n
+                      ? `${formatEther(registerFee)} ${BRANDING.nativeTokenSymbol}`
+                      : "当前免费"
+                    : "正在读取费用..."}
+                </div>
+                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  链上登记时会把这笔费用转入协议金库，用于形成内容发布的消耗口。
+                </div>
+              </div>
+
               <button
                 onClick={handleUploadToIpfs}
                 disabled={!file || uploading || isAuthenticating}
@@ -536,7 +566,7 @@ export default function ContentPage() {
 
               <button
                 onClick={handleRegisterContent}
-                disabled={!uploadedCid || registering}
+                disabled={!uploadedCid || registering || registerFee === undefined}
                 className="w-full rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 {registering ? "正在登记..." : "链上登记"}

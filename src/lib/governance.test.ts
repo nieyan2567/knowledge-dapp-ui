@@ -63,6 +63,18 @@ describe("governance summaries", () => {
     expect(summary?.details?.[1]?.value).toBe("允许");
   });
 
+  it("summarizes content fee updates", () => {
+    const summary = summarizeFromTemplate("content.setContentFees", {
+      registerFee: "0.02",
+      updateFee: "0.01",
+    });
+
+    expect(summary?.title).toContain("费用");
+    expect(summary?.description).toContain("0.02");
+    expect(summary?.description).toContain("0.01");
+    expect(summary?.details?.[0]?.value).toContain("0.02");
+  });
+
   it("summarizes governor parameter updates", () => {
     const summary = summarizeFromTemplate("governor.setVotingPeriod", {
       votingPeriod: "42",
@@ -71,6 +83,16 @@ describe("governance summaries", () => {
     expect(summary?.title).toContain("投票");
     expect(summary?.description).toContain("42");
     expect(summary?.details?.[0]?.value).toContain("42");
+  });
+
+  it("summarizes proposal fee updates", () => {
+    const summary = summarizeFromTemplate("governor.setProposalFee", {
+      proposalFee: "0.07",
+    });
+
+    expect(summary?.title).toContain("费用");
+    expect(summary?.description).toContain("0.07");
+    expect(summary?.details?.[0]?.value).toContain("0.07");
   });
 
   it("summarizes stake cooldown updates", () => {
@@ -98,7 +120,7 @@ describe("governance summaries", () => {
       lateQuorumVoteExtension: "24",
     });
 
-    expect(summary?.title).toContain("延迟法定人数");
+    expect(summary?.title).toContain("法定人数");
     expect(summary?.description).toContain("24");
     expect(summary?.details?.[0]?.value).toContain("24");
   });

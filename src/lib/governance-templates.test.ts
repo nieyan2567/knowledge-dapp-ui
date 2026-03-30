@@ -23,9 +23,15 @@ describe("governance-templates", () => {
   it("lists only supported proposal actions", () => {
     const templates = getGovernanceTemplates();
 
-    expect(templates.length).toBe(11);
+    expect(templates.length).toBe(13);
     expect(getGovernanceTemplateById("governor.setVotingPeriod")?.functionName).toBe(
       "setVotingPeriod"
+    );
+    expect(getGovernanceTemplateById("content.setContentFees")?.functionName).toBe(
+      "setContentFees"
+    );
+    expect(getGovernanceTemplateById("governor.setProposalFee")?.functionName).toBe(
+      "setProposalFee"
     );
     expect(getGovernanceTemplateById("stake.setCooldownSeconds")?.functionName).toBe(
       "setCooldownSeconds"
@@ -89,6 +95,31 @@ describe("governance-templates", () => {
     expect(encoded.description).toContain("12");
   });
 
+  it("encodes content fee proposals", () => {
+    const draft = createGovernanceDraftAction("content.setContentFees");
+    draft.values.registerFee = "0.02";
+    draft.values.updateFee = "0.01";
+
+    const encoded = encodeGovernanceActionDraft(draft);
+
+    expect(encoded.templateId).toBe("content.setContentFees");
+    expect(encoded.target).toBe(CONTRACTS.KnowledgeContent);
+    expect(encoded.description).toContain("0.02");
+    expect(encoded.description).toContain("0.01");
+  });
+
+  it("allows zero fees for content and proposal fee actions", () => {
+    const contentFeeDraft = createGovernanceDraftAction("content.setContentFees");
+    contentFeeDraft.values.registerFee = "0";
+    contentFeeDraft.values.updateFee = "0";
+
+    const proposalFeeDraft = createGovernanceDraftAction("governor.setProposalFee");
+    proposalFeeDraft.values.proposalFee = "0";
+
+    expect(validateGovernanceActionDraft(contentFeeDraft).ok).toBe(true);
+    expect(validateGovernanceActionDraft(proposalFeeDraft).ok).toBe(true);
+  });
+
   it("encodes timelock delay proposals", () => {
     const draft = createGovernanceDraftAction("timelock.updateDelay");
     draft.values.delaySeconds = "7200";
@@ -131,5 +162,16 @@ describe("governance-templates", () => {
     expect(encoded.templateId).toBe("governor.setLateQuorumVoteExtension");
     expect(encoded.target).toBe(CONTRACTS.KnowledgeGovernor);
     expect(encoded.description).toContain("25");
+  });
+
+  it("encodes proposal fee proposals", () => {
+    const draft = createGovernanceDraftAction("governor.setProposalFee");
+    draft.values.proposalFee = "0.08";
+
+    const encoded = encodeGovernanceActionDraft(draft);
+
+    expect(encoded.templateId).toBe("governor.setProposalFee");
+    expect(encoded.target).toBe(CONTRACTS.KnowledgeGovernor);
+    expect(encoded.description).toContain("0.08");
   });
 });

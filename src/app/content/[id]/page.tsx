@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { formatEther } from "viem";
 import { toast } from "sonner";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import {
@@ -27,6 +28,7 @@ import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useUploadAuth } from "@/hooks/useUploadAuth";
+import { BRANDING } from "@/lib/branding";
 import { getIpfsFileUrl } from "@/lib/ipfs";
 import { reportClientError } from "@/lib/observability/client";
 import { txToast, writeTxToast } from "@/lib/tx-toast";
@@ -159,12 +161,19 @@ export default function ContentDetailPage() {
     functionName: "maxVersionsPerContent",
   });
 
+  const { data: updateFeeData } = useReadContract({
+    address: CONTRACTS.KnowledgeContent as `0x${string}`,
+    abi: ABIS.KnowledgeContent,
+    functionName: "updateFee",
+  });
+
   const content = asContentData(contentData);
   const versionCount = typeof versionCountData === "bigint" ? versionCountData : 0n;
   const rewardAccrualCount =
     typeof rewardAccrualCountData === "bigint" ? rewardAccrualCountData : 0n;
   const maxVersionsPerContent =
     typeof maxVersionsPerContentData === "bigint" ? maxVersionsPerContentData : undefined;
+  const updateFee = typeof updateFeeData === "bigint" ? updateFeeData : undefined;
 
   const loadVersions = useCallback(
     async (countOverride?: bigint) => {
@@ -514,6 +523,11 @@ export default function ContentDetailPage() {
       return;
     }
 
+    if (updateFee === undefined) {
+      toast.error("更新费用尚未加载完成");
+      return;
+    }
+
     setSavingEdit(true);
 
     try {
@@ -530,6 +544,7 @@ export default function ContentDetailPage() {
             editTitle.trim(),
             editDescription.trim(),
           ],
+          value: updateFee ?? 0n,
           account: address,
         },
         loading: "正在提交新版本...",
@@ -1000,6 +1015,22 @@ export default function ContentDetailPage() {
                   <CopyField label="新版本网关地址" value={uploadedVersionUrl} />
                 ) : null}
 
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
+                  <div className="font-medium text-slate-900 dark:text-slate-100">
+                    新版本更新费用
+                  </div>
+                  <div className="mt-1">
+                    {updateFee === undefined
+                      ? "正在读取费用..."
+                      : updateFee > 0n
+                        ? `${formatEther(updateFee)} ${BRANDING.nativeTokenSymbol}`
+                        : "当前免费"}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    创建新版本时会把这笔费用转入协议金库，用于约束低成本刷版本。
+                  </div>
+                </div>
+
                 {newVersionBlockedReason ? (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-6 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
                     {newVersionBlockedReason}
@@ -1017,7 +1048,12 @@ export default function ContentDetailPage() {
                 <div className="flex flex-wrap gap-3">
                   <button
                     onClick={handleUpdateContent}
-                    disabled={!!newVersionBlockedReason || savingEdit || uploadingVersionFile}
+                    disabled={
+                      !!newVersionBlockedReason ||
+                      savingEdit ||
+                      uploadingVersionFile ||
+                      updateFee === undefined
+                    }
                     className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
                   >
                     <PencilLine className="h-4 w-4" />

@@ -101,6 +101,35 @@ function summarizeDecodedAction(
           rawCalldata: calldata,
         });
       }
+
+      if (
+        decoded.functionName === "setContentFees" &&
+        typeof args[0] === "bigint" &&
+        typeof args[1] === "bigint"
+      ) {
+        return createSummary({
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新内容费用",
+          description: appendValueSuffix(
+            `将发布费用更新为 ${formatEther(args[0])} ${BRANDING.nativeTokenSymbol}，更新费用更新为 ${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}`,
+            value
+          ),
+          details: [
+            {
+              label: "发布费用",
+              value: `${formatEther(args[0])} ${BRANDING.nativeTokenSymbol}`,
+            },
+            {
+              label: "更新费用",
+              value: `${formatEther(args[1])} ${BRANDING.nativeTokenSymbol}`,
+            },
+          ],
+          rawCalldata: calldata,
+        });
+      }
     }
 
     if (isSameAddress(target, CONTRACTS.TreasuryNative)) {
@@ -198,6 +227,27 @@ function summarizeDecodedAction(
           details: [
             {
               label: "提案门槛",
+              value: `${formatEther(args[0])} ${BRANDING.nativeTokenSymbol}`,
+            },
+          ],
+          rawCalldata: calldata,
+        });
+      }
+
+      if (decoded.functionName === "setProposalFee" && typeof args[0] === "bigint") {
+        return createSummary({
+          target,
+          targetLabel,
+          value,
+          functionName: decoded.functionName,
+          title: "更新提案费用",
+          description: appendValueSuffix(
+            `将提案费用更新为 ${formatEther(args[0])} ${BRANDING.nativeTokenSymbol}`,
+            value
+          ),
+          details: [
+            {
+              label: "提案费用",
               value: `${formatEther(args[0])} ${BRANDING.nativeTokenSymbol}`,
             },
           ],

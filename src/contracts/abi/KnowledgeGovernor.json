@@ -11,6 +11,16 @@
           "internalType": "contract TimelockController",
           "name": "_timelock",
           "type": "address"
+        },
+        {
+          "internalType": "address payable",
+          "name": "_revenueVault",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_proposalFee",
+          "type": "uint256"
         }
       ],
       "stateMutability": "nonpayable",
@@ -174,6 +184,19 @@
         {
           "indexed": false,
           "internalType": "uint256",
+          "name": "proposalFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "ProposalFeeUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
           "name": "proposalId",
           "type": "uint256"
         },
@@ -223,6 +246,19 @@
         }
       ],
       "name": "QuorumNumeratorUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "revenueVault",
+          "type": "address"
+        }
+      ],
+      "name": "RevenueVaultUpdated",
       "type": "event"
     },
     {
@@ -1001,6 +1037,19 @@
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "proposalFee",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint256",
@@ -1132,6 +1181,40 @@
           "type": "bytes[]"
         },
         {
+          "internalType": "string",
+          "name": "description",
+          "type": "string"
+        }
+      ],
+      "name": "proposeWithFee",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "targets",
+          "type": "address[]"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "values",
+          "type": "uint256[]"
+        },
+        {
+          "internalType": "bytes[]",
+          "name": "calldatas",
+          "type": "bytes[]"
+        },
+        {
           "internalType": "bytes32",
           "name": "descriptionHash",
           "type": "bytes32"
@@ -1236,6 +1319,19 @@
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "revenueVault",
+      "outputs": [
+        {
+          "internalType": "address payable",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint64",
@@ -1252,11 +1348,37 @@
       "inputs": [
         {
           "internalType": "uint256",
+          "name": "_proposalFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "setProposalFee",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
           "name": "newProposalThreshold",
           "type": "uint256"
         }
       ],
       "name": "setProposalThreshold",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address payable",
+          "name": "_revenueVault",
+          "type": "address"
+        }
+      ],
+      "name": "setRevenueVault",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
