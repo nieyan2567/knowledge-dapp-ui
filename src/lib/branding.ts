@@ -7,6 +7,6 @@ export const BRANDING = {
   chainName: "KnowChain",
   nativeTokenName: "Know Coin",
   nativeTokenSymbol: "KC",
-  explorerName: "Chainlens",
-  explorerUrl: env.NEXT_PUBLIC_CHAINLENS_URL,
+  explorerName: "Blockscout",
+  explorerUrl: env.NEXT_PUBLIC_BLOCKSCOUT_URL,
 };

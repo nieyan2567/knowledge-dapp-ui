@@ -47,7 +47,7 @@ const optionalUrl = z.preprocess(
 
 const productionRequiredPublicUrls = [
   "NEXT_PUBLIC_BESU_RPC_URL",
-  "NEXT_PUBLIC_CHAINLENS_URL",
+  "NEXT_PUBLIC_BLOCKSCOUT_URL",
   "NEXT_PUBLIC_IPFS_GATEWAY_URL",
 ] as const;
 
@@ -59,7 +59,7 @@ const productionRequiredServerUrls = [
 const publicEnvSchema = z.object({
   NEXT_PUBLIC_BESU_RPC_URL: urlWithDefault("http://127.0.0.1:8545"),
   NEXT_PUBLIC_BESU_CHAIN_ID: positiveIntWithDefault(20260),
-  NEXT_PUBLIC_CHAINLENS_URL: urlWithDefault("http://127.0.0.1:8181"),
+  NEXT_PUBLIC_BLOCKSCOUT_URL: urlWithDefault("http://127.0.0.1:8182"),
   NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: z.string().trim().default(""),
   NEXT_PUBLIC_IPFS_GATEWAY_URL: urlWithDefault("http://127.0.0.1:8080/ipfs"),
 });
@@ -236,7 +236,7 @@ function getPublicEnvSource() {
   return {
     NEXT_PUBLIC_BESU_RPC_URL: process.env.NEXT_PUBLIC_BESU_RPC_URL,
     NEXT_PUBLIC_BESU_CHAIN_ID: process.env.NEXT_PUBLIC_BESU_CHAIN_ID,
-    NEXT_PUBLIC_CHAINLENS_URL: process.env.NEXT_PUBLIC_CHAINLENS_URL,
+    NEXT_PUBLIC_BLOCKSCOUT_URL: process.env.NEXT_PUBLIC_BLOCKSCOUT_URL,
     NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:
       process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
     NEXT_PUBLIC_IPFS_GATEWAY_URL: process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL,

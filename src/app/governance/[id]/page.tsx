@@ -631,7 +631,7 @@ export default function ProposalDetailPage() {
                 }
               }}
             >
-              在 ChainLens 中查看
+              在 {BRANDING.explorerName} 中查看
               <ExternalLink className="h-4 w-4" />
             </a>
           </SectionCard>

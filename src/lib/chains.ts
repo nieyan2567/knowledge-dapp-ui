@@ -5,7 +5,7 @@ import { getPublicEnv } from "./env";
 const env = getPublicEnv();
 const chainId = env.NEXT_PUBLIC_BESU_CHAIN_ID;
 const rpcUrl = env.NEXT_PUBLIC_BESU_RPC_URL;
-const explorerUrl = env.NEXT_PUBLIC_CHAINLENS_URL;
+const explorerUrl = env.NEXT_PUBLIC_BLOCKSCOUT_URL;
 
 export const knowledgeChain = defineChain({
   id: chainId,
@@ -22,7 +22,7 @@ export const knowledgeChain = defineChain({
   },
   blockExplorers: {
     default: {
-      name: "Chainlens",
+      name: "Blockscout",
       url: explorerUrl,
     },
   },

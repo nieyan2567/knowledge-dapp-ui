@@ -95,7 +95,7 @@ src/
 建议先确保以下服务可用：
 
 - Besu / EVM RPC：`http://127.0.0.1:8545`
-- ChainLens：`http://127.0.0.1:8181`
+- Blockscout：`http://127.0.0.1:8182`
 - IPFS Kubo API：`http://127.0.0.1:5001`
 - IPFS Gateway：`http://127.0.0.1:8080/ipfs`
 - Redis：用于上传鉴权 nonce 和 Faucet 限流
@@ -141,7 +141,7 @@ npm run start
 
 - `NEXT_PUBLIC_BESU_RPC_URL`：前端读取链上数据的 RPC 地址
 - `NEXT_PUBLIC_BESU_CHAIN_ID`：当前链 ID，默认 `20260`
-- `NEXT_PUBLIC_CHAINLENS_URL`：区块浏览器地址
+- `NEXT_PUBLIC_BLOCKSCOUT_URL`：区块浏览器地址
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`：WalletConnect 项目 ID
 
 ### 上传服务

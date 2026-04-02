@@ -8,7 +8,7 @@ const originalEnv = {
   NODE_ENV: process.env["NODE_ENV"],
   NEXT_PUBLIC_BESU_RPC_URL: process.env["NEXT_PUBLIC_BESU_RPC_URL"],
   NEXT_PUBLIC_BESU_CHAIN_ID: process.env["NEXT_PUBLIC_BESU_CHAIN_ID"],
-  NEXT_PUBLIC_CHAINLENS_URL: process.env["NEXT_PUBLIC_CHAINLENS_URL"],
+  NEXT_PUBLIC_BLOCKSCOUT_URL: process.env["NEXT_PUBLIC_BLOCKSCOUT_URL"],
   NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:
     process.env["NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID"],
   NEXT_PUBLIC_IPFS_GATEWAY_URL: process.env["NEXT_PUBLIC_IPFS_GATEWAY_URL"],
@@ -44,7 +44,7 @@ function applyValidServerEnv() {
   mutableEnv.NODE_ENV = "test";
   mutableEnv.NEXT_PUBLIC_BESU_RPC_URL = "http://127.0.0.1:8545";
   mutableEnv.NEXT_PUBLIC_BESU_CHAIN_ID = "20260";
-  mutableEnv.NEXT_PUBLIC_CHAINLENS_URL = "http://127.0.0.1:8181";
+  mutableEnv.NEXT_PUBLIC_BLOCKSCOUT_URL = "http://127.0.0.1:8182";
   mutableEnv.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID = "";
   mutableEnv.NEXT_PUBLIC_IPFS_GATEWAY_URL = "http://127.0.0.1:8080/ipfs";
   mutableEnv.UPLOAD_AUTH_SECRET = "test-upload-secret";
@@ -67,7 +67,7 @@ function applyValidServerEnv() {
 
 function applyValidProductionUrls() {
   mutableEnv.NEXT_PUBLIC_BESU_RPC_URL = "https://rpc.example.com";
-  mutableEnv.NEXT_PUBLIC_CHAINLENS_URL = "https://scan.example.com";
+  mutableEnv.NEXT_PUBLIC_BLOCKSCOUT_URL = "https://scan.example.com";
   mutableEnv.NEXT_PUBLIC_IPFS_GATEWAY_URL = "https://ipfs.example.com/ipfs";
   mutableEnv.IPFS_API_URL = "https://ipfs-api.example.com";
   mutableEnv.IPFS_GATEWAY_URL = "https://ipfs.example.com/ipfs";
@@ -77,7 +77,7 @@ afterEach(() => {
   restoreEnvValue("NODE_ENV", originalEnv.NODE_ENV);
   restoreEnvValue("NEXT_PUBLIC_BESU_RPC_URL", originalEnv.NEXT_PUBLIC_BESU_RPC_URL);
   restoreEnvValue("NEXT_PUBLIC_BESU_CHAIN_ID", originalEnv.NEXT_PUBLIC_BESU_CHAIN_ID);
-  restoreEnvValue("NEXT_PUBLIC_CHAINLENS_URL", originalEnv.NEXT_PUBLIC_CHAINLENS_URL);
+  restoreEnvValue("NEXT_PUBLIC_BLOCKSCOUT_URL", originalEnv.NEXT_PUBLIC_BLOCKSCOUT_URL);
   restoreEnvValue(
     "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID",
     originalEnv.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
@@ -117,14 +117,14 @@ describe("env", () => {
   it("applies defaults for public variables", () => {
     delete process.env.NEXT_PUBLIC_BESU_RPC_URL;
     delete process.env.NEXT_PUBLIC_BESU_CHAIN_ID;
-    delete process.env.NEXT_PUBLIC_CHAINLENS_URL;
+    delete process.env.NEXT_PUBLIC_BLOCKSCOUT_URL;
     delete process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
     delete process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL;
 
     expect(getPublicEnv()).toMatchObject({
       NEXT_PUBLIC_BESU_RPC_URL: "http://127.0.0.1:8545",
       NEXT_PUBLIC_BESU_CHAIN_ID: 20260,
-      NEXT_PUBLIC_CHAINLENS_URL: "http://127.0.0.1:8181",
+      NEXT_PUBLIC_BLOCKSCOUT_URL: "http://127.0.0.1:8182",
       NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: "",
       NEXT_PUBLIC_IPFS_GATEWAY_URL: "http://127.0.0.1:8080/ipfs",
     });
