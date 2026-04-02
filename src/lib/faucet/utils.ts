@@ -1,13 +1,15 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 import {
   createPublicClient,
   createWalletClient,
+  encodeAbiParameters,
   encodeFunctionData,
   formatEther,
   http,
+  keccak256,
   parseEther,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -35,12 +37,21 @@ export type FaucetClaimLock = {
 export type FaucetClaimEligibilityResult =
   | {
       ok: true;
+      amount: bigint;
+      minAllowedBalance: bigint;
     }
   | {
       ok: false;
       status: number;
       error: string;
     };
+
+export type FaucetClaimAuthorization = {
+  amount: bigint;
+  deadline: bigint;
+  nonce: `0x${string}`;
+  signature: `0x${string}`;
+};
 
 export class FaucetError extends Error {
   status: number;
@@ -66,30 +77,60 @@ export class FaucetRateLimitError extends FaucetError {
   }
 }
 
-let faucetClients:
-  | {
-      publicClient: ReturnType<typeof createPublicClient>;
-      walletClient: ReturnType<typeof createWalletClient>;
-      account: ReturnType<typeof privateKeyToAccount>;
-    }
-  | undefined;
+type FaucetClients = {
+  publicClient: ReturnType<typeof createPublicClient>;
+  walletClient: ReturnType<typeof createWalletClient>;
+  account: ReturnType<typeof privateKeyToAccount>;
+  relayerAccount: ReturnType<typeof privateKeyToAccount>;
+  authSignerAccount: ReturnType<typeof privateKeyToAccount>;
+};
+
+let faucetClients: FaucetClients | undefined;
 
 function getRpcUrl() {
   return getServerEnv().NEXT_PUBLIC_BESU_RPC_URL;
 }
 
-function getFaucetPrivateKey() {
-  const privateKey = getServerEnv().FAUCET_PRIVATE_KEY;
+function getConfiguredPrivateKey(
+  keys: Array<
+    | "FAUCET_RELAYER_PRIVATE_KEY"
+    | "FAUCET_AUTH_SIGNER_PRIVATE_KEY"
+    | "FAUCET_PRIVATE_KEY"
+  >,
+  label: string
+) {
+  const env = getServerEnv();
 
-  if (!privateKey) {
-    throw new Error("FAUCET_PRIVATE_KEY is not configured");
+  for (const key of keys) {
+    const value = env[key];
+    if (value) {
+      return value as `0x${string}`;
+    }
   }
 
-  if (!privateKey.startsWith("0x")) {
-    throw new Error("FAUCET_PRIVATE_KEY must start with 0x");
-  }
+  throw new Error(`${label} is not configured`);
+}
 
-  return privateKey as `0x${string}`;
+function getFaucetRelayerPrivateKey() {
+  return getConfiguredPrivateKey(
+    ["FAUCET_RELAYER_PRIVATE_KEY", "FAUCET_PRIVATE_KEY"],
+    "FAUCET_RELAYER_PRIVATE_KEY"
+  );
+}
+
+function getFaucetAuthSignerPrivateKey() {
+  return getConfiguredPrivateKey(
+    ["FAUCET_AUTH_SIGNER_PRIVATE_KEY", "FAUCET_PRIVATE_KEY"],
+    "FAUCET_AUTH_SIGNER_PRIVATE_KEY"
+  );
+}
+
+function getFaucetVaultAddress() {
+  const address = CONTRACTS.FaucetVault as `0x${string}` | undefined;
+  if (!address) {
+    throw new FaucetInfraError("FaucetVault 尚未部署或前端部署信息未同步。");
+  }
+  return address;
 }
 
 function normalizeIp(ip: string | null) {
@@ -185,6 +226,10 @@ function getRateLimitMax(kind: "nonce" | "claim") {
   return Math.floor(value);
 }
 
+function getAuthorizationDeadlineSeconds() {
+  return Math.max(60, getServerEnv().FAUCET_NONCE_TTL_SECONDS);
+}
+
 export function getRequestIp(headers: Headers) {
   const forwardedFor = headers.get("x-forwarded-for");
   if (forwardedFor) {
@@ -230,17 +275,20 @@ export async function getFaucetClients() {
     return faucetClients;
   }
 
-  const account = privateKeyToAccount(getFaucetPrivateKey());
+  const relayerAccount = privateKeyToAccount(getFaucetRelayerPrivateKey());
+  const authSignerAccount = privateKeyToAccount(getFaucetAuthSignerPrivateKey());
   const transport = http(getRpcUrl());
 
   faucetClients = {
-    account,
+    account: relayerAccount,
+    relayerAccount,
+    authSignerAccount,
     publicClient: createPublicClient({
       chain: knowledgeChain,
       transport,
     }),
     walletClient: createWalletClient({
-      account,
+      account: relayerAccount,
       chain: knowledgeChain,
       transport,
     }),
@@ -249,8 +297,160 @@ export async function getFaucetClients() {
   return faucetClients;
 }
 
+async function readFaucetVaultConfig() {
+  const { publicClient } = await getFaucetClients();
+  const faucetVaultAddress = getFaucetVaultAddress();
+  const code = await publicClient.getCode({ address: faucetVaultAddress });
+
+  if (!code || code === "0x") {
+    throw new FaucetInfraError("FaucetVault 合约不存在或部署信息已过期。");
+  }
+
+  const [
+    claimAmount,
+    minAllowedBalance,
+    claimCooldown,
+    availableBudget,
+    paused,
+  ] = await Promise.all([
+    publicClient.readContract({
+      address: faucetVaultAddress,
+      abi: ABIS.FaucetVault,
+      functionName: "claimAmount",
+    }),
+    publicClient.readContract({
+      address: faucetVaultAddress,
+      abi: ABIS.FaucetVault,
+      functionName: "minAllowedBalance",
+    }),
+    publicClient.readContract({
+      address: faucetVaultAddress,
+      abi: ABIS.FaucetVault,
+      functionName: "claimCooldown",
+    }),
+    publicClient.readContract({
+      address: faucetVaultAddress,
+      abi: ABIS.FaucetVault,
+      functionName: "availableBudget",
+    }),
+    publicClient.readContract({
+      address: faucetVaultAddress,
+      abi: ABIS.FaucetVault,
+      functionName: "paused",
+    }),
+  ]);
+
+  return {
+    address: faucetVaultAddress,
+    claimAmount: claimAmount as bigint,
+    minAllowedBalance: minAllowedBalance as bigint,
+    claimCooldown: claimCooldown as bigint,
+    availableBudget: availableBudget as bigint,
+    paused: paused as boolean,
+  };
+}
+
+async function readRecipientLastClaimAt(address: `0x${string}`) {
+  const { publicClient } = await getFaucetClients();
+  const faucetVaultAddress = getFaucetVaultAddress();
+
+  return publicClient.readContract({
+    address: faucetVaultAddress,
+    abi: ABIS.FaucetVault,
+    functionName: "lastClaimAt",
+    args: [address],
+  }) as Promise<bigint>;
+}
+
+function encodeClaimRequestHash(input: {
+  recipient: `0x${string}`;
+  amount: bigint;
+  deadline: bigint;
+  nonce: `0x${string}`;
+}) {
+  return keccak256(
+    encodeAbiParameters(
+      [
+        { type: "uint256" },
+        { type: "address" },
+        { type: "address" },
+        { type: "uint256" },
+        { type: "uint256" },
+        { type: "bytes32" },
+      ],
+      [
+        BigInt(knowledgeChain.id),
+        getFaucetVaultAddress(),
+        input.recipient,
+        input.amount,
+        input.deadline,
+        input.nonce,
+      ]
+    )
+  );
+}
+
+export async function createFaucetClaimAuthorization(
+  recipient: `0x${string}`
+): Promise<FaucetClaimAuthorization> {
+  const { authSignerAccount } = await getFaucetClients();
+  const { claimAmount } = await readFaucetVaultConfig();
+  const deadline = BigInt(
+    Math.floor(Date.now() / 1000) + getAuthorizationDeadlineSeconds()
+  );
+  const nonce = `0x${randomBytes(32).toString("hex")}` as `0x${string}`;
+  const requestHash = encodeClaimRequestHash({
+    recipient,
+    amount: claimAmount,
+    deadline,
+    nonce,
+  });
+
+  const signature = await authSignerAccount.signMessage({
+    message: { raw: requestHash },
+  });
+
+  return {
+    amount: claimAmount,
+    deadline,
+    nonce,
+    signature,
+  };
+}
+
+export async function submitFaucetClaim(input: {
+  recipient: `0x${string}`;
+  amount: bigint;
+  deadline: bigint;
+  nonce: `0x${string}`;
+  signature: `0x${string}`;
+}) {
+  const { publicClient, walletClient, relayerAccount } = await getFaucetClients();
+  const faucetVaultAddress = getFaucetVaultAddress();
+
+  const txHash = await walletClient.sendTransaction({
+    account: relayerAccount,
+    to: faucetVaultAddress,
+    data: encodeFunctionData({
+      abi: ABIS.FaucetVault,
+      functionName: "claim",
+      args: [
+        input.recipient,
+        input.amount,
+        input.deadline,
+        input.nonce,
+        input.signature,
+      ],
+    }),
+    chain: knowledgeChain,
+  });
+
+  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  return txHash;
+}
+
 export async function rebalanceRevenueVault() {
-  const { account, publicClient, walletClient } = await getFaucetClients();
+  const { relayerAccount, publicClient, walletClient } = await getFaucetClients();
   const revenueVaultAddress = CONTRACTS.RevenueVault as `0x${string}` | undefined;
 
   if (!revenueVaultAddress) {
@@ -263,7 +463,7 @@ export async function rebalanceRevenueVault() {
   }
 
   const txHash = await walletClient.sendTransaction({
-    account,
+    account: relayerAccount,
     to: revenueVaultAddress,
     data: encodeFunctionData({
       abi: ABIS.RevenueVault,
@@ -294,7 +494,20 @@ export async function getCooldownRemainingSeconds(
       : Promise.resolve(0),
   ]);
 
-  return Math.max(...ttlValues, 0);
+  const offchainTtl = Math.max(...ttlValues, 0);
+
+  try {
+    const [lastClaimAt, claimCooldown] = await Promise.all([
+      readRecipientLastClaimAt(address),
+      readFaucetVaultConfig().then((config) => config.claimCooldown),
+    ]);
+
+    const onchainReadyAt = Number(lastClaimAt + claimCooldown);
+    const onchainTtl = Math.max(0, onchainReadyAt - Math.floor(Date.now() / 1000));
+    return Math.max(offchainTtl, onchainTtl);
+  } catch {
+    return offchainTtl;
+  }
 }
 
 export async function checkFaucetClaimEligibility(
@@ -311,32 +524,53 @@ export async function checkFaucetClaimEligibility(
     };
   }
 
-  const amount = getFaucetAmount();
-  const minBalance = getFaucetMinBalance();
-  const { account, publicClient } = await getFaucetClients();
+  const { publicClient } = await getFaucetClients();
+  const config = await readFaucetVaultConfig();
 
-  const [recipientBalance, faucetBalance] = await Promise.all([
-    publicClient.getBalance({ address }),
-    publicClient.getBalance({ address: account.address }),
-  ]);
-
-  if (recipientBalance >= minBalance) {
-    return {
-      ok: false,
-      status: 400,
-      error: `钱包余额已达到 Faucet 门槛（${formatFaucetAmount(minBalance)}），暂时无法领取。`,
-    };
-  }
-
-  if (faucetBalance < amount) {
+  if (config.paused) {
     return {
       ok: false,
       status: 503,
-      error: "Faucet 钱包余额不足，请稍后再试。",
+      error: "Faucet 当前已暂停，请稍后再试。",
     };
   }
 
-  return { ok: true };
+  const [recipientBalance, faucetBalance] = await Promise.all([
+    publicClient.getBalance({ address }),
+    publicClient.getBalance({ address: config.address }),
+  ]);
+
+  if (recipientBalance >= config.minAllowedBalance) {
+    return {
+      ok: false,
+      status: 400,
+      error: `钱包余额已达到 Faucet 门槛（${formatFaucetAmount(
+        config.minAllowedBalance
+      )}），暂时无法领取。`,
+    };
+  }
+
+  if (faucetBalance < config.claimAmount) {
+    return {
+      ok: false,
+      status: 503,
+      error: "FaucetVault 余额不足，请稍后再试。",
+    };
+  }
+
+  if (config.availableBudget < config.claimAmount) {
+    return {
+      ok: false,
+      status: 429,
+      error: "当前 Faucet 周期预算已用尽，请等待下一预算周期。",
+    };
+  }
+
+  return {
+    ok: true,
+    amount: config.claimAmount,
+    minAllowedBalance: config.minAllowedBalance,
+  };
 }
 
 export async function acquireFaucetClaimLock(

@@ -302,7 +302,7 @@ export default function FaucetPage() {
                   仅需钱包签名
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  你只需要签署一条请求消息，真正的启动资金由 Faucet 服务端发起发放。
+                  你只需要签署一条请求消息，后端会生成授权并由 relayer 代为提交 FaucetVault 发放交易。
                 </p>
               </div>
 
@@ -421,7 +421,7 @@ export default function FaucetPage() {
             <ol className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
               <li>连接 {BRANDING.chainName} 网络上的钱包。</li>
               <li>签署 Faucet 请求消息。</li>
-              <li>后端验证签名后发放启动资金。</li>
+              <li>后端验证签名后，代为提交 FaucetVault 发放交易。</li>
             </ol>
           </div>
 

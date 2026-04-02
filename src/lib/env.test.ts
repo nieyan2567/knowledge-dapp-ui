@@ -25,6 +25,9 @@ const originalEnv = {
   OBS_ALERT_DEDUP_WINDOW_SECONDS: process.env["OBS_ALERT_DEDUP_WINDOW_SECONDS"],
   OBS_CLIENT_ERROR_SAMPLE_RATE: process.env["OBS_CLIENT_ERROR_SAMPLE_RATE"],
   FAUCET_PRIVATE_KEY: process.env["FAUCET_PRIVATE_KEY"],
+  FAUCET_AUTH_SIGNER_PRIVATE_KEY:
+    process.env["FAUCET_AUTH_SIGNER_PRIVATE_KEY"],
+  FAUCET_RELAYER_PRIVATE_KEY: process.env["FAUCET_RELAYER_PRIVATE_KEY"],
   REBALANCE_API_TOKEN: process.env["REBALANCE_API_TOKEN"],
 };
 
@@ -57,6 +60,8 @@ function applyValidServerEnv() {
   mutableEnv.OBS_ALERT_DEDUP_WINDOW_SECONDS = "300";
   mutableEnv.OBS_CLIENT_ERROR_SAMPLE_RATE = "1";
   mutableEnv.FAUCET_PRIVATE_KEY = `0x${"1".repeat(64)}`;
+  mutableEnv.FAUCET_AUTH_SIGNER_PRIVATE_KEY = `0x${"2".repeat(64)}`;
+  mutableEnv.FAUCET_RELAYER_PRIVATE_KEY = `0x${"3".repeat(64)}`;
   mutableEnv.REBALANCE_API_TOKEN = "rebalance-secret";
 }
 
@@ -97,6 +102,14 @@ afterEach(() => {
     originalEnv.OBS_CLIENT_ERROR_SAMPLE_RATE
   );
   restoreEnvValue("FAUCET_PRIVATE_KEY", originalEnv.FAUCET_PRIVATE_KEY);
+  restoreEnvValue(
+    "FAUCET_AUTH_SIGNER_PRIVATE_KEY",
+    originalEnv.FAUCET_AUTH_SIGNER_PRIVATE_KEY
+  );
+  restoreEnvValue(
+    "FAUCET_RELAYER_PRIVATE_KEY",
+    originalEnv.FAUCET_RELAYER_PRIVATE_KEY
+  );
   restoreEnvValue("REBALANCE_API_TOKEN", originalEnv.REBALANCE_API_TOKEN);
 });
 

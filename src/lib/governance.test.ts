@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { encodeFunctionData } from "viem";
 
+import { ABIS, CONTRACTS } from "@/contracts";
 import {
   createGovernanceDraftAction,
   encodeGovernanceActionDraft,
@@ -133,5 +135,25 @@ describe("governance summaries", () => {
     expect(summary?.title).toContain("时间锁");
     expect(summary?.description).toContain("900");
     expect(summary?.details?.[0]?.value).toContain("900");
+  });
+
+  it("summarizes faucet configuration updates", () => {
+    const faucetAddress = "0x1111111111111111111111111111111111111111" as const;
+    CONTRACTS.FaucetVault = faucetAddress;
+    const summary = summarizeProposalActions({
+      targets: [faucetAddress],
+      values: [0n],
+      calldatas: [
+        encodeFunctionData({
+          abi: ABIS.FaucetVault,
+          functionName: "setClaimConfig",
+          args: [2n * 10n ** 18n, 1n * 10n ** 18n, 86400n],
+        }),
+      ],
+    })[0];
+
+    expect(summary?.title).toContain("Faucet");
+    expect(summary?.description).toContain("86400");
+    expect(summary?.details?.[0]?.value).toContain("2");
   });
 });

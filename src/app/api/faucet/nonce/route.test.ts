@@ -48,7 +48,11 @@ describe("GET /api/faucet/nonce", () => {
       userAgentHash: "ua-hash",
     });
     vi.mocked(enforceFaucetRateLimit).mockResolvedValue(undefined);
-    vi.mocked(checkFaucetClaimEligibility).mockResolvedValue({ ok: true });
+    vi.mocked(checkFaucetClaimEligibility).mockResolvedValue({
+      ok: true,
+      amount: 2n,
+      minAllowedBalance: 1n,
+    });
   });
 
   it("returns the rate-limit response when blocked", async () => {

@@ -11,19 +11,18 @@ import { takeFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
 import {
   acquireFaucetClaimLock,
   checkFaucetClaimEligibility,
+  createFaucetClaimAuthorization,
   createRequestContextHashes,
   enforceFaucetRateLimit,
   formatFaucetAmount,
   getCooldownRemainingSeconds,
-  getFaucetAmount,
-  getFaucetClients,
-  getFaucetMinBalance,
   getRequestIp,
   getRequestUserAgent,
   isFaucetError,
   markFaucetClaimed,
   rebalanceRevenueVault,
   releaseFaucetClaimLock,
+  submitFaucetClaim,
 } from "@/lib/faucet/utils";
 import { captureServerException } from "@/lib/observability/server";
 
@@ -102,11 +101,9 @@ export async function POST(req: NextRequest) {
     }
 
     await enforceFaucetRateLimit("claim", address, ip);
-
     await rebalanceRevenueVault();
 
     const eligibility = await checkFaucetClaimEligibility(address, ip);
-
     if (!eligibility.ok) {
       return NextResponse.json(
         { error: eligibility.error },
@@ -115,7 +112,6 @@ export async function POST(req: NextRequest) {
     }
 
     const lock = await acquireFaucetClaimLock(address, ip);
-
     if (!lock) {
       const lockedCooldownSeconds = await getCooldownRemainingSeconds(address, ip);
 
@@ -131,48 +127,18 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const amount = getFaucetAmount();
-      const minBalance = getFaucetMinBalance();
-      const { account, publicClient, walletClient } = await getFaucetClients();
-      const [recipientBalance, faucetBalance] = await Promise.all([
-        publicClient.getBalance({ address }),
-        publicClient.getBalance({ address: account.address }),
-      ]);
-
-      if (recipientBalance >= minBalance) {
-        await releaseFaucetClaimLock(lock);
-
-        return NextResponse.json(
-          {
-            error: `钱包余额已达到 Faucet 门槛（${formatFaucetAmount(
-              minBalance
-            )}），暂时无法领取。`,
-          },
-          { status: 400 }
-        );
-      }
-
-      if (faucetBalance < amount) {
-        await releaseFaucetClaimLock(lock);
-
-        return NextResponse.json(
-          {
-            error: "Faucet 钱包余额不足，请稍后再试。",
-          },
-          { status: 503 }
-        );
-      }
-
-      const txHash = await walletClient.sendTransaction({
-        account,
-        to: address,
-        value: amount,
-        chain: knowledgeChain,
+      const authorization = await createFaucetClaimAuthorization(address);
+      const txHash = await submitFaucetClaim({
+        recipient: address,
+        amount: authorization.amount,
+        deadline: authorization.deadline,
+        nonce: authorization.nonce,
+        signature: authorization.signature,
       });
 
       await markFaucetClaimed({
         address,
-        amount: amount.toString(),
+        amount: authorization.amount.toString(),
         txHash,
         claimedAt: new Date().toISOString(),
         ip,
@@ -182,8 +148,8 @@ export async function POST(req: NextRequest) {
         {
           ok: true,
           txHash,
-          amount: amount.toString(),
-          displayAmount: formatFaucetAmount(amount),
+          amount: authorization.amount.toString(),
+          displayAmount: formatFaucetAmount(authorization.amount),
           address,
         },
         {
@@ -206,7 +172,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await captureServerException("Faucet transfer failed", {
+    await captureServerException("Faucet relay claim failed", {
       source: "api.faucet.claim",
       severity: "error",
       request: req,

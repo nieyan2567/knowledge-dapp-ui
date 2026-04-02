@@ -107,6 +107,24 @@ function parseRequiredTokenAmount(
   }
 }
 
+function parseRequiredAddress(
+  values: Record<string, string | boolean>,
+  key: string,
+  label: string
+): Address | FailedValidation {
+  const value = readString(values, key);
+
+  if (!value) {
+    return fail(`请输入${label}`);
+  }
+
+  if (!/^0x[a-fA-F0-9]{40}$/.test(value)) {
+    return fail(`${label}格式不正确`);
+  }
+
+  return value as Address;
+}
+
 function parseRequiredNonNegativeTokenAmount(
   values: Record<string, string | boolean>,
   key: string,
@@ -316,6 +334,132 @@ const GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
         required: true,
         placeholder: "例如 100",
         defaultValue: "100",
+      },
+    ],
+  },
+  {
+    id: "revenueVault.setFaucetConfig",
+    category: "treasury",
+    label: "更新 Faucet 补充策略",
+    description: "调整 RevenueVault 向 FaucetVault 的分账比例与自动补充阈值。",
+    riskLevel: "medium",
+    target: CONTRACTS.RevenueVault as Address,
+    functionName: "setFaucetConfig",
+    valueMode: "fixedZero",
+    fields: [
+      {
+        key: "faucetWallet",
+        label: "FaucetVault 地址",
+        type: "address",
+        required: true,
+        placeholder: "0x...",
+        defaultValue: (CONTRACTS.FaucetVault as string | undefined) ?? "",
+      },
+      {
+        key: "faucetShareBps",
+        label: "Faucet 分成基点",
+        type: "uint256",
+        required: true,
+        placeholder: "例如 3000",
+        defaultValue: "3000",
+      },
+      {
+        key: "minFaucetPayout",
+        label: "最小补充金额",
+        type: "tokenAmount",
+        required: true,
+        placeholder: "例如 0.5",
+        defaultValue: "0.5",
+      },
+      {
+        key: "autoFaucetEnabled",
+        label: "自动补充",
+        type: "boolean",
+        required: true,
+        defaultValue: true,
+      },
+    ],
+  },
+  {
+    id: "faucet.setSigner",
+    category: "treasury",
+    label: "轮换 Faucet 签名地址",
+    description: "更新 Faucet 后端授权签名地址。",
+    riskLevel: "high",
+    target: CONTRACTS.FaucetVault as Address,
+    functionName: "setSigner",
+    valueMode: "fixedZero",
+    fields: [
+      {
+        key: "signer",
+        label: "新签名地址",
+        type: "address",
+        required: true,
+        placeholder: "0x...",
+      },
+    ],
+  },
+  {
+    id: "faucet.setClaimConfig",
+    category: "treasury",
+    label: "更新 Faucet 领取规则",
+    description: "调整单次领取金额、余额门槛和领取冷却时间。",
+    riskLevel: "medium",
+    target: CONTRACTS.FaucetVault as Address,
+    functionName: "setClaimConfig",
+    valueMode: "fixedZero",
+    fields: [
+      {
+        key: "claimAmount",
+        label: "单次领取金额",
+        type: "tokenAmount",
+        required: true,
+        placeholder: "例如 2",
+        defaultValue: "2",
+      },
+      {
+        key: "minAllowedBalance",
+        label: "余额门槛",
+        type: "tokenAmount",
+        required: true,
+        placeholder: "例如 1",
+        defaultValue: "1",
+      },
+      {
+        key: "claimCooldown",
+        label: "领取冷却（秒）",
+        type: "uint256",
+        required: true,
+        placeholder: "例如 86400",
+        defaultValue: "86400",
+      },
+    ],
+  },
+  {
+    id: "faucet.setBudgetConfig",
+    category: "treasury",
+    label: "更新 Faucet 周期预算",
+    description: "调整 Faucet 的预算周期和周期总额度。",
+    riskLevel: "medium",
+    target: CONTRACTS.FaucetVault as Address,
+    functionName: "setBudgetConfig",
+    valueMode: "fixedZero",
+    fields: [
+      {
+        key: "epochDuration",
+        label: "预算周期（秒）",
+        type: "uint256",
+        required: true,
+        placeholder: "例如 86400",
+        defaultValue: "86400",
+      },
+      {
+        key: "epochBudget",
+        label: "周期预算",
+        type: "tokenAmount",
+        required: true,
+        placeholder: "例如 20",
+        defaultValue: "20",
       },
     ],
   },
@@ -690,6 +834,154 @@ const templateCodecs: Record<string, TemplateCodec> = {
         args: [epochDuration, epochBudget],
         title: "更新金库预算",
         description: `将周期时长设为 ${epochDuration.toString()} 秒，周期预算设为 ${formatEther(epochBudget)} ${BRANDING.nativeTokenSymbol}`,
+        riskLevel: "medium",
+      });
+    },
+  },
+  "revenueVault.setFaucetConfig": {
+    validate(values) {
+      const faucetWallet = parseRequiredAddress(values, "faucetWallet", "FaucetVault 地址");
+      if (isFailed(faucetWallet)) return faucetWallet;
+
+      const faucetShareBps = parseRequiredUint(values, "faucetShareBps", "Faucet 分成基点");
+      if (isFailed(faucetShareBps)) return faucetShareBps;
+
+      const minFaucetPayout = parseRequiredTokenAmount(
+        values,
+        "minFaucetPayout",
+        "最小补充金额"
+      );
+      if (isFailed(minFaucetPayout)) return minFaucetPayout;
+
+      return ok();
+    },
+    encode(values) {
+      const faucetWallet = parseRequiredAddress(values, "faucetWallet", "FaucetVault 地址");
+      const faucetShareBps = parseRequiredUint(values, "faucetShareBps", "Faucet 分成基点");
+      const minFaucetPayout = parseRequiredTokenAmount(
+        values,
+        "minFaucetPayout",
+        "最小补充金额"
+      );
+
+      if (
+        isFailed(faucetWallet) ||
+        isFailed(faucetShareBps) ||
+        isFailed(minFaucetPayout)
+      ) {
+        throw new Error("无效的 Faucet 补充策略提案");
+      }
+
+      const autoFaucetEnabled = readBoolean(values, "autoFaucetEnabled");
+
+      return buildEncodedAction({
+        templateId: "revenueVault.setFaucetConfig",
+        target: CONTRACTS.RevenueVault as Address,
+        abi: ABIS.RevenueVault,
+        functionName: "setFaucetConfig",
+        args: [
+          faucetWallet,
+          faucetShareBps,
+          minFaucetPayout,
+          autoFaucetEnabled,
+        ],
+        title: "更新 Faucet 补充策略",
+        description: `将 Faucet 钱包更新为 ${formatAddress(faucetWallet)}，分成比例设为 ${faucetShareBps.toString()} bps，最小补充金额设为 ${formatEther(minFaucetPayout)} ${BRANDING.nativeTokenSymbol}，自动补充设为${autoFaucetEnabled ? "开启" : "关闭"}`,
+        riskLevel: "medium",
+      });
+    },
+  },
+  "faucet.setSigner": {
+    validate(values) {
+      const signer = parseRequiredAddress(values, "signer", "新签名地址");
+      return isFailed(signer) ? signer : ok();
+    },
+    encode(values) {
+      const signer = parseRequiredAddress(values, "signer", "新签名地址");
+      if (isFailed(signer)) {
+        throw new Error("无效的 Faucet 签名地址提案");
+      }
+
+      return buildEncodedAction({
+        templateId: "faucet.setSigner",
+        target: CONTRACTS.FaucetVault as Address,
+        abi: ABIS.FaucetVault,
+        functionName: "setSigner",
+        args: [signer],
+        title: "轮换 Faucet 签名地址",
+        description: `将 Faucet 授权签名地址更新为 ${formatAddress(signer)}`,
+        riskLevel: "high",
+      });
+    },
+  },
+  "faucet.setClaimConfig": {
+    validate(values) {
+      const claimAmount = parseRequiredTokenAmount(values, "claimAmount", "单次领取金额");
+      if (isFailed(claimAmount)) return claimAmount;
+
+      const minAllowedBalance = parseRequiredTokenAmount(
+        values,
+        "minAllowedBalance",
+        "余额门槛"
+      );
+      if (isFailed(minAllowedBalance)) return minAllowedBalance;
+
+      const claimCooldown = parseRequiredUint(values, "claimCooldown", "领取冷却");
+      return isFailed(claimCooldown) ? claimCooldown : ok();
+    },
+    encode(values) {
+      const claimAmount = parseRequiredTokenAmount(values, "claimAmount", "单次领取金额");
+      const minAllowedBalance = parseRequiredTokenAmount(
+        values,
+        "minAllowedBalance",
+        "余额门槛"
+      );
+      const claimCooldown = parseRequiredUint(values, "claimCooldown", "领取冷却");
+
+      if (
+        isFailed(claimAmount) ||
+        isFailed(minAllowedBalance) ||
+        isFailed(claimCooldown)
+      ) {
+        throw new Error("无效的 Faucet 领取规则提案");
+      }
+
+      return buildEncodedAction({
+        templateId: "faucet.setClaimConfig",
+        target: CONTRACTS.FaucetVault as Address,
+        abi: ABIS.FaucetVault,
+        functionName: "setClaimConfig",
+        args: [claimAmount, minAllowedBalance, claimCooldown],
+        title: "更新 Faucet 领取规则",
+        description: `将单次领取金额更新为 ${formatEther(claimAmount)} ${BRANDING.nativeTokenSymbol}，余额门槛更新为 ${formatEther(minAllowedBalance)} ${BRANDING.nativeTokenSymbol}，领取冷却更新为 ${claimCooldown.toString()} 秒`,
+        riskLevel: "medium",
+      });
+    },
+  },
+  "faucet.setBudgetConfig": {
+    validate(values) {
+      const epochDuration = parseRequiredUint(values, "epochDuration", "预算周期");
+      if (isFailed(epochDuration)) return epochDuration;
+
+      const epochBudget = parseRequiredTokenAmount(values, "epochBudget", "周期预算");
+      return isFailed(epochBudget) ? epochBudget : ok();
+    },
+    encode(values) {
+      const epochDuration = parseRequiredUint(values, "epochDuration", "预算周期");
+      const epochBudget = parseRequiredTokenAmount(values, "epochBudget", "周期预算");
+
+      if (isFailed(epochDuration) || isFailed(epochBudget)) {
+        throw new Error("无效的 Faucet 周期预算提案");
+      }
+
+      return buildEncodedAction({
+        templateId: "faucet.setBudgetConfig",
+        target: CONTRACTS.FaucetVault as Address,
+        abi: ABIS.FaucetVault,
+        functionName: "setBudgetConfig",
+        args: [epochDuration, epochBudget],
+        title: "更新 Faucet 周期预算",
+        description: `将 Faucet 预算周期更新为 ${epochDuration.toString()} 秒，周期预算更新为 ${formatEther(epochBudget)} ${BRANDING.nativeTokenSymbol}`,
         riskLevel: "medium",
       });
     },

@@ -113,6 +113,20 @@ const serverEnvSchema = publicEnvSchema
         .regex(/^0x[0-9a-fA-F]+$/, "Must be a 0x-prefixed hex string")
         .optional()
     ),
+    FAUCET_AUTH_SIGNER_PRIVATE_KEY: z.preprocess(
+      emptyStringToUndefined,
+      z
+        .string()
+        .regex(/^0x[0-9a-fA-F]+$/, "Must be a 0x-prefixed hex string")
+        .optional()
+    ),
+    FAUCET_RELAYER_PRIVATE_KEY: z.preprocess(
+      emptyStringToUndefined,
+      z
+        .string()
+        .regex(/^0x[0-9a-fA-F]+$/, "Must be a 0x-prefixed hex string")
+        .optional()
+    ),
     REBALANCE_API_TOKEN: z.preprocess(
       emptyStringToUndefined,
       z.string().trim().min(1).optional()
@@ -254,6 +268,8 @@ function getServerEnvSource() {
       process.env.OBS_ALERT_DEDUP_WINDOW_SECONDS,
     OBS_CLIENT_ERROR_SAMPLE_RATE: process.env.OBS_CLIENT_ERROR_SAMPLE_RATE,
     FAUCET_PRIVATE_KEY: process.env.FAUCET_PRIVATE_KEY,
+    FAUCET_AUTH_SIGNER_PRIVATE_KEY: process.env.FAUCET_AUTH_SIGNER_PRIVATE_KEY,
+    FAUCET_RELAYER_PRIVATE_KEY: process.env.FAUCET_RELAYER_PRIVATE_KEY,
     REBALANCE_API_TOKEN: process.env.REBALANCE_API_TOKEN,
     FAUCET_AMOUNT: process.env.FAUCET_AMOUNT,
     FAUCET_MIN_BALANCE: process.env.FAUCET_MIN_BALANCE,

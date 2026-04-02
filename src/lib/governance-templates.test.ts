@@ -23,7 +23,7 @@ describe("governance-templates", () => {
   it("lists only supported proposal actions", () => {
     const templates = getGovernanceTemplates();
 
-    expect(templates.length).toBe(13);
+    expect(templates.length).toBe(17);
     expect(getGovernanceTemplateById("governor.setVotingPeriod")?.functionName).toBe(
       "setVotingPeriod"
     );
@@ -39,6 +39,18 @@ describe("governance-templates", () => {
     expect(getGovernanceTemplateById("stake.setActivationBlocks")?.functionName).toBe(
       "setActivationBlocks"
     );
+    expect(getGovernanceTemplateById("revenueVault.setFaucetConfig")?.functionName).toBe(
+      "setFaucetConfig"
+    );
+    expect(getGovernanceTemplateById("faucet.setSigner")?.functionName).toBe(
+      "setSigner"
+    );
+    expect(getGovernanceTemplateById("faucet.setClaimConfig")?.functionName).toBe(
+      "setClaimConfig"
+    );
+    expect(getGovernanceTemplateById("faucet.setBudgetConfig")?.functionName).toBe(
+      "setBudgetConfig"
+    );
     expect(getGovernanceTemplateById("content.setTreasury")).toBeNull();
     expect(getGovernanceTemplateById("content.setAntiSybil")).toBeNull();
     expect(getGovernanceTemplateById("content.pause")).toBeNull();
@@ -47,14 +59,9 @@ describe("governance-templates", () => {
     expect(getGovernanceTemplateById("timelock.grantRole")).toBeNull();
   });
 
-  it("does not expose address-based or pause actions", () => {
+  it("does not expose pause actions", () => {
     const templates = getGovernanceTemplates();
 
-    expect(
-      templates.every((template) =>
-        template.fields.every((field) => field.type !== "address" && field.type !== "select")
-      )
-    ).toBe(true);
     expect(
       templates.every(
         (template) =>
@@ -173,5 +180,27 @@ describe("governance-templates", () => {
     expect(encoded.templateId).toBe("governor.setProposalFee");
     expect(encoded.target).toBe(CONTRACTS.KnowledgeGovernor);
     expect(encoded.description).toContain("0.08");
+  });
+
+  it("encodes faucet governance proposals", () => {
+    const signerDraft = createGovernanceDraftAction("faucet.setSigner");
+    signerDraft.values.signer = "0x1111111111111111111111111111111111111111";
+
+    const claimDraft = createGovernanceDraftAction("faucet.setClaimConfig");
+    claimDraft.values.claimAmount = "2";
+    claimDraft.values.minAllowedBalance = "1";
+    claimDraft.values.claimCooldown = "86400";
+
+    const budgetDraft = createGovernanceDraftAction("faucet.setBudgetConfig");
+    budgetDraft.values.epochDuration = "86400";
+    budgetDraft.values.epochBudget = "20";
+
+    expect(encodeGovernanceActionDraft(signerDraft).templateId).toBe("faucet.setSigner");
+    expect(encodeGovernanceActionDraft(claimDraft).templateId).toBe(
+      "faucet.setClaimConfig"
+    );
+    expect(encodeGovernanceActionDraft(budgetDraft).templateId).toBe(
+      "faucet.setBudgetConfig"
+    );
   });
 });

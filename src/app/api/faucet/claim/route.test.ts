@@ -7,17 +7,16 @@ import { takeFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
 import {
   acquireFaucetClaimLock,
   checkFaucetClaimEligibility,
+  createFaucetClaimAuthorization,
   createRequestContextHashes,
   enforceFaucetRateLimit,
   formatFaucetAmount,
   getCooldownRemainingSeconds,
-  getFaucetAmount,
-  getFaucetClients,
-  getFaucetMinBalance,
   getRequestIp,
   getRequestUserAgent,
   markFaucetClaimed,
   rebalanceRevenueVault,
+  submitFaucetClaim,
 } from "@/lib/faucet/utils";
 import { verifyMessage } from "viem";
 
@@ -32,19 +31,18 @@ vi.mock("@/lib/faucet/nonce-store", () => ({
 vi.mock("@/lib/faucet/utils", () => ({
   acquireFaucetClaimLock: vi.fn(),
   checkFaucetClaimEligibility: vi.fn(),
+  createFaucetClaimAuthorization: vi.fn(),
   createRequestContextHashes: vi.fn(),
   enforceFaucetRateLimit: vi.fn(),
   formatFaucetAmount: vi.fn(),
   getCooldownRemainingSeconds: vi.fn(),
-  getFaucetAmount: vi.fn(),
-  getFaucetClients: vi.fn(),
-  getFaucetMinBalance: vi.fn(),
   getRequestIp: vi.fn(),
   getRequestUserAgent: vi.fn(),
   isFaucetError: vi.fn(() => false),
   markFaucetClaimed: vi.fn(),
   rebalanceRevenueVault: vi.fn(),
   releaseFaucetClaimLock: vi.fn(),
+  submitFaucetClaim: vi.fn(),
 }));
 
 vi.mock("viem", async () => {
@@ -86,28 +84,23 @@ describe("POST /api/faucet/claim", () => {
     });
     vi.mocked(verifyMessage).mockResolvedValue(true);
     vi.mocked(enforceFaucetRateLimit).mockResolvedValue(undefined);
-    vi.mocked(checkFaucetClaimEligibility).mockResolvedValue({ ok: true });
+    vi.mocked(checkFaucetClaimEligibility).mockResolvedValue({
+      ok: true,
+      amount: 2n,
+      minAllowedBalance: 1n,
+    });
     vi.mocked(acquireFaucetClaimLock).mockResolvedValue({
       entries: [{ key: "lock", token: "token" }],
     });
-    vi.mocked(getFaucetAmount).mockReturnValue(2n);
-    vi.mocked(getFaucetMinBalance).mockReturnValue(1n);
+    vi.mocked(createFaucetClaimAuthorization).mockResolvedValue({
+      amount: 2n,
+      deadline: 12345n,
+      nonce: "0xnonce",
+      signature: "0xsigned",
+    });
     vi.mocked(formatFaucetAmount).mockReturnValue("2 KC");
     vi.mocked(rebalanceRevenueVault).mockResolvedValue("0xrebalance");
-    vi.mocked(getFaucetClients).mockResolvedValue(
-      {
-        account: { address: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-        publicClient: {
-          getBalance: vi
-            .fn()
-            .mockResolvedValueOnce(0n)
-            .mockResolvedValueOnce(10n),
-        },
-        walletClient: {
-          sendTransaction: vi.fn().mockResolvedValue("0xtxhash"),
-        },
-      } as unknown as Awaited<ReturnType<typeof getFaucetClients>>
-    );
+    vi.mocked(submitFaucetClaim).mockResolvedValue("0xtxhash");
     vi.mocked(markFaucetClaimed).mockResolvedValue(undefined);
   });
 
@@ -185,6 +178,20 @@ describe("POST /api/faucet/claim", () => {
 
     expect(response.status).toBe(200);
     expect(rebalanceRevenueVault).toHaveBeenCalledTimes(1);
+    expect(createFaucetClaimAuthorization).toHaveBeenCalledTimes(1);
+    expect(
+      String(vi.mocked(createFaucetClaimAuthorization).mock.calls[0]?.[0]).toLowerCase()
+    ).toBe(address.toLowerCase());
+    expect(submitFaucetClaim).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(submitFaucetClaim).mock.calls[0]?.[0]).toMatchObject({
+      amount: 2n,
+      deadline: 12345n,
+      nonce: "0xnonce",
+      signature: "0xsigned",
+    });
+    expect(
+      String(vi.mocked(submitFaucetClaim).mock.calls[0]?.[0]?.recipient).toLowerCase()
+    ).toBe(address.toLowerCase());
     expect(markFaucetClaimed).toHaveBeenCalledTimes(1);
     const claimedRecord = vi.mocked(markFaucetClaimed).mock.calls[0]?.[0];
     expect(claimedRecord).toMatchObject({
