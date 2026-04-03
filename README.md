@@ -160,7 +160,8 @@ npm run start
 
 ### Faucet
 
-- `FAUCET_PRIVATE_KEY`：Faucet 发放账户私钥
+- `FAUCET_AUTH_SIGNER_PRIVATE_KEY`：用于签发 Faucet 领取授权的私钥
+- `FAUCET_RELAYER_PRIVATE_KEY`：用于提交 Faucet `claim` / `rebalance` 交易的私钥
 - `REBALANCE_API_TOKEN`：服务端 `POST /api/system/rebalance` 接口的 Bearer Token
 - `FAUCET_AMOUNT`：每次领取的启动资金数量
 - `FAUCET_MIN_BALANCE`：钱包余额达到该阈值后不再允许领取

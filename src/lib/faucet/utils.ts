@@ -92,11 +92,7 @@ function getRpcUrl() {
 }
 
 function getConfiguredPrivateKey(
-  keys: Array<
-    | "FAUCET_RELAYER_PRIVATE_KEY"
-    | "FAUCET_AUTH_SIGNER_PRIVATE_KEY"
-    | "FAUCET_PRIVATE_KEY"
-  >,
+  keys: Array<"FAUCET_RELAYER_PRIVATE_KEY" | "FAUCET_AUTH_SIGNER_PRIVATE_KEY">,
   label: string
 ) {
   const env = getServerEnv();
@@ -113,14 +109,14 @@ function getConfiguredPrivateKey(
 
 function getFaucetRelayerPrivateKey() {
   return getConfiguredPrivateKey(
-    ["FAUCET_RELAYER_PRIVATE_KEY", "FAUCET_PRIVATE_KEY"],
+    ["FAUCET_RELAYER_PRIVATE_KEY"],
     "FAUCET_RELAYER_PRIVATE_KEY"
   );
 }
 
 function getFaucetAuthSignerPrivateKey() {
   return getConfiguredPrivateKey(
-    ["FAUCET_AUTH_SIGNER_PRIVATE_KEY", "FAUCET_PRIVATE_KEY"],
+    ["FAUCET_AUTH_SIGNER_PRIVATE_KEY"],
     "FAUCET_AUTH_SIGNER_PRIVATE_KEY"
   );
 }
