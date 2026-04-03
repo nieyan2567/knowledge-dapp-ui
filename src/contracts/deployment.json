@@ -1,7 +1,7 @@
 {
   "network": "consortium",
   "chainId": 20260,
-  "timestamp": "2026-04-02T12:05:47.178Z",
+  "timestamp": "2026-04-03T19:30:30.391Z",
   "deployer": "0x148dd37731e3CaA6d7C0DcF6B89372e5aF135D0a",
   "contracts": {
     "NativeVotes": "0xf913CC093f66D705936f3c8376eF4CDaAD970a42",
