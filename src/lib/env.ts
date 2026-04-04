@@ -31,6 +31,15 @@ const positiveNumberStringWithDefault = (defaultValue: string) =>
       .optional()
   ).transform((value) => value ?? defaultValue);
 
+const optionalPositiveNumberString = z.preprocess(
+  emptyStringToUndefined,
+  z
+    .string()
+    .trim()
+    .refine((value) => Number(value) > 0, "Must be a positive number")
+    .optional()
+);
+
 const numberWithRangeDefault = (
   defaultValue: number,
   constraints: { min: number; max: number }
@@ -120,12 +129,26 @@ const serverEnvSchema = publicEnvSchema
         .regex(/^0x[0-9a-fA-F]+$/, "Must be a 0x-prefixed hex string")
         .optional()
     ),
+    FAUCET_TOP_UP_FUNDER_PRIVATE_KEY: z.preprocess(
+      emptyStringToUndefined,
+      z
+        .string()
+        .regex(/^0x[0-9a-fA-F]+$/, "Must be a 0x-prefixed hex string")
+        .optional()
+    ),
+    SYSTEM_API_TOKEN: z.preprocess(
+      emptyStringToUndefined,
+      z.string().trim().min(1).optional()
+    ),
     REBALANCE_API_TOKEN: z.preprocess(
       emptyStringToUndefined,
       z.string().trim().min(1).optional()
     ),
     FAUCET_AMOUNT: positiveNumberStringWithDefault("2"),
     FAUCET_MIN_BALANCE: positiveNumberStringWithDefault("1"),
+    FAUCET_RELAYER_ALERT_MIN_BALANCE: positiveNumberStringWithDefault("0.05"),
+    FAUCET_RELAYER_TOP_UP_AMOUNT: positiveNumberStringWithDefault("0.2"),
+    FAUCET_VAULT_ALERT_MIN_BALANCE: optionalPositiveNumberString,
     FAUCET_COOLDOWN_HOURS: positiveIntWithDefault(24),
     FAUCET_LOCK_TTL_SECONDS: positiveIntWithDefault(60),
     FAUCET_NONCE_TTL_SECONDS: positiveIntWithDefault(300),
@@ -262,9 +285,17 @@ function getServerEnvSource() {
     OBS_CLIENT_ERROR_SAMPLE_RATE: process.env.OBS_CLIENT_ERROR_SAMPLE_RATE,
     FAUCET_AUTH_SIGNER_PRIVATE_KEY: process.env.FAUCET_AUTH_SIGNER_PRIVATE_KEY,
     FAUCET_RELAYER_PRIVATE_KEY: process.env.FAUCET_RELAYER_PRIVATE_KEY,
+    FAUCET_TOP_UP_FUNDER_PRIVATE_KEY:
+      process.env.FAUCET_TOP_UP_FUNDER_PRIVATE_KEY,
+    SYSTEM_API_TOKEN: process.env.SYSTEM_API_TOKEN,
     REBALANCE_API_TOKEN: process.env.REBALANCE_API_TOKEN,
     FAUCET_AMOUNT: process.env.FAUCET_AMOUNT,
     FAUCET_MIN_BALANCE: process.env.FAUCET_MIN_BALANCE,
+    FAUCET_RELAYER_ALERT_MIN_BALANCE:
+      process.env.FAUCET_RELAYER_ALERT_MIN_BALANCE,
+    FAUCET_RELAYER_TOP_UP_AMOUNT: process.env.FAUCET_RELAYER_TOP_UP_AMOUNT,
+    FAUCET_VAULT_ALERT_MIN_BALANCE:
+      process.env.FAUCET_VAULT_ALERT_MIN_BALANCE,
     FAUCET_COOLDOWN_HOURS: process.env.FAUCET_COOLDOWN_HOURS,
     FAUCET_LOCK_TTL_SECONDS: process.env.FAUCET_LOCK_TTL_SECONDS,
     FAUCET_NONCE_TTL_SECONDS: process.env.FAUCET_NONCE_TTL_SECONDS,

@@ -17,6 +17,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { knowledgeChain } from "@/lib/chains";
 import { getServerEnv } from "@/lib/env";
+import { captureServerEvent } from "@/lib/observability/server";
 import { getRedis } from "@/lib/redis";
 
 export type FaucetClaimRecord = {
@@ -51,6 +52,31 @@ export type FaucetClaimAuthorization = {
   deadline: bigint;
   nonce: `0x${string}`;
   signature: `0x${string}`;
+};
+
+export type FaucetMaintenanceReport = {
+  status: "ok" | "degraded";
+  relayer: {
+    address: `0x${string}`;
+    balance: string;
+    alertMinBalance: string;
+  };
+  topUp: {
+    attempted: boolean;
+    txHash?: `0x${string}`;
+    amount?: string;
+    funderAddress?: `0x${string}`;
+    error?: string;
+  };
+  faucetVault: {
+    address: `0x${string}`;
+    balance: string;
+    claimAmount: string;
+    availableBudget: string;
+    paused: boolean;
+    alertMinBalance?: string;
+  };
+  issues: string[];
 };
 
 export class FaucetError extends Error {
@@ -119,6 +145,24 @@ function getFaucetAuthSignerPrivateKey() {
     ["FAUCET_AUTH_SIGNER_PRIVATE_KEY"],
     "FAUCET_AUTH_SIGNER_PRIVATE_KEY"
   );
+}
+
+function getFaucetTopUpFunderPrivateKey() {
+  const value = getServerEnv().FAUCET_TOP_UP_FUNDER_PRIVATE_KEY;
+  return value ? (value as `0x${string}`) : undefined;
+}
+
+export function getFaucetRelayerAlertMinBalance() {
+  return parseEther(getServerEnv().FAUCET_RELAYER_ALERT_MIN_BALANCE);
+}
+
+export function getFaucetRelayerTopUpAmount() {
+  return parseEther(getServerEnv().FAUCET_RELAYER_TOP_UP_AMOUNT);
+}
+
+export function getFaucetVaultAlertMinBalance() {
+  const value = getServerEnv().FAUCET_VAULT_ALERT_MIN_BALANCE;
+  return value ? parseEther(value) : undefined;
 }
 
 function getFaucetVaultAddress() {
@@ -470,6 +514,195 @@ export async function rebalanceRevenueVault() {
 
   await publicClient.waitForTransactionReceipt({ hash: txHash });
   return txHash;
+}
+
+async function alertFaucetMaintenanceIssue(input: {
+  source: string;
+  severity: "warn" | "error";
+  message: string;
+  fingerprint: string;
+  context?: Record<string, unknown>;
+}) {
+  await captureServerEvent({
+    message: input.message,
+    source: input.source,
+    severity: input.severity,
+    fingerprint: input.fingerprint,
+    context: input.context,
+  });
+}
+
+async function topUpFaucetRelayerBalance(
+  relayerAddress: `0x${string}`,
+  amount: bigint
+): Promise<FaucetMaintenanceReport["topUp"]> {
+  const funderKey = getFaucetTopUpFunderPrivateKey();
+
+  if (!funderKey) {
+    return {
+      attempted: false,
+      error: "FAUCET_TOP_UP_FUNDER_PRIVATE_KEY is not configured",
+    };
+  }
+
+  const funderAccount = privateKeyToAccount(funderKey);
+  const { publicClient } = await getFaucetClients();
+
+  if (funderAccount.address.toLowerCase() === relayerAddress.toLowerCase()) {
+    return {
+      attempted: false,
+      funderAddress: funderAccount.address,
+      error: "Top-up funder address must be different from the faucet relayer",
+    };
+  }
+
+  const funderBalance = await publicClient.getBalance({
+    address: funderAccount.address,
+  });
+
+  if (funderBalance < amount) {
+    return {
+      attempted: true,
+      funderAddress: funderAccount.address,
+      amount: amount.toString(),
+      error: "Top-up funder balance is below the configured faucet relayer top-up amount",
+    };
+  }
+
+  const funderWalletClient = createWalletClient({
+    account: funderAccount,
+    chain: knowledgeChain,
+    transport: http(getRpcUrl()),
+  });
+
+  const txHash = await funderWalletClient.sendTransaction({
+    account: funderAccount,
+    chain: knowledgeChain,
+    to: relayerAddress,
+    value: amount,
+  });
+
+  await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+  return {
+    attempted: true,
+    txHash,
+    amount: amount.toString(),
+    funderAddress: funderAccount.address,
+  };
+}
+
+export async function runFaucetMaintenance(): Promise<FaucetMaintenanceReport> {
+  const { publicClient, relayerAccount } = await getFaucetClients();
+  const relayerAlertMinBalance = getFaucetRelayerAlertMinBalance();
+  const relayerTopUpAmount = getFaucetRelayerTopUpAmount();
+  let relayerBalance = await publicClient.getBalance({
+    address: relayerAccount.address,
+  });
+  const issues: string[] = [];
+  let topUp: FaucetMaintenanceReport["topUp"] = { attempted: false };
+
+  if (relayerBalance < relayerAlertMinBalance) {
+    const lowBalanceMessage = `Faucet relayer balance dropped below threshold: ${formatEther(
+      relayerBalance
+    )} < ${formatEther(relayerAlertMinBalance)} ${knowledgeChain.nativeCurrency.symbol}`;
+
+    issues.push(lowBalanceMessage);
+    await alertFaucetMaintenanceIssue({
+      source: "faucet.maintenance.relayer.low_balance",
+      severity: "warn",
+      message: lowBalanceMessage,
+      fingerprint: `faucet:relayer-low-balance:${relayerAccount.address.toLowerCase()}`,
+      context: {
+        relayerAddress: relayerAccount.address,
+        relayerBalance: relayerBalance.toString(),
+        alertMinBalance: relayerAlertMinBalance.toString(),
+      },
+    });
+
+    topUp = await topUpFaucetRelayerBalance(relayerAccount.address, relayerTopUpAmount);
+
+    if (topUp.error) {
+      issues.push(topUp.error);
+      await alertFaucetMaintenanceIssue({
+        source: "faucet.maintenance.relayer.top_up_failed",
+        severity: "error",
+        message: `Faucet relayer top-up failed: ${topUp.error}`,
+        fingerprint: `faucet:relayer-topup-failed:${relayerAccount.address.toLowerCase()}`,
+        context: {
+          relayerAddress: relayerAccount.address,
+          topUpAmount: relayerTopUpAmount.toString(),
+          funderAddress: topUp.funderAddress,
+        },
+      });
+    } else if (topUp.txHash) {
+      relayerBalance = await publicClient.getBalance({
+        address: relayerAccount.address,
+      });
+      await captureServerEvent({
+        message: "Faucet relayer wallet topped up successfully",
+        source: "faucet.maintenance.relayer.top_up_succeeded",
+        severity: "warn",
+        alert: false,
+        context: {
+          relayerAddress: relayerAccount.address,
+          funderAddress: topUp.funderAddress,
+          amount: topUp.amount,
+          txHash: topUp.txHash,
+          relayerBalance: relayerBalance.toString(),
+        },
+      });
+    }
+  }
+
+  const faucetVaultConfig = await readFaucetVaultConfig();
+  const faucetVaultBalance = await publicClient.getBalance({
+    address: faucetVaultConfig.address,
+  });
+  const faucetVaultAlertMinBalance = getFaucetVaultAlertMinBalance();
+
+  if (
+    faucetVaultAlertMinBalance !== undefined &&
+    faucetVaultBalance < faucetVaultAlertMinBalance
+  ) {
+    const lowVaultMessage = `FaucetVault balance dropped below threshold: ${formatEther(
+      faucetVaultBalance
+    )} < ${formatEther(faucetVaultAlertMinBalance)} ${knowledgeChain.nativeCurrency.symbol}`;
+
+    issues.push(lowVaultMessage);
+    await alertFaucetMaintenanceIssue({
+      source: "faucet.maintenance.vault.low_balance",
+      severity: "warn",
+      message: lowVaultMessage,
+      fingerprint: `faucet:vault-low-balance:${faucetVaultConfig.address.toLowerCase()}`,
+      context: {
+        faucetVaultAddress: faucetVaultConfig.address,
+        faucetVaultBalance: faucetVaultBalance.toString(),
+        alertMinBalance: faucetVaultAlertMinBalance.toString(),
+        claimAmount: faucetVaultConfig.claimAmount.toString(),
+        availableBudget: faucetVaultConfig.availableBudget.toString(),
+      },
+    });
+  }
+
+  return {
+    status: issues.length > 0 ? "degraded" : "ok",
+    relayer: {
+      address: relayerAccount.address,
+      balance: relayerBalance.toString(),
+      alertMinBalance: relayerAlertMinBalance.toString(),
+    },
+    topUp,
+    faucetVault: {
+      address: faucetVaultConfig.address,
+      balance: faucetVaultBalance.toString(),
+      claimAmount: faucetVaultConfig.claimAmount.toString(),
+      availableBudget: faucetVaultConfig.availableBudget.toString(),
+      paused: faucetVaultConfig.paused,
+      alertMinBalance: faucetVaultAlertMinBalance?.toString(),
+    },
+    issues,
+  };
 }
 
 export async function getCooldownRemainingSeconds(

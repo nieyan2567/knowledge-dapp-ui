@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { rebalanceRevenueVault } from "@/lib/faucet/utils";
+import { runFaucetMaintenance } from "@/lib/faucet/utils";
 import { captureServerException } from "@/lib/observability/server";
 import {
   getSystemApiToken,
@@ -24,19 +24,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const txHash = await rebalanceRevenueVault();
-
-    if (!txHash) {
-      return NextResponse.json(
-        { error: "RevenueVault is not available" },
-        { status: 503 }
-      );
-    }
+    const report = await runFaucetMaintenance();
 
     return NextResponse.json(
       {
-        ok: true,
-        txHash,
+        ok: report.status === "ok",
+        report,
       },
       {
         headers: {
@@ -45,15 +38,15 @@ export async function POST(req: NextRequest) {
       }
     );
   } catch (error) {
-    await captureServerException("System rebalance failed", {
-      source: "api.system.rebalance",
+    await captureServerException("Faucet maintenance failed", {
+      source: "api.system.faucet.maintenance",
       severity: "error",
       request: req,
       error,
     });
 
     return NextResponse.json(
-      { error: "System rebalance failed" },
+      { error: "Faucet maintenance failed" },
       { status: 500 }
     );
   }

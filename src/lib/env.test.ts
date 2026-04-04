@@ -27,7 +27,15 @@ const originalEnv = {
   FAUCET_AUTH_SIGNER_PRIVATE_KEY:
     process.env["FAUCET_AUTH_SIGNER_PRIVATE_KEY"],
   FAUCET_RELAYER_PRIVATE_KEY: process.env["FAUCET_RELAYER_PRIVATE_KEY"],
+  FAUCET_TOP_UP_FUNDER_PRIVATE_KEY:
+    process.env["FAUCET_TOP_UP_FUNDER_PRIVATE_KEY"],
+  SYSTEM_API_TOKEN: process.env["SYSTEM_API_TOKEN"],
   REBALANCE_API_TOKEN: process.env["REBALANCE_API_TOKEN"],
+  FAUCET_RELAYER_ALERT_MIN_BALANCE:
+    process.env["FAUCET_RELAYER_ALERT_MIN_BALANCE"],
+  FAUCET_RELAYER_TOP_UP_AMOUNT: process.env["FAUCET_RELAYER_TOP_UP_AMOUNT"],
+  FAUCET_VAULT_ALERT_MIN_BALANCE:
+    process.env["FAUCET_VAULT_ALERT_MIN_BALANCE"],
 };
 
 function restoreEnvValue(name: keyof typeof originalEnv, value: string | undefined) {
@@ -60,7 +68,12 @@ function applyValidServerEnv() {
   mutableEnv.OBS_CLIENT_ERROR_SAMPLE_RATE = "1";
   mutableEnv.FAUCET_AUTH_SIGNER_PRIVATE_KEY = `0x${"2".repeat(64)}`;
   mutableEnv.FAUCET_RELAYER_PRIVATE_KEY = `0x${"3".repeat(64)}`;
+  mutableEnv.FAUCET_TOP_UP_FUNDER_PRIVATE_KEY = `0x${"4".repeat(64)}`;
+  mutableEnv.SYSTEM_API_TOKEN = "system-secret";
   mutableEnv.REBALANCE_API_TOKEN = "rebalance-secret";
+  mutableEnv.FAUCET_RELAYER_ALERT_MIN_BALANCE = "0.05";
+  mutableEnv.FAUCET_RELAYER_TOP_UP_AMOUNT = "0.2";
+  mutableEnv.FAUCET_VAULT_ALERT_MIN_BALANCE = "20";
 }
 
 function applyValidProductionUrls() {
@@ -107,7 +120,24 @@ afterEach(() => {
     "FAUCET_RELAYER_PRIVATE_KEY",
     originalEnv.FAUCET_RELAYER_PRIVATE_KEY
   );
+  restoreEnvValue(
+    "FAUCET_TOP_UP_FUNDER_PRIVATE_KEY",
+    originalEnv.FAUCET_TOP_UP_FUNDER_PRIVATE_KEY
+  );
+  restoreEnvValue("SYSTEM_API_TOKEN", originalEnv.SYSTEM_API_TOKEN);
   restoreEnvValue("REBALANCE_API_TOKEN", originalEnv.REBALANCE_API_TOKEN);
+  restoreEnvValue(
+    "FAUCET_RELAYER_ALERT_MIN_BALANCE",
+    originalEnv.FAUCET_RELAYER_ALERT_MIN_BALANCE
+  );
+  restoreEnvValue(
+    "FAUCET_RELAYER_TOP_UP_AMOUNT",
+    originalEnv.FAUCET_RELAYER_TOP_UP_AMOUNT
+  );
+  restoreEnvValue(
+    "FAUCET_VAULT_ALERT_MIN_BALANCE",
+    originalEnv.FAUCET_VAULT_ALERT_MIN_BALANCE
+  );
 });
 
 describe("env", () => {
@@ -203,5 +233,12 @@ describe("env", () => {
     mutableEnv.REBALANCE_API_TOKEN = "";
 
     expect(getServerEnv().REBALANCE_API_TOKEN).toBeUndefined();
+  });
+
+  it("treats blank faucet vault alert threshold as undefined", () => {
+    applyValidServerEnv();
+    mutableEnv.FAUCET_VAULT_ALERT_MIN_BALANCE = "";
+
+    expect(getServerEnv().FAUCET_VAULT_ALERT_MIN_BALANCE).toBeUndefined();
   });
 });

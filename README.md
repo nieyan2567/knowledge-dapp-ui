@@ -84,6 +84,7 @@ src/
       faucet/                 # Faucet nonce / claim
       ipfs/upload/            # 本地 IPFS 上传
       system/rebalance/       # RevenueVault 结算触发接口
+      system/faucet/maintenance/ # Faucet relayer 维护任务接口
   components/                 # 通用 UI 组件
   contracts/                  # ABI 与部署地址
   hooks/                      # Wagmi / 刷新 / 上传鉴权 hooks
@@ -162,11 +163,48 @@ npm run start
 
 - `FAUCET_AUTH_SIGNER_PRIVATE_KEY`：用于签发 Faucet 领取授权的私钥
 - `FAUCET_RELAYER_PRIVATE_KEY`：用于提交 Faucet `claim` / `rebalance` 交易的私钥
+- `FAUCET_TOP_UP_FUNDER_PRIVATE_KEY`：用于在 relayer 余额低于阈值时自动补充 Gas 的运维钱包私钥
+- `SYSTEM_API_TOKEN`：服务端内部维护接口的 Bearer Token，供 `/api/system/faucet/maintenance` 等系统任务使用
 - `REBALANCE_API_TOKEN`：服务端 `POST /api/system/rebalance` 接口的 Bearer Token
 - `FAUCET_AMOUNT`：每次领取的启动资金数量
 - `FAUCET_MIN_BALANCE`：钱包余额达到该阈值后不再允许领取
+- `FAUCET_RELAYER_ALERT_MIN_BALANCE`：relayer 低余额告警阈值
+- `FAUCET_RELAYER_TOP_UP_AMOUNT`：每次自动为 relayer 补充的 Gas 数量
+- `FAUCET_VAULT_ALERT_MIN_BALANCE`：`FaucetVault` 低余额告警阈值
 - `FAUCET_COOLDOWN_HOURS`：领取冷却时间
 - `FAUCET_NONCE_TTL_SECONDS`：Faucet 签名 challenge 有效期
+
+## Faucet Maintenance
+
+生产环境建议定时调用 `POST /api/system/faucet/maintenance`，而不是等用户点击 Faucet 时才发现 relayer 余额不足。该接口会：
+
+- 检查 `FAUCET_RELAYER_PRIVATE_KEY` 对应钱包余额
+- 当 relayer 余额低于 `FAUCET_RELAYER_ALERT_MIN_BALANCE` 时，用 `FAUCET_TOP_UP_FUNDER_PRIVATE_KEY` 自动补充 `FAUCET_RELAYER_TOP_UP_AMOUNT`
+- 当 relayer 或 `FaucetVault` 余额低于阈值时，走现有 `OBS_ALERT_WEBHOOK_URL` 告警
+
+手动执行一次维护任务：
+
+```bash
+curl --fail --show-error --silent \
+  -X POST "https://your-domain.com/api/system/faucet/maintenance" \
+  -H "Authorization: Bearer YOUR_SYSTEM_API_TOKEN" \
+  -H "Content-Type: application/json"
+```
+
+PowerShell 示例：
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "https://your-domain.com/api/system/faucet/maintenance" `
+  -Headers @{ Authorization = "Bearer YOUR_SYSTEM_API_TOKEN" }
+```
+
+如果使用 GitHub Actions schedule：
+
+- 在仓库 `Settings -> Secrets and variables -> Actions` 中创建 `FAUCET_MAINTENANCE_URL`
+- 在仓库 `Settings -> Secrets and variables -> Actions` 中创建 `SYSTEM_API_TOKEN`
+- 在 `.github/workflows/faucet-maintenance.yml` 中定时调用 maintenance API
 
 ## 质量门禁
 
@@ -239,6 +277,8 @@ Faucet 当前采用“钱包地址 + IP”双限流：
 - 检查钱包余额是否已经高于 `FAUCET_MIN_BALANCE`
 - 检查是否仍在冷却期内
 - 检查 Faucet 私钥账户余额是否充足
+- 检查是否已经执行过 `/api/system/faucet/maintenance`
+- 检查 relayer 地址是否已被 `FAUCET_TOP_UP_FUNDER_PRIVATE_KEY` 成功补充 Gas
 
 ## 说明
 
