@@ -13,12 +13,13 @@ import { ThemeProvider, useTheme } from "next-themes";
 import { WagmiProvider } from "wagmi";
 import { useIsClient } from "@/hooks/useIsClient";
 import { ObservabilityProvider } from "@/components/observability-provider";
-import { knowledgeChain } from "@/lib/chains";
-import { config } from "@/lib/wagmi";
+import { getKnowledgeChain } from "@/lib/chains";
+import { getWagmiConfig } from "@/lib/wagmi";
 
 function RainbowKitThemeBridge({ children }: { children: ReactNode }) {
   const { resolvedTheme } = useTheme();
   const isClient = useIsClient();
+  const knowledgeChain = getKnowledgeChain();
 
   const isDark = isClient && resolvedTheme === "dark";
 
@@ -48,6 +49,7 @@ function RainbowKitThemeBridge({ children }: { children: ReactNode }) {
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
+  const wagmiConfig = getWagmiConfig();
 
   return (
     <ThemeProvider
@@ -55,7 +57,7 @@ export function Providers({ children }: { children: ReactNode }) {
       defaultTheme="light"
       enableSystem={false}
     >
-      <WagmiProvider config={config}>
+      <WagmiProvider config={wagmiConfig}>
         <QueryClientProvider client={queryClient}>
           <ObservabilityProvider />
           <RainbowKitThemeBridge>{children}</RainbowKitThemeBridge>

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createJsonRequest } from "@/test/api-route";
-import { knowledgeChain } from "@/lib/chains";
+import { getKnowledgeChain } from "@/lib/chains";
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { takeUploadAuthChallenge } from "@/lib/auth/nonce-store";
 import { createUploadSession, setUploadSessionCookie } from "@/lib/auth/session";
@@ -75,7 +75,7 @@ describe("POST /api/auth/verify", () => {
       issuedAt: "2026-03-24T00:00:00.000Z",
       domain: "example.com",
       origin: "https://example.com",
-      chainId: knowledgeChain.id,
+      chainId: getKnowledgeChain().id,
     });
 
     const { POST } = await import("@/app/api/auth/verify/route");
@@ -96,7 +96,7 @@ describe("POST /api/auth/verify", () => {
       issuedAt: "2026-03-24T00:00:00.000Z",
       domain: "localhost",
       origin: "http://localhost",
-      chainId: knowledgeChain.id,
+      chainId: getKnowledgeChain().id,
     });
     vi.mocked(verifyMessage).mockResolvedValue(false);
 
@@ -118,14 +118,14 @@ describe("POST /api/auth/verify", () => {
       issuedAt: "2026-03-24T00:00:00.000Z",
       domain: "localhost",
       origin: "http://localhost",
-      chainId: knowledgeChain.id,
+      chainId: getKnowledgeChain().id,
     });
     vi.mocked(verifyMessage).mockResolvedValue(true);
     vi.mocked(createUploadSession).mockResolvedValue({
       session: {
         id: "session-1",
         sub: address,
-        chainId: knowledgeChain.id,
+        chainId: getKnowledgeChain().id,
         version: 2,
         createdAt: 1,
         expiresAt: 2,
@@ -148,7 +148,7 @@ describe("POST /api/auth/verify", () => {
     const body = await response.json();
     expect(body).toMatchObject({
       authenticated: true,
-      chainId: knowledgeChain.id,
+      chainId: getKnowledgeChain().id,
       sessionVersion: 2,
     });
     expect(String(body.address).toLowerCase()).toBe(address.toLowerCase());

@@ -1,11 +1,11 @@
-import { getAddress } from "viem";
+﻿import { getAddress } from "viem";
 import { NextRequest, NextResponse } from "next/server";
 
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { parseValue } from "@/lib/api-validation";
 import { faucetNonceQuerySchema } from "@/lib/api-schemas";
 import { getRequestSite } from "@/lib/auth/request";
-import { knowledgeChain } from "@/lib/chains";
+import { getKnowledgeChain } from "@/lib/chains";
 import {
   checkFaucetClaimEligibility,
   createRequestContextHashes,
@@ -20,6 +20,7 @@ import { captureServerException } from "@/lib/observability/server";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
+  const knowledgeChain = getKnowledgeChain();
   const rateLimit = await enforceApiRateLimits(req.headers, ["faucet:nonce"]);
   if (!rateLimit.ok) {
     return NextResponse.json(
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
         address: req.nextUrl.searchParams.get("address"),
       },
       faucetNonceQuerySchema,
-      "请求参数格式无效"
+      "请求参数无效"
     );
 
     if (!queryResult.ok) {
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
       address = getAddress(queryResult.value.address);
     } catch {
       return NextResponse.json(
-        { error: "钱包地址格式无效" },
+        { error: "无效的钱包地址" },
         {
           status: 400,
           headers: {

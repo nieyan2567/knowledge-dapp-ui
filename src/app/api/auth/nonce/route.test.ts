@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createNextRequest } from "@/test/api-route";
-import { knowledgeChain } from "@/lib/chains";
+import { getKnowledgeChain } from "@/lib/chains";
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { createUploadAuthChallenge } from "@/lib/auth/nonce-store";
 
@@ -43,7 +43,7 @@ describe("GET /api/auth/nonce", () => {
       issuedAt: "2026-03-24T00:00:00.000Z",
       domain: "localhost",
       origin: "http://localhost",
-      chainId: knowledgeChain.id,
+      chainId: getKnowledgeChain().id,
     });
 
     const { GET } = await import("@/app/api/auth/nonce/route");
@@ -54,13 +54,13 @@ describe("GET /api/auth/nonce", () => {
     expect(createUploadAuthChallenge).toHaveBeenCalledWith({
       domain: "localhost",
       origin: "http://localhost",
-      chainId: knowledgeChain.id,
+      chainId: getKnowledgeChain().id,
     });
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     await expect(response.json()).resolves.toMatchObject({
       nonce: "nonce-1",
-      chainId: knowledgeChain.id,
+      chainId: getKnowledgeChain().id,
     });
   });
 });

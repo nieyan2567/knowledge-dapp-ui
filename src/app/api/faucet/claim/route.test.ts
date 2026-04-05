@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createJsonRequest } from "@/test/api-route";
-import { knowledgeChain } from "@/lib/chains";
+import { getKnowledgeChain } from "@/lib/chains";
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { takeFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
 import {
@@ -63,7 +63,7 @@ const challenge = {
   issuedAt: "2026-03-24T00:00:00.000Z",
   domain: "localhost",
   origin: "http://localhost",
-  chainId: knowledgeChain.id,
+  chainId: getKnowledgeChain().id,
   address,
   ipHash: "ip-hash",
   userAgentHash: "ua-hash",

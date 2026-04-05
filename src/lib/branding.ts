@@ -1,6 +1,4 @@
-import { getPublicEnv } from "./env";
-
-const env = getPublicEnv();
+import { getPublicRuntimeEnv } from "./env";
 
 export const BRANDING = {
   appName: "Knowledge DApp",
@@ -8,5 +6,7 @@ export const BRANDING = {
   nativeTokenName: "Know Coin",
   nativeTokenSymbol: "KC",
   explorerName: "Blockscout",
-  explorerUrl: env.NEXT_PUBLIC_BLOCKSCOUT_URL,
+  get explorerUrl() {
+    return getPublicRuntimeEnv().NEXT_PUBLIC_BLOCKSCOUT_URL;
+  },
 };

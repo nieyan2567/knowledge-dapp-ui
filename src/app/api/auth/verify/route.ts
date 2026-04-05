@@ -1,4 +1,4 @@
-﻿import { getAddress, verifyMessage } from "viem";
+import { getAddress, verifyMessage } from "viem";
 import { NextRequest, NextResponse } from "next/server";
 
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
@@ -11,11 +11,12 @@ import {
   createUploadSession,
   setUploadSessionCookie,
 } from "@/lib/auth/session";
-import { knowledgeChain } from "@/lib/chains";
+import { getKnowledgeChain } from "@/lib/chains";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  const knowledgeChain = getKnowledgeChain();
   const rateLimit = await enforceApiRateLimits(req.headers, ["auth:verify"]);
   if (!rateLimit.ok) {
     return NextResponse.json(

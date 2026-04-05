@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createNextRequest } from "@/test/api-route";
-import { knowledgeChain } from "@/lib/chains";
+import { getKnowledgeChain } from "@/lib/chains";
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { createFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
 import {
@@ -102,7 +102,7 @@ describe("GET /api/faucet/nonce", () => {
       issuedAt: "2026-03-24T00:00:00.000Z",
       domain: "localhost",
       origin: "http://localhost",
-      chainId: knowledgeChain.id,
+      chainId: getKnowledgeChain().id,
       address,
       ipHash: "ip-hash",
       userAgentHash: "ua-hash",
@@ -116,7 +116,7 @@ describe("GET /api/faucet/nonce", () => {
     expect(createFaucetAuthChallenge).toHaveBeenCalledWith({
       domain: "localhost",
       origin: "http://localhost",
-      chainId: knowledgeChain.id,
+      chainId: getKnowledgeChain().id,
       address,
       ipHash: "ip-hash",
       userAgentHash: "ua-hash",

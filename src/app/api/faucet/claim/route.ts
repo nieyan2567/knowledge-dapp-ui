@@ -1,11 +1,11 @@
-import { getAddress, verifyMessage } from "viem";
+﻿import { getAddress, verifyMessage } from "viem";
 import { NextRequest, NextResponse } from "next/server";
 
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { parseJsonBody } from "@/lib/api-validation";
 import { signedRequestBodySchema } from "@/lib/api-schemas";
 import { getRequestSite } from "@/lib/auth/request";
-import { knowledgeChain } from "@/lib/chains";
+import { getKnowledgeChain } from "@/lib/chains";
 import { buildFaucetClaimMessage } from "@/lib/faucet/message";
 import { takeFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
 import {
@@ -29,6 +29,7 @@ import { captureServerException } from "@/lib/observability/server";
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  const knowledgeChain = getKnowledgeChain();
   const rateLimit = await enforceApiRateLimits(req.headers, ["faucet:claim"]);
   if (!rateLimit.ok) {
     return NextResponse.json({ error: rateLimit.error }, { status: rateLimit.status });
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
   try {
     address = getAddress(body.address);
   } catch {
-    return NextResponse.json({ error: "钱包地址格式无效" }, { status: 400 });
+    return NextResponse.json({ error: "无效的钱包地址" }, { status: 400 });
   }
 
   try {
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
 
     if (!challenge) {
       return NextResponse.json(
-        { error: "签名挑战已过期或已被使用" },
+        { error: "签名挑战不存在或已过期，请重新发起请求" },
         { status: 401 }
       );
     }
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
       challenge.userAgentHash !== contextHashes.userAgentHash
     ) {
       return NextResponse.json(
-        { error: "签名挑战与当前设备环境不匹配" },
+        { error: "签名挑战与当前设备或网络环境不匹配" },
         { status: 401 }
       );
     }
@@ -119,8 +120,8 @@ export async function POST(req: NextRequest) {
         {
           error:
             lockedCooldownSeconds > 0
-              ? `Faucet 冷却中，请在 ${lockedCooldownSeconds} 秒后重试。`
-              : "该钱包或当前网络已有 Faucet 请求正在处理中，请稍后再试。",
+              ? `Faucet 冷却中，请在 ${lockedCooldownSeconds} 秒后重试`
+              : "该钱包或当前网络已有 Faucet 请求正在处理中，请稍后重试",
         },
         { status: 429 }
       );
@@ -181,7 +182,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       {
-        error: "Faucet 发放失败，请稍后再试。",
+        error: "Faucet 发放失败，请稍后重试",
       },
       { status: 500 }
     );

@@ -180,6 +180,9 @@ type ServerEnvSchema = z.infer<typeof serverEnvSchema>;
 type PublicUrlKey = (typeof productionRequiredPublicUrls)[number];
 type ServerUrlKey = (typeof productionRequiredServerUrls)[number];
 
+let cachedPublicRuntimeEnv: PublicEnvSchema | undefined;
+let cachedPublicRuntimeEnvKey: string | undefined;
+
 function formatEnvErrors(scope: string, error: z.ZodError) {
   const details = error.issues
     .map((issue) => {
@@ -313,9 +316,23 @@ export function getPublicEnv(): PublicEnvSchema {
     ...getPublicEnvSource(),
     NODE_ENV: process.env.NODE_ENV,
   };
-  const parsed = parseEnv(publicEnvSchema, rawEnv, "public");
+  const parsed = getPublicRuntimeEnv();
   assertProductionUrlConfig(rawEnv, parsed, "public");
   return parsed;
+}
+
+export function getPublicRuntimeEnv(): PublicEnvSchema {
+  const rawEnv = getPublicEnvSource();
+  const cacheKey = JSON.stringify(rawEnv);
+
+  if (cachedPublicRuntimeEnv && cachedPublicRuntimeEnvKey === cacheKey) {
+    return cachedPublicRuntimeEnv;
+  }
+
+  cachedPublicRuntimeEnv = parseEnv(publicEnvSchema, rawEnv, "public");
+  cachedPublicRuntimeEnvKey = cacheKey;
+
+  return cachedPublicRuntimeEnv;
 }
 
 export function getServerEnv(): ServerEnvSchema {

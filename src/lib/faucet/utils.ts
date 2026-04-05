@@ -1,4 +1,4 @@
-import "server-only";
+﻿import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
 
@@ -15,7 +15,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 
 import { ABIS, CONTRACTS } from "@/contracts";
-import { knowledgeChain } from "@/lib/chains";
+import { getKnowledgeChain } from "@/lib/chains";
 import { getServerEnv } from "@/lib/env";
 import { captureServerEvent } from "@/lib/observability/server";
 import { getRedis } from "@/lib/redis";
@@ -106,7 +106,6 @@ export class FaucetRateLimitError extends FaucetError {
 type FaucetClients = {
   publicClient: ReturnType<typeof createPublicClient>;
   walletClient: ReturnType<typeof createWalletClient>;
-  account: ReturnType<typeof privateKeyToAccount>;
   relayerAccount: ReturnType<typeof privateKeyToAccount>;
   authSignerAccount: ReturnType<typeof privateKeyToAccount>;
 };
@@ -310,31 +309,32 @@ async function getRequiredFaucetRedis() {
   return redis;
 }
 
-export async function getFaucetClients() {
+export async function getFaucetClients(): Promise<FaucetClients> {
   if (faucetClients) {
     return faucetClients;
   }
 
+  const knowledgeChain = getKnowledgeChain();
   const relayerAccount = privateKeyToAccount(getFaucetRelayerPrivateKey());
   const authSignerAccount = privateKeyToAccount(getFaucetAuthSignerPrivateKey());
   const transport = http(getRpcUrl());
 
-  faucetClients = {
-    account: relayerAccount,
+  const clients: FaucetClients = {
     relayerAccount,
     authSignerAccount,
     publicClient: createPublicClient({
       chain: knowledgeChain,
       transport,
-    }),
+    }) as ReturnType<typeof createPublicClient>,
     walletClient: createWalletClient({
       account: relayerAccount,
       chain: knowledgeChain,
       transport,
-    }),
+    }) as ReturnType<typeof createWalletClient>,
   };
 
-  return faucetClients;
+  faucetClients = clients;
+  return clients;
 }
 
 async function readFaucetVaultConfig() {
@@ -394,6 +394,7 @@ async function readRecipientLastClaimAt(address: `0x${string}`) {
   const { publicClient } = await getFaucetClients();
   const faucetVaultAddress = getFaucetVaultAddress();
 
+
   return publicClient.readContract({
     address: faucetVaultAddress,
     abi: ABIS.FaucetVault,
@@ -408,6 +409,7 @@ function encodeClaimRequestHash(input: {
   deadline: bigint;
   nonce: `0x${string}`;
 }) {
+  const knowledgeChain = getKnowledgeChain();
   return keccak256(
     encodeAbiParameters(
       [
@@ -468,6 +470,7 @@ export async function submitFaucetClaim(input: {
   const { publicClient, walletClient, relayerAccount } = await getFaucetClients();
   const faucetVaultAddress = getFaucetVaultAddress();
 
+
   const txHash = await walletClient.sendTransaction({
     account: relayerAccount,
     to: faucetVaultAddress,
@@ -482,7 +485,7 @@ export async function submitFaucetClaim(input: {
         input.signature,
       ],
     }),
-    chain: knowledgeChain,
+    chain: getKnowledgeChain(),
   });
 
   await publicClient.waitForTransactionReceipt({ hash: txHash });
@@ -492,6 +495,7 @@ export async function submitFaucetClaim(input: {
 export async function rebalanceRevenueVault() {
   const { relayerAccount, publicClient, walletClient } = await getFaucetClients();
   const revenueVaultAddress = CONTRACTS.RevenueVault as `0x${string}` | undefined;
+
 
   if (!revenueVaultAddress) {
     return null;
@@ -509,7 +513,7 @@ export async function rebalanceRevenueVault() {
       abi: ABIS.RevenueVault,
       functionName: "rebalance",
     }),
-    chain: knowledgeChain,
+    chain: getKnowledgeChain(),
   });
 
   await publicClient.waitForTransactionReceipt({ hash: txHash });
@@ -571,13 +575,13 @@ async function topUpFaucetRelayerBalance(
 
   const funderWalletClient = createWalletClient({
     account: funderAccount,
-    chain: knowledgeChain,
+    chain: getKnowledgeChain(),
     transport: http(getRpcUrl()),
   });
 
   const txHash = await funderWalletClient.sendTransaction({
     account: funderAccount,
-    chain: knowledgeChain,
+    chain: getKnowledgeChain(),
     to: relayerAddress,
     value: amount,
   });
@@ -605,7 +609,7 @@ export async function runFaucetMaintenance(): Promise<FaucetMaintenanceReport> {
   if (relayerBalance < relayerAlertMinBalance) {
     const lowBalanceMessage = `Faucet relayer balance dropped below threshold: ${formatEther(
       relayerBalance
-    )} < ${formatEther(relayerAlertMinBalance)} ${knowledgeChain.nativeCurrency.symbol}`;
+    )} < ${formatEther(relayerAlertMinBalance)} ${getKnowledgeChain().nativeCurrency.symbol}`;
 
     issues.push(lowBalanceMessage);
     await alertFaucetMaintenanceIssue({
@@ -667,7 +671,7 @@ export async function runFaucetMaintenance(): Promise<FaucetMaintenanceReport> {
   ) {
     const lowVaultMessage = `FaucetVault balance dropped below threshold: ${formatEther(
       faucetVaultBalance
-    )} < ${formatEther(faucetVaultAlertMinBalance)} ${knowledgeChain.nativeCurrency.symbol}`;
+    )} < ${formatEther(faucetVaultAlertMinBalance)} ${getKnowledgeChain().nativeCurrency.symbol}`;
 
     issues.push(lowVaultMessage);
     await alertFaucetMaintenanceIssue({
@@ -775,7 +779,7 @@ export async function checkFaucetClaimEligibility(
       status: 400,
       error: `钱包余额已达到 Faucet 门槛（${formatFaucetAmount(
         config.minAllowedBalance
-      )}），暂时无法领取。`,
+      )}），暂时无需领取。`,
     };
   }
 
@@ -791,7 +795,7 @@ export async function checkFaucetClaimEligibility(
     return {
       ok: false,
       status: 429,
-      error: "当前 Faucet 周期预算已用尽，请等待下一预算周期。",
+      error: "当前 Faucet 周期预算已用尽，请等待下一个预算周期。",
     };
   }
 
@@ -865,7 +869,7 @@ export async function markFaucetClaimed(record: FaucetClaimRecord) {
 }
 
 export function formatFaucetAmount(value: bigint) {
-  return `${formatEther(value)} ${knowledgeChain.nativeCurrency.symbol}`;
+  return `${formatEther(value)} ${getKnowledgeChain().nativeCurrency.symbol}`;
 }
 
 function getRateLimitKey(

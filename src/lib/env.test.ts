@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getPublicEnv, getServerEnv } from "./env";
+import { getPublicEnv, getPublicRuntimeEnv, getServerEnv } from "./env";
 
 const mutableEnv = process.env as Record<string, string | undefined>;
 
@@ -194,6 +194,26 @@ describe("env", () => {
     mutableEnv.NODE_ENV = "production";
 
     expect(() => getPublicEnv()).toThrow(/Must not point to localhost/i);
+  });
+
+  it("allows runtime public config without the production localhost guard", () => {
+    applyValidServerEnv();
+    mutableEnv.NODE_ENV = "production";
+
+    expect(getPublicRuntimeEnv()).toMatchObject({
+      NEXT_PUBLIC_BESU_RPC_URL: "http://127.0.0.1:8545",
+      NEXT_PUBLIC_BLOCKSCOUT_URL: "http://127.0.0.1:8182",
+    });
+  });
+
+  it("does not throw when importing branding, chains, and wagmi modules in production", async () => {
+    applyValidServerEnv();
+    mutableEnv.NODE_ENV = "production";
+    vi.resetModules();
+
+    await expect(import("./branding")).resolves.toBeTruthy();
+    await expect(import("./chains")).resolves.toBeTruthy();
+    await expect(import("./wagmi")).resolves.toBeTruthy();
   });
 
   it("requires explicit server URLs in production", () => {

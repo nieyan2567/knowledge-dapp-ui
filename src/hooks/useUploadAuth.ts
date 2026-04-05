@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
@@ -9,7 +9,7 @@ import {
   buildUploadAuthMessage,
   type UploadAuthChallenge,
 } from "@/lib/auth/message";
-import { knowledgeChain } from "@/lib/chains";
+import { getKnowledgeChain } from "@/lib/chains";
 import { reportClientError } from "@/lib/observability/client";
 
 type UploadSessionResponse = {
@@ -26,6 +26,7 @@ export function useUploadAuth() {
   const { address, chainId, isConnected, isCorrectChain } = useWalletReady();
   const { signMessageAsync } = useSignMessage();
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const chainName = getKnowledgeChain().name;
 
   const ensureUploadAuth = useCallback(async () => {
     if (!isConnected || !address) {
@@ -34,7 +35,7 @@ export function useUploadAuth() {
     }
 
     if (!isCorrectChain) {
-      toast.error(`请切换到 ${knowledgeChain.name}`);
+      toast.error(`请切换到 ${chainName}`);
       return false;
     }
 
@@ -126,7 +127,7 @@ export function useUploadAuth() {
     } finally {
       setIsAuthenticating(false);
     }
-  }, [address, chainId, isConnected, isCorrectChain, signMessageAsync]);
+  }, [address, chainId, chainName, isConnected, isCorrectChain, signMessageAsync]);
 
   return {
     ensureUploadAuth,
