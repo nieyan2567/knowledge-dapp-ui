@@ -10,7 +10,7 @@ test("navigates across the main application pages", async ({ page }) => {
   await page.goto("/");
 
   await expect(
-    page.getByRole("heading", { name: "Knowledge DApp Dashboard" })
+    page.getByRole("heading", { name: "Dashboard" })
   ).toBeVisible();
 
   await page.getByRole("link", { name: "Stake", exact: true }).click();
@@ -38,6 +38,7 @@ test("navigates across the main application pages", async ({ page }) => {
 
   await page.getByRole("link", { name: "Faucet", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: /Get starter .* for your first on-chain actions/i })
+    page.getByRole("heading", { name: /Get starter .* first onchain action/i })
   ).toBeVisible();
 });
+
