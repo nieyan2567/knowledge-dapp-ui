@@ -1,20 +1,36 @@
-import type { Page, Route } from "@playwright/test";
+﻿import type { Page, Route } from "@playwright/test";
 
 const CHAIN_ID = 20260;
 const CHAIN_ID_HEX = `0x${CHAIN_ID.toString(16)}`;
-const RPC_URL = process.env.NEXT_PUBLIC_BESU_RPC_URL ?? "http://127.0.0.1:8545";
 const ZERO_WORD = `0x${"0".repeat(64)}`;
 const ZERO_ADDRESS_WORD = `0x${"0".repeat(24)}${"0".repeat(40)}`;
 const EMPTY_TX_HASH = `0x${"1".repeat(64)}`;
 
 type JsonRpcRequest = {
   id?: string | number | null;
+  jsonrpc?: string;
   method?: string;
   params?: unknown[];
 };
 
 function json(value: unknown) {
   return JSON.stringify(value);
+}
+
+function isJsonRpcPayload(value: unknown): value is JsonRpcRequest | JsonRpcRequest[] {
+  const isRequest = (entry: unknown): entry is JsonRpcRequest => {
+    return (
+      typeof entry === "object" &&
+      entry !== null &&
+      typeof (entry as JsonRpcRequest).method === "string"
+    );
+  };
+
+  if (Array.isArray(value)) {
+    return value.every(isRequest);
+  }
+
+  return isRequest(value);
 }
 
 function jsonRpcResult(id: JsonRpcRequest["id"], result: unknown) {
@@ -108,15 +124,28 @@ async function fulfillJsonRpc(route: Route, payload: JsonRpcRequest | JsonRpcReq
 }
 
 export async function mockKnowChainRpc(page: Page) {
-  await page.route(RPC_URL, async (route) => {
+  await page.route("**/*", async (route) => {
     const request = route.request();
 
     if (request.method() !== "POST") {
-      await route.fulfill({ status: 200, body: "" });
+      await route.continue();
       return;
     }
 
-    const payload = request.postDataJSON() as JsonRpcRequest | JsonRpcRequest[];
+    let payload: unknown;
+
+    try {
+      payload = request.postDataJSON();
+    } catch {
+      await route.continue();
+      return;
+    }
+
+    if (!isJsonRpcPayload(payload)) {
+      await route.continue();
+      return;
+    }
+
     await fulfillJsonRpc(route, payload);
   });
 }

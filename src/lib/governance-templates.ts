@@ -1,7 +1,23 @@
-import { encodeFunctionData, formatEther, parseEther } from "viem";
+import { formatEther } from "viem";
 
 import { ABIS, CONTRACTS } from "@/contracts";
 import { BRANDING } from "@/lib/branding";
+import {
+  buildEncodedGovernanceAction,
+  createGovernanceDraftId,
+  type FailedValidation as GovernanceFailedValidation,
+  failValidation,
+  formatGovernanceAddress,
+  isFailedValidation,
+  okValidation,
+  parseRequiredAddress,
+  parseRequiredNonNegativeTokenAmount,
+  parseRequiredTokenAmount,
+  parseRequiredUint,
+  readGovernanceBoolean,
+  readGovernanceString,
+  type ValidationResult as GovernanceValidationResult,
+} from "@/lib/governance-template-utils";
 import type { Address, HexString } from "@/types/contracts";
 import type {
   GovernanceDraftAction,
@@ -10,172 +26,24 @@ import type {
   GovernanceTemplateDefinition,
 } from "@/types/governance";
 
-type ValidationResult =
-  | { ok: true }
-  | { ok: false; error: string };
-
-type FailedValidation = Extract<ValidationResult, { ok: false }>;
-
 type TemplateCodec = {
-  validate: (values: Record<string, string | boolean>) => ValidationResult;
+  validate: (
+    values: Record<string, string | boolean>
+  ) => ReturnType<typeof okValidation> | ReturnType<typeof failValidation>;
   encode: (values: Record<string, string | boolean>) => GovernanceEncodedAction;
 };
 
-function createDraftId() {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `draft-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
+type ValidationResult = GovernanceValidationResult;
+type FailedValidation = GovernanceFailedValidation;
 
-function ok(): ValidationResult {
-  return { ok: true };
-}
-
-function fail(error: string): FailedValidation {
-  return { ok: false, error };
-}
-
-function isFailed(
-  value: unknown
-): value is Extract<ValidationResult, { ok: false }> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "ok" in value &&
-    value.ok === false
-  );
-}
-
-function readString(
-  values: Record<string, string | boolean>,
-  key: string
-): string {
-  const value = values[key];
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function readBoolean(
-  values: Record<string, string | boolean>,
-  key: string
-): boolean {
-  const value = values[key];
-
-  if (typeof value === "boolean") {
-    return value;
-  }
-
-  return value === "true";
-}
-
-function parseRequiredUint(
-  values: Record<string, string | boolean>,
-  key: string,
-  label: string
-): bigint | FailedValidation {
-  const value = readString(values, key);
-
-  if (!value) {
-    return fail(`请输入${label}`);
-  }
-
-  if (!/^\d+$/.test(value)) {
-    return fail(`${label}必须是非负整数`);
-  }
-
-  return BigInt(value);
-}
-
-function parseRequiredTokenAmount(
-  values: Record<string, string | boolean>,
-  key: string,
-  label: string
-): bigint | FailedValidation {
-  const value = readString(values, key);
-
-  if (!value) {
-    return fail(`请输入${label}`);
-  }
-
-  try {
-    const parsed = parseEther(value);
-    if (parsed <= 0n) {
-      return fail(`${label}必须大于 0`);
-    }
-    return parsed;
-  } catch {
-    return fail(`${label}格式不正确`);
-  }
-}
-
-function parseRequiredAddress(
-  values: Record<string, string | boolean>,
-  key: string,
-  label: string
-): Address | FailedValidation {
-  const value = readString(values, key);
-
-  if (!value) {
-    return fail(`请输入${label}`);
-  }
-
-  if (!/^0x[a-fA-F0-9]{40}$/.test(value)) {
-    return fail(`${label}格式不正确`);
-  }
-
-  return value as Address;
-}
-
-function parseRequiredNonNegativeTokenAmount(
-  values: Record<string, string | boolean>,
-  key: string,
-  label: string
-): bigint | FailedValidation {
-  const value = readString(values, key);
-
-  if (!value) {
-    return fail(`请输入${label}`);
-  }
-
-  try {
-    const parsed = parseEther(value);
-    if (parsed < 0n) {
-      return fail(`${label}必须大于或等于 0`);
-    }
-    return parsed;
-  } catch {
-    return fail(`${label}格式不正确`);
-  }
-}
-
-function formatAddress(address: Address) {
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
-
-function buildEncodedAction(input: {
-  templateId: string;
-  target: Address;
-  functionName: string;
-  args?: readonly unknown[];
-  title: string;
-  description: string;
-  riskLevel: GovernanceRiskLevel;
-  abi: typeof ABIS.KnowledgeContent;
-  value?: bigint;
-}): GovernanceEncodedAction {
-  return {
-    templateId: input.templateId,
-    target: input.target,
-    value: input.value ?? 0n,
-    calldata: encodeFunctionData({
-      abi: input.abi,
-      functionName: input.functionName,
-      args: input.args,
-    }) as HexString,
-    title: input.title,
-    description: input.description,
-    riskLevel: input.riskLevel,
-  };
-}
+const createDraftId = createGovernanceDraftId;
+const ok = okValidation;
+const fail = failValidation;
+const isFailed = isFailedValidation;
+const readString = readGovernanceString;
+const readBoolean = readGovernanceBoolean;
+const formatAddress = formatGovernanceAddress;
+const buildEncodedAction = buildEncodedGovernanceAction;
 
 const GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {

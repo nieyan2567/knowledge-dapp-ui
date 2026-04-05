@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatEther } from "viem";
@@ -20,6 +20,7 @@ import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useUploadAuth } from "@/hooks/useUploadAuth";
 import { BRANDING } from "@/lib/branding";
 import { reportClientError } from "@/lib/observability/client";
+import { PAGE_TEST_IDS } from "@/lib/test-ids";
 import { txToast, writeTxToast } from "@/lib/tx-toast";
 import {
   formatUploadFileSize,
@@ -167,7 +168,7 @@ export default function ContentPage() {
       setContentList(parsed);
     } catch (error) {
       reportContentPageError("Failed to refresh content list", error);
-      toast.error("加载内容列表失败");
+      toast.error("鍔犺浇鍐呭鍒楄〃澶辫触");
     } finally {
       setLoadingList(false);
     }
@@ -193,7 +194,7 @@ export default function ContentPage() {
       } catch (error) {
         reportContentPageError("Failed to load content list", error);
         if (!cancelled) {
-          toast.error("加载内容列表失败");
+          toast.error("鍔犺浇鍐呭鍒楄〃澶辫触");
         }
       } finally {
         if (!cancelled) {
@@ -271,7 +272,7 @@ export default function ContentPage() {
 
   async function handleUploadToIpfs() {
     if (!file) {
-      toast.error("请先选择文件");
+      toast.error("璇峰厛閫夋嫨鏂囦欢");
       return;
     }
 
@@ -308,7 +309,7 @@ export default function ContentPage() {
           };
 
           if (!response.ok || !result.cid || !result.url) {
-            throw new Error(result.error || "文件上传失败");
+            throw new Error(result.error || "鏂囦欢涓婁紶澶辫触");
           }
 
           return {
@@ -316,9 +317,9 @@ export default function ContentPage() {
             url: result.url,
           };
         })(),
-        "正在上传文件到 IPFS...",
-        "文件上传成功",
-        "文件上传失败"
+        "姝ｅ湪涓婁紶鏂囦欢鍒?IPFS...",
+        "鏂囦欢涓婁紶鎴愬姛",
+        "鏂囦欢涓婁紶澶辫触"
       );
 
       setUploadedCid(data.cid);
@@ -409,6 +410,7 @@ export default function ContentPage() {
         eyebrow="Content Registry · Local IPFS"
         title="Content Hub"
         description="先完成钱包身份验证，再上传文件到本地 IPFS，最后将 CID 和元数据登记到链上。"
+        testId={PAGE_TEST_IDS.content}
       />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -526,7 +528,8 @@ export default function ContentPage() {
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
                 单文件大小上限：{uploadMaxFileSizeText}。当前默认拒绝高风险格式，例如
-                HTML、JS、SVG、EXE、BAT、PS1、SH 等文件。服务端会重新识别文件真实类型，并对文本内容做风险扫描。
+                HTML、JS、SVG、EXE、BAT、PS1、SH 等文件。服务端会重新识别文件真实类型，
+                并对文本内容做风险扫描。
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
@@ -578,3 +581,4 @@ export default function ContentPage() {
     </main>
   );
 }
+

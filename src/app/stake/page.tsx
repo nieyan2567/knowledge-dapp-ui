@@ -18,80 +18,18 @@ import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { BRANDING } from "@/lib/branding";
+import { PAGE_TEST_IDS } from "@/lib/test-ids";
+import {
+	formatStakeDuration,
+	formatStakeTimestamp,
+	formatStakeTokenInput,
+	getScaledStakeAmount,
+	STAKE_COPY,
+	STAKE_FLOW_STEPS,
+	tryParseStakeAmount,
+} from "@/lib/stake-display";
 import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt } from "@/lib/web3-types";
-
-function tryParseAmount(value: string) {
-	if (!value.trim()) return null;
-
-	try {
-		const amount = parseEther(value.trim());
-		return amount > 0n ? amount : null;
-	} catch {
-		return null;
-	}
-}
-
-function formatTokenInput(amount: bigint) {
-	const formatted = formatEther(amount);
-	if (!formatted.includes(".")) {
-		return formatted;
-	}
-
-	return formatted.replace(/\.?0+$/, "") || "0";
-}
-
-function formatDuration(seconds: bigint) {
-	if (seconds <= 0n) return "现在即可操作";
-
-	const total = Number(seconds);
-	const days = Math.floor(total / 86400);
-	const hours = Math.floor((total % 86400) / 3600);
-	const minutes = Math.floor((total % 3600) / 60);
-	const remainSeconds = total % 60;
-
-	if (days > 0) return `${days}天 ${hours}小时`;
-	if (hours > 0) return `${hours}小时 ${minutes}分钟`;
-	if (minutes > 0) return `${minutes}分钟 ${remainSeconds}秒`;
-	return `${remainSeconds}秒`;
-}
-
-function formatTimestamp(timestamp: bigint) {
-	return new Date(Number(timestamp) * 1000).toLocaleString("zh-CN", {
-		hour12: false,
-	});
-}
-
-function getScaledAmount(base: bigint, numerator: bigint, denominator: bigint) {
-	if (base <= 0n) return 0n;
-	if (numerator === denominator) return base;
-
-	const scaled = (base * numerator) / denominator;
-	return scaled > 0n ? scaled : 0n;
-}
-
-const stakeFlowSteps = [
-	{
-		id: 1,
-		title: "Deposit",
-		description: "先存入原生币，形成待激活质押。",
-	},
-	{
-		id: 2,
-		title: "Activate",
-		description: "等待激活区块达到后启用投票权。",
-	},
-	{
-		id: 3,
-		title: "Request Withdraw",
-		description: "申请退出后，质押会进入冷却阶段。",
-	},
-	{
-		id: 4,
-		title: "Withdraw",
-		description: "冷却结束后提取原生币回到钱包。",
-	},
-] as const;
 
 export default function StakePage() {
 	const { address } = useAccount();
@@ -241,8 +179,8 @@ export default function StakePage() {
 	const withdrawAfterTimeValue = asBigInt(withdrawAfterTime) ?? 0n;
 	const currentBlock = liveBlockNumber;
 	const walletBalanceValue = nativeBalance?.value ?? 0n;
-	const depositAmountWei = useMemo(() => tryParseAmount(depositAmount), [depositAmount]);
-	const withdrawAmountWei = useMemo(() => tryParseAmount(withdrawAmount), [withdrawAmount]);
+	const depositAmountWei = useMemo(() => tryParseStakeAmount(depositAmount), [depositAmount]);
+	const withdrawAmountWei = useMemo(() => tryParseStakeAmount(withdrawAmount), [withdrawAmount]);
 	const hasPendingStake = pendingStakeValue > 0n;
 	const hasPendingWithdraw = pendingWithdrawValue > 0n;
 	const activateRemainingBlocks =
@@ -296,7 +234,7 @@ export default function StakePage() {
 		: !hasPendingWithdraw
 			? "暂无待提取余额，申请退出后会进入冷却期。"
 			: withdrawRemainingSeconds > 0n
-				? `还需等待 ${formatDuration(withdrawRemainingSeconds)}，预计 ${formatTimestamp(withdrawAfterTimeValue)} 后可提取。`
+				? `还需等待 ${formatStakeDuration(withdrawRemainingSeconds)}，预计 ${formatStakeTimestamp(withdrawAfterTimeValue)} 后可提取。`
 				: "当前待提取余额已满足条件，可以立即提取。";
 	const activeFlowStep = hasPendingWithdraw
 		? withdrawRemainingSeconds > 0n
@@ -311,7 +249,7 @@ export default function StakePage() {
 		? "当前未连接钱包"
 		: hasPendingWithdraw
 			? withdrawRemainingSeconds > 0n
-				? `当前处于退出冷却阶段，还需等待 ${formatDuration(withdrawRemainingSeconds)}`
+				? `当前处于退出冷却阶段，还需等待 ${formatStakeDuration(withdrawRemainingSeconds)}`
 				: "当前已满足提现条件，可执行 Withdraw"
 			: hasPendingStake
 				? activateRemainingBlocks > 0n
@@ -347,15 +285,15 @@ export default function StakePage() {
 		denominator: bigint,
 		setter: (value: string) => void
 	) {
-		const amount = getScaledAmount(base, numerator, denominator);
+		const amount = getScaledStakeAmount(base, numerator, denominator);
 		if (amount > 0n) {
-			setter(formatTokenInput(amount));
+			setter(formatStakeTokenInput(formatEther(amount)));
 		}
 	}
 
 	async function handleDeposit() {
 		if (!address) {
-			toast.error("请先连接钱包");
+			toast.error(STAKE_COPY.connectWalletFirst);
 			return;
 		}
 
@@ -388,7 +326,7 @@ export default function StakePage() {
 
 	async function handleActivate() {
 		if (!address) {
-			toast.error("请先连接钱包");
+			toast.error(STAKE_COPY.connectWalletFirst);
 			return;
 		}
 
@@ -422,7 +360,7 @@ export default function StakePage() {
 
 	async function handleCancelPendingStake() {
 		if (!address) {
-			toast.error("请先连接钱包");
+			toast.error(STAKE_COPY.connectWalletFirst);
 			return;
 		}
 
@@ -460,7 +398,7 @@ export default function StakePage() {
 
 	async function handleRequestWithdraw() {
 		if (!address) {
-			toast.error("请先连接钱包");
+			toast.error(STAKE_COPY.connectWalletFirst);
 			return;
 		}
 
@@ -503,7 +441,7 @@ export default function StakePage() {
 
 	async function handleWithdraw() {
 		if (!address) {
-			toast.error("请先连接钱包");
+			toast.error(STAKE_COPY.connectWalletFirst);
 			return;
 		}
 
@@ -521,7 +459,7 @@ export default function StakePage() {
 		}
 
 		if (withdrawRemainingSeconds > 0n) {
-			toast.error(`还需等待 ${formatDuration(withdrawRemainingSeconds)} 后才能提取`);
+			toast.error(`还需等待 ${formatStakeDuration(withdrawRemainingSeconds)} 后才能提取`);
 			return;
 		}
 
@@ -548,8 +486,9 @@ export default function StakePage() {
 		<main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
 			<PageHeader
 				eyebrow="Staking · Voting Power"
-				title="Stake & Voting Power"
-				description="先质押原生币并激活投票权，再参与内容投票和 DAO 治理；退出质押需要先申请，再等待冷却期结束。"
+				title={STAKE_COPY.headerTitle}
+				description={STAKE_COPY.headerDescription}
+				testId={PAGE_TEST_IDS.stake}
 			/>
 
 			<section className="rounded-3xl border border-amber-200/70 bg-linear-to-r from-amber-50 via-white to-sky-50 p-3.5 shadow-sm dark:border-amber-900/40 dark:from-amber-950/20 dark:via-slate-900 dark:to-sky-950/10">
@@ -569,7 +508,7 @@ export default function StakePage() {
 					</div>
 				</div>
 				<div className="mt-2.5 grid gap-2 md:grid-cols-4">
-					{stakeFlowSteps.map((step) => {
+					{STAKE_FLOW_STEPS.map((step) => {
 						const isActive = step.id === activeFlowStep;
 						return (
 							<div
@@ -662,17 +601,17 @@ export default function StakePage() {
 					<div className="mt-auto pt-1.5 text-xs text-slate-500 dark:text-slate-400">
 						{hasPendingWithdraw
 							? withdrawRemainingSeconds > 0n
-								? `还需 ${formatDuration(withdrawRemainingSeconds)}`
+								? `还需 ${formatStakeDuration(withdrawRemainingSeconds)}`
 								: "现在可以提取"
-							: `默认冷却 ${formatDuration(cooldownSecondsValue)}`}
+							: `默认冷却 ${formatStakeDuration(cooldownSecondsValue)}`}
 					</div>
 				</div>
 			</section>
 
 			<div className="grid gap-4 lg:grid-cols-2">
 				<SectionCard
-					title="质押、激活与撤回待激活"
-					description="先发起 Deposit 锁定原生币；等激活区块数达到后执行 Activate 获得投票权。若尚未激活，也可以直接撤回。"
+					title={STAKE_COPY.depositSectionTitle}
+					description={STAKE_COPY.depositSectionDescription}
 					className="p-5"
 				>
 					<div className="space-y-3">
@@ -743,8 +682,8 @@ export default function StakePage() {
 				</SectionCard>
 
 				<SectionCard
-					title="退出与提现"
-					description="先申请退出，系统会立即减少投票权；等冷却期结束后，再执行 Withdraw 提取原生币。"
+					title={STAKE_COPY.withdrawSectionTitle}
+					description={STAKE_COPY.withdrawSectionDescription}
 					className="p-5"
 				>
 					<div className="space-y-3">
@@ -804,7 +743,7 @@ export default function StakePage() {
 						</div>
 
 						<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
-							<div>退出冷却期：{formatDuration(cooldownSecondsValue)}</div>
+							<div>退出冷却期：{formatStakeDuration(cooldownSecondsValue)}</div>
 							<div>{withdrawHelperText}</div>
 						</div>
 
@@ -853,4 +792,6 @@ function QuickAmountButton({
 		</button>
 	);
 }
+
+
 

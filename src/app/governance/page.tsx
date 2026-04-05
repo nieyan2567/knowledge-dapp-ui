@@ -47,8 +47,17 @@ import {
   summarizeProposalActions,
 } from "@/lib/governance";
 import { BRANDING } from "@/lib/branding";
+import {
+  GOVERNANCE_CATEGORY_LABELS,
+  GOVERNANCE_FLOW_STEPS,
+  GOVERNANCE_PAGE_COPY,
+  groupGovernanceTemplates,
+  MAX_GOVERNANCE_DRAFT_ACTIONS,
+  moveGovernanceItem,
+} from "@/lib/governance-page-helpers";
 import { reportClientError } from "@/lib/observability/client";
 import { fetchParsedProposals } from "@/lib/proposal-events";
+import { PAGE_TEST_IDS } from "@/lib/test-ids";
 import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt, asProposalVotes } from "@/lib/web3-types";
 import type {
@@ -59,39 +68,6 @@ import type {
   ProposalItem,
   ProposalVotes,
 } from "@/types/governance";
-
-const MAX_DRAFT_ACTIONS = 5;
-
-const CATEGORY_LABELS: Record<GovernanceTemplateCategory, string> = {
-  content: "Content",
-  stake: "Stake",
-  treasury: "Treasury",
-  governor: "Governor",
-  timelock: "Timelock",
-};
-
-const GOVERNANCE_FLOW_STEPS = [
-  {
-    step: 1,
-    title: "配置提案动作",
-    description: "从治理模板中组合链上动作，明确要修改的规则与参数。",
-  },
-  {
-    step: 2,
-    title: "提交并进入投票",
-    description: "提案达到门槛后发起，经过 voting delay 后进入投票阶段。",
-  },
-  {
-    step: 3,
-    title: "通过后排队",
-    description: "成功提案会进入 Timelock 队列，等待最小延迟结束。",
-  },
-  {
-    step: 4,
-    title: "执行生效",
-    description: "队列完成后执行提案，治理参数和系统配置正式更新。",
-  },
-] as const;
 
 type DraftActionState = {
   action: GovernanceDraftAction;
@@ -124,33 +100,6 @@ function reportGovernancePageError(message: string, error: unknown) {
     handled: true,
     error,
   });
-}
-
-function moveItem<T>(items: T[], fromIndex: number, toIndex: number) {
-  const next = [...items];
-  const [item] = next.splice(fromIndex, 1);
-
-  if (item === undefined) {
-    return items;
-  }
-
-  next.splice(toIndex, 0, item);
-  return next;
-}
-
-function getCategoryOrder(category: GovernanceTemplateCategory) {
-  switch (category) {
-    case "content":
-      return 0;
-    case "treasury":
-      return 1;
-    case "governor":
-      return 2;
-    case "timelock":
-      return 3;
-    default:
-      return 999;
-  }
 }
 
 export default function GovernancePage() {
@@ -215,28 +164,7 @@ export default function GovernancePage() {
   }, [publicClient]);
 
   const templates = useMemo(() => getGovernanceTemplates(), []);
-  const groupedTemplates = useMemo(() => {
-    return Object.entries(
-      templates.reduce<Record<GovernanceTemplateCategory, GovernanceTemplateDefinition[]>>(
-        (groups, template) => {
-          groups[template.category].push(template);
-          return groups;
-        },
-        {
-          content: [],
-          stake: [],
-          treasury: [],
-          governor: [],
-          timelock: [],
-        }
-      )
-    )
-      .filter(([, items]) => items.length > 0)
-      .sort(([left], [right]) =>
-        getCategoryOrder(left as GovernanceTemplateCategory) -
-        getCategoryOrder(right as GovernanceTemplateCategory)
-      ) as Array<[GovernanceTemplateCategory, GovernanceTemplateDefinition[]]>;
-  }, [templates]);
+  const groupedTemplates = useMemo(() => groupGovernanceTemplates(templates), [templates]);
 
   const { data: proposalThreshold, refetch: refetchProposalThreshold } = useReadContract({
     address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
@@ -506,8 +434,8 @@ export default function GovernancePage() {
   }
 
   function handleAddAction() {
-    if (draftActions.length >= MAX_DRAFT_ACTIONS) {
-      toast.error(`单个提案最多支持 ${MAX_DRAFT_ACTIONS} 个动作`);
+    if (draftActions.length >= MAX_GOVERNANCE_DRAFT_ACTIONS) {
+      toast.error(`单个提案最多支持 ${MAX_GOVERNANCE_DRAFT_ACTIONS} 个动作`);
       return;
     }
 
@@ -532,11 +460,11 @@ export default function GovernancePage() {
       }
 
       if (direction === "up" && index > 0) {
-        return moveItem(current, index, index - 1);
+        return moveGovernanceItem(current, index, index - 1);
       }
 
       if (direction === "down" && index < current.length - 1) {
-        return moveItem(current, index, index + 1);
+        return moveGovernanceItem(current, index, index + 1);
       }
 
       return current;
@@ -605,8 +533,9 @@ export default function GovernancePage() {
     <main className="mx-auto max-w-375 space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
         eyebrow="Governor / Timelock / DAO"
-        title="Governance Center"
-        description="在同一页面查看治理流程、浏览提案、核对参数，并完成提案创建与提交前确认。"
+        title={GOVERNANCE_PAGE_COPY.headerTitle}
+        description={GOVERNANCE_PAGE_COPY.headerDescription}
+        testId={PAGE_TEST_IDS.governance}
         right={
           <a
             href={explorerAddressUrl(CONTRACTS.KnowledgeGovernor)}
@@ -683,8 +612,8 @@ export default function GovernancePage() {
           </section>
 
           <SectionCard
-            title="提案列表"
-            description="这里集中展示全部治理提案，支持滚动浏览状态、投票进度与后续处理阶段。"
+            title={GOVERNANCE_PAGE_COPY.listTitle}
+            description={GOVERNANCE_PAGE_COPY.listDescription}
           >
             <div className="mb-4 grid gap-3 sm:grid-cols-3">
               <PreviewStat label="当前提案" value={String(proposals.length)} />
@@ -706,8 +635,8 @@ export default function GovernancePage() {
 
           <section className="grid gap-6 2xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.95fr)] 2xl:items-stretch">
             <SectionCard
-              title="创建提案"
-              description="在一个提案里组合多个治理动作，按执行顺序发起链上变更。"
+              title={GOVERNANCE_PAGE_COPY.createTitle}
+              description={GOVERNANCE_PAGE_COPY.createDescription}
               className="h-208"
               bodyClassName="flex min-h-0 flex-col"
             >
@@ -731,13 +660,13 @@ export default function GovernancePage() {
                       提案动作
                     </div>
                     <div className="text-xs text-slate-500 dark:text-slate-400">
-                      当前 {draftActions.length} / {MAX_DRAFT_ACTIONS} 个动作
+                      当前 {draftActions.length} / {MAX_GOVERNANCE_DRAFT_ACTIONS} 个动作
                     </div>
                   </div>
 
                   <button
                     onClick={handleAddAction}
-                    disabled={draftActions.length >= MAX_DRAFT_ACTIONS}
+                    disabled={draftActions.length >= MAX_GOVERNANCE_DRAFT_ACTIONS}
                     className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     <Plus className="h-4 w-4" />
@@ -813,8 +742,8 @@ export default function GovernancePage() {
             </SectionCard>
 
             <SectionCard
-              title="提交前预览"
-              description="这里会按顺序展示最终要写入 Governor.propose 的目标地址、编码动作与风险等级。"
+              title={GOVERNANCE_PAGE_COPY.previewTitle}
+              description={GOVERNANCE_PAGE_COPY.previewDescription}
               className="h-208"
               bodyClassName="flex min-h-0 flex-col"
             >
@@ -857,8 +786,8 @@ export default function GovernancePage() {
         </div>
         <div className="space-y-6 xl:sticky xl:top-6">
           <SectionCard
-            title="治理参数"
-            description="展示当前治理所需的关键参数，便于在配置提案时随时参考。"
+            title={GOVERNANCE_PAGE_COPY.paramsTitle}
+            description={GOVERNANCE_PAGE_COPY.paramsDescription}
           >
             <div className="space-y-3">
               <GovernanceMetricCard
@@ -1041,7 +970,7 @@ function DraftActionEditor({
             className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-400"
           >
             {groupedTemplates.map(([category, templates]) => (
-              <optgroup key={category} label={CATEGORY_LABELS[category]}>
+              <optgroup key={category} label={GOVERNANCE_CATEGORY_LABELS[category]}>
                 {templates.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.label}

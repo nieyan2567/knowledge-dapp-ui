@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -19,13 +19,15 @@ import {
 import { toast } from "sonner";
 
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useWalletReady } from "@/hooks/useWalletReady";
+import { BRANDING } from "@/lib/branding";
+import { FAUCET_COPY, getFaucetSuccessTitle } from "@/lib/faucet/copy";
 import {
   buildFaucetClaimMessage,
   type FaucetAuthChallenge,
 } from "@/lib/faucet/message";
-import { useWalletReady } from "@/hooks/useWalletReady";
-import { BRANDING } from "@/lib/branding";
 import { reportClientError } from "@/lib/observability/client";
+import { PAGE_TEST_IDS } from "@/lib/test-ids";
 
 type FaucetClaimResponse = {
   ok?: boolean;
@@ -108,7 +110,7 @@ function ConnectAction() {
               onClick={openConnectModal}
               className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
-              连接钱包
+              {FAUCET_COPY.page.connectWallet}
             </button>
           );
         }
@@ -153,7 +155,7 @@ export default function FaucetPage() {
 
   async function handleClaim() {
     if (!address || !isConnected) {
-      toast.error("请先连接钱包");
+      toast.error(FAUCET_COPY.page.connectWallet);
       return;
     }
 
@@ -188,7 +190,8 @@ export default function FaucetPage() {
           }
         );
         toast.error(
-          ("error" in nonceData && nonceData.error) || "创建 Faucet 签名挑战失败"
+          ("error" in nonceData && nonceData.error) ||
+            FAUCET_COPY.page.claimRequestChallengeFailed
         );
         return;
       }
@@ -217,20 +220,22 @@ export default function FaucetPage() {
           address,
           status: claimRes.status,
         });
-        toast.error(claimData.error || "Faucet 发放失败，请稍后再试");
+        toast.error(claimData.error || FAUCET_COPY.errors.claimFailed);
         return;
       }
 
       setTxHash(claimData.txHash);
       setClaimAmount(claimData.displayAmount || null);
-      toast.success("启动资金已发放");
+      toast.success(FAUCET_COPY.page.claimSuccess);
     } catch (error) {
       if (isUserRejectedError(error)) {
-        toast.info("已取消钱包签名");
+        toast.info(FAUCET_COPY.page.signatureCancelled);
         return;
       }
 
-      toast.error(error instanceof Error ? error.message : "Faucet 请求失败");
+      toast.error(
+        error instanceof Error ? error.message : FAUCET_COPY.page.claimRequestFailed
+      );
       reportFaucetPageError("Faucet request failed", error, { address });
     } finally {
       setLoading(false);
@@ -242,7 +247,10 @@ export default function FaucetPage() {
     : "--";
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(15,23,42,0.08),transparent_30%),radial-gradient(circle_at_80%_20%,rgba(16,185,129,0.14),transparent_24%),linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)] px-6 py-8 text-slate-900 dark:bg-[radial-gradient(circle_at_top,rgba(148,163,184,0.12),transparent_26%),radial-gradient(circle_at_80%_20%,rgba(16,185,129,0.16),transparent_24%),linear-gradient(180deg,#020617_0%,#0f172a_100%)] dark:text-slate-100">
+    <main
+      data-testid={PAGE_TEST_IDS.faucet}
+      className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(15,23,42,0.08),transparent_30%),radial-gradient(circle_at_80%_20%,rgba(16,185,129,0.14),transparent_24%),linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)] px-6 py-8 text-slate-900 dark:bg-[radial-gradient(circle_at_top,rgba(148,163,184,0.12),transparent_26%),radial-gradient(circle_at_80%_20%,rgba(16,185,129,0.16),transparent_24%),linear-gradient(180deg,#020617_0%,#0f172a_100%)] dark:text-slate-100"
+    >
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Link
@@ -250,7 +258,7 @@ export default function FaucetPage() {
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 backdrop-blur transition hover:bg-white dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-900"
           >
             <ArrowRight className="h-4 w-4 rotate-180" />
-            返回应用
+            {FAUCET_COPY.page.backToApp}
           </Link>
 
           <div className="flex items-center gap-3">
@@ -264,24 +272,25 @@ export default function FaucetPage() {
             <div className="space-y-5">
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
                 <Droplets className="h-4 w-4" />
-                {BRANDING.chainName} Starter Faucet
+                {FAUCET_COPY.page.heroEyebrow}
               </div>
 
               <div className="space-y-4">
-                <h1 className="max-w-3xl text-5xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-6xl">
-                  Get starter funds and complete your first onchain action.
+                <h1
+                  data-testid={PAGE_TEST_IDS.faucet}
+                  className="max-w-3xl text-5xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-6xl"
+                >
+                  {FAUCET_COPY.page.heroTitle}
                 </h1>
                 <p className="max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-                  这个 Faucet 会为新钱包发放少量 {BRANDING.nativeTokenSymbol}，
-                  用于支付 Gas，并完成 {BRANDING.appName}
-                  中的首次上传、投票、领取奖励或质押操作。
+                  {FAUCET_COPY.page.heroDescription}
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-3">
                 <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-700 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200">
                   <Wallet className="h-4 w-4 text-slate-400" />
-                  Wallet balance: {walletBalanceText}
+                  {FAUCET_COPY.page.walletBalanceLabel}: {walletBalanceText}
                 </div>
                 <a
                   href={BRANDING.explorerUrl}
@@ -289,7 +298,7 @@ export default function FaucetPage() {
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-700 backdrop-blur transition hover:bg-white dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-900"
                 >
-                  Open explorer
+                  {FAUCET_COPY.page.openExplorer}
                   <ExternalLink className="h-4 w-4" />
                 </a>
               </div>
@@ -299,30 +308,30 @@ export default function FaucetPage() {
               <div className="rounded-3xl border border-slate-200 bg-white/80 p-5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
                 <ShieldCheck className="mb-4 h-5 w-5 text-emerald-500" />
                 <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
-                  仅需钱包签名
+                  {FAUCET_COPY.page.signatureCardTitle}
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  你只需要签署一条请求消息，后端会生成授权并由 relayer 代为提交 FaucetVault 发放交易。
+                  {FAUCET_COPY.page.signatureCardDescription}
                 </p>
               </div>
 
               <div className="rounded-3xl border border-slate-200 bg-white/80 p-5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
                 <Sparkles className="mb-4 h-5 w-5 text-blue-500" />
                 <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
-                  用于首次操作
+                  {FAUCET_COPY.page.firstActionCardTitle}
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  这笔启动资金主要用于 Gas，以及你的首次投票、上传、奖励领取或质押流程。
+                  {FAUCET_COPY.page.firstActionCardDescription}
                 </p>
               </div>
 
               <div className="rounded-3xl border border-slate-200 bg-white/80 p-5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
                 <Coins className="mb-4 h-5 w-5 text-violet-500" />
                 <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
-                  受冷却期保护
+                  {FAUCET_COPY.page.cooldownCardTitle}
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  重复领取会受到频率限制，余额已经足够的钱包也可能会被拒绝。
+                  {FAUCET_COPY.page.cooldownCardDescription}
                 </p>
               </div>
             </div>
@@ -332,7 +341,7 @@ export default function FaucetPage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                  申请启动资金
+                  {FAUCET_COPY.page.requestFundsLabel}
                 </div>
                 <div className="mt-1 text-2xl font-semibold text-slate-950 dark:text-slate-100">
                   {BRANDING.nativeTokenSymbol} Faucet
@@ -346,16 +355,16 @@ export default function FaucetPage() {
             <div className="mt-6 space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/50">
                 <div className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                  Connected wallet
+                  {FAUCET_COPY.page.connectedWalletLabel}
                 </div>
                 <div className="mt-2 break-all text-sm font-medium text-slate-900 dark:text-slate-100">
-                  {address || "连接钱包后可申请启动资金"}
+                  {address || FAUCET_COPY.page.disconnectedWalletHint}
                 </div>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/50">
                 <div className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                  Chain
+                  {FAUCET_COPY.page.chainLabel}
                 </div>
                 <div className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">
                   {BRANDING.chainName}
@@ -371,19 +380,18 @@ export default function FaucetPage() {
               >
                 <Droplets className="h-4 w-4" />
                 {loading
-                  ? "正在申请启动资金..."
-                  : `申请 ${BRANDING.nativeTokenSymbol}`}
+                  ? FAUCET_COPY.page.claimButtonLoading
+                  : FAUCET_COPY.page.claimButtonIdle}
               </button>
 
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-slate-500 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-400">
-                这个 Faucet 面向需要初始 Gas 的新钱包。如果你的钱包已经持有足够的{" "}
-                {BRANDING.nativeTokenSymbol}，申请可能会被拒绝。
+                {FAUCET_COPY.page.helperText}
               </div>
 
               {txHash ? (
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30">
                   <div className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
-                    启动资金已发放{claimAmount ? `，${claimAmount}` : ""}
+                    {getFaucetSuccessTitle(claimAmount)}
                   </div>
                   <a
                     href={`${BRANDING.explorerUrl}/tx/${txHash}`}
@@ -404,36 +412,36 @@ export default function FaucetPage() {
           <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
             <div className="flex items-center gap-3 text-slate-950 dark:text-slate-100">
               <Vote className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">接下来可以做什么</h2>
+              <h2 className="text-lg font-semibold">{FAUCET_COPY.page.nextStepsTitle}</h2>
             </div>
             <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              <li>用这笔资金支付首次投票所需的 Gas。</li>
-              <li>上传内容到 IPFS，并完成链上登记。</li>
-              <li>领取已累积奖励，或激活你的第一笔质押。</li>
+              {FAUCET_COPY.page.nextSteps.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
             </ul>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
             <div className="flex items-center gap-3 text-slate-950 dark:text-slate-100">
               <FileText className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">工作流程</h2>
+              <h2 className="text-lg font-semibold">{FAUCET_COPY.page.workflowTitle}</h2>
             </div>
             <ol className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              <li>连接 {BRANDING.chainName} 网络上的钱包。</li>
-              <li>签署 Faucet 请求消息。</li>
-              <li>后端验证签名后，代为提交 FaucetVault 发放交易。</li>
+              {FAUCET_COPY.page.workflow.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
             </ol>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
             <div className="flex items-center gap-3 text-slate-950 dark:text-slate-100">
               <ShieldCheck className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">规则说明</h2>
+              <h2 className="text-lg font-semibold">{FAUCET_COPY.page.rulesTitle}</h2>
             </div>
             <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              <li>每个钱包和 IP 都会受到领取频率限制。</li>
-              <li>仅接受 {BRANDING.chainName} 网络上的钱包。</li>
-              <li>如果钱包余额已经足够，申请可能会被拒绝。</li>
+              {FAUCET_COPY.page.rules.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
             </ul>
           </div>
         </section>

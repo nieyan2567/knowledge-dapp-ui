@@ -5,11 +5,13 @@ export function PageHeader({
   title,
   description,
   right,
+  testId,
 }: {
   eyebrow?: string;
   title: string;
   description?: string;
   right?: ReactNode;
+  testId?: string;
 }) {
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -19,7 +21,10 @@ export function PageHeader({
             {eyebrow}
           </div>
         ) : null}
-        <h1 className="text-3xl font-bold tracking-tight text-slate-950 md:text-4xl dark:text-slate-100">
+        <h1
+          data-testid={testId}
+          className="text-3xl font-bold tracking-tight text-slate-950 md:text-4xl dark:text-slate-100"
+        >
           {title}
         </h1>
         {description ? (

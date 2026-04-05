@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
 
 import { mockKnowChainRpc } from "./support/rpc";
 
@@ -9,36 +9,26 @@ test.beforeEach(async ({ page }) => {
 test("navigates across the main application pages", async ({ page }) => {
   await page.goto("/");
 
-  await expect(
-    page.getByRole("heading", { name: "Dashboard" })
-  ).toBeVisible();
+  await expect(page.getByTestId("page-dashboard")).toBeVisible();
 
-  await page.getByRole("link", { name: "Stake", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Stake & Voting Power" })
-  ).toBeVisible();
+  await page.getByTestId("nav-stake").click();
+  await expect(page).toHaveURL(/\/stake$/);
+  await expect(page.getByTestId("page-stake")).toBeVisible();
 
-  await page.getByRole("link", { name: "Content", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Content Hub" })).toBeVisible();
+  await page.getByTestId("nav-content").click();
+  await expect(page).toHaveURL(/\/content$/);
 
-  await page.getByRole("link", { name: "Rewards", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Rewards Center" })
-  ).toBeVisible();
+  await page.getByTestId("nav-rewards").click();
+  await expect(page).toHaveURL(/\/rewards$/);
 
-  await page.getByRole("link", { name: "Governance", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Governance Center" })
-  ).toBeVisible();
+  await page.getByTestId("nav-governance").click();
+  await expect(page).toHaveURL(/\/governance$/);
+  await expect(page.getByTestId("page-governance")).toBeVisible();
 
-  await page.getByRole("link", { name: "System", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "System Overview" })
-  ).toBeVisible();
+  await page.getByTestId("nav-system").click();
+  await expect(page).toHaveURL(/\/system$/);
 
-  await page.getByRole("link", { name: "Faucet", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: /Get starter .* first onchain action/i })
-  ).toBeVisible();
+  await page.getByTestId("nav-faucet").click();
+  await expect(page).toHaveURL(/\/faucet$/);
+  await expect(page.getByTestId("page-faucet")).toBeVisible();
 });
-

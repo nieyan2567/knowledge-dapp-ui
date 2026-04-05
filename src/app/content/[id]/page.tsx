@@ -29,8 +29,14 @@ import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useUploadAuth } from "@/hooks/useUploadAuth";
 import { BRANDING } from "@/lib/branding";
+import {
+  CONTENT_DETAIL_COPY,
+  formatContentDate,
+  getVersionChangeSummary,
+} from "@/lib/content-detail-helpers";
 import { getIpfsFileUrl } from "@/lib/ipfs";
 import { reportClientError } from "@/lib/observability/client";
+import { PAGE_TEST_IDS } from "@/lib/test-ids";
 import { txToast, writeTxToast } from "@/lib/tx-toast";
 import {
   formatUploadFileSize,
@@ -39,12 +45,6 @@ import {
 } from "@/lib/upload-policy";
 import { asContentData, asContentVersion } from "@/lib/web3-types";
 import type { ContentVersionData } from "@/types/content";
-
-function formatDate(timestamp: bigint) {
-  return new Date(Number(timestamp) * 1000).toLocaleString("zh-CN", {
-    hour12: false,
-  });
-}
 
 function reportContentDetailError(
   message: string,
@@ -59,31 +59,6 @@ function reportContentDetailError(
     error,
     context,
   });
-}
-
-function getVersionChangeSummary(
-  version: ContentVersionData,
-  previousVersion?: ContentVersionData
-) {
-  if (!previousVersion) {
-    return ["初始版本"];
-  }
-
-  const changes: string[] = [];
-
-  if (version.ipfsHash !== previousVersion.ipfsHash) {
-    changes.push("文件已更新");
-  }
-
-  if (version.title !== previousVersion.title) {
-    changes.push("标题已更新");
-  }
-
-  if (version.description !== previousVersion.description) {
-    changes.push("描述已更新");
-  }
-
-  return changes.length > 0 ? changes : ["元数据未变化"];
 }
 
 export default function ContentDetailPage() {
@@ -214,7 +189,7 @@ export default function ContentDetailPage() {
         reportContentDetailError("Failed to load content version history", error, {
           contentId: contentId.toString(),
         });
-        toast.error("加载内容版本历史失败");
+        toast.error(CONTENT_DETAIL_COPY.loadVersionsFailed);
       } finally {
         setLoadingVersions(false);
       }
@@ -375,7 +350,7 @@ export default function ContentDetailPage() {
 
   async function handleUploadVersionFile() {
     if (!content) {
-      toast.error("内容暂不可用");
+      toast.error(CONTENT_DETAIL_COPY.unavailable);
       return;
     }
 
@@ -474,7 +449,7 @@ export default function ContentDetailPage() {
 
   async function handleAccrueReward() {
     if (!address) {
-      toast.error("请先连接钱包");
+      toast.error(CONTENT_DETAIL_COPY.connectWalletFirst);
       return;
     }
 
@@ -504,7 +479,7 @@ export default function ContentDetailPage() {
 
   async function handleUpdateContent() {
     if (!address) {
-      toast.error("请先连接钱包");
+      toast.error(CONTENT_DETAIL_COPY.connectWalletFirst);
       return;
     }
 
@@ -514,17 +489,17 @@ export default function ContentDetailPage() {
     }
 
     if (!editTitle.trim()) {
-      toast.error("请输入内容标题");
+      toast.error(CONTENT_DETAIL_COPY.updateTitleRequired);
       return;
     }
 
     if (!editCid.trim()) {
-      toast.error("请先上传新文件或填写新的 CID");
+      toast.error(CONTENT_DETAIL_COPY.updateCidRequired);
       return;
     }
 
     if (updateFee === undefined) {
-      toast.error("更新费用尚未加载完成");
+      toast.error(CONTENT_DETAIL_COPY.updateFeeLoading);
       return;
     }
 
@@ -564,7 +539,7 @@ export default function ContentDetailPage() {
 
   async function handleDeleteContent() {
     if (!address) {
-      toast.error("请先连接钱包");
+      toast.error(CONTENT_DETAIL_COPY.connectWalletFirst);
       return;
     }
 
@@ -600,7 +575,7 @@ export default function ContentDetailPage() {
 
   async function handleRestoreContent() {
     if (!address) {
-      toast.error("请先连接钱包");
+      toast.error(CONTENT_DETAIL_COPY.connectWalletFirst);
       return;
     }
 
@@ -660,6 +635,7 @@ export default function ContentDetailPage() {
         eyebrow={`内容 #${contentRecord.id.toString()}`}
         title={contentRecord.title}
         description={contentRecord.description || "暂无描述"}
+        testId={PAGE_TEST_IDS.content}
       />
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -676,8 +652,8 @@ export default function ContentDetailPage() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
           <SectionCard
-            title="当前文件"
-            description="把记录摘要、文件入口和当前元数据集中到同一处查看。"
+            title={CONTENT_DETAIL_COPY.currentFileTitle}
+            description={CONTENT_DETAIL_COPY.currentFileDescription}
           >
             <div className="space-y-5">
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
@@ -771,8 +747,8 @@ export default function ContentDetailPage() {
           </SectionCard>
 
           <SectionCard
-            title="内容快照"
-            description="当前内容记录包含最新快照和版本元数据。"
+            title={CONTENT_DETAIL_COPY.snapshotTitle}
+            description={CONTENT_DETAIL_COPY.snapshotDescription}
           >
             <div className="grid gap-4 md:grid-cols-2">
               <InfoCard label="作者">
@@ -782,12 +758,14 @@ export default function ContentDetailPage() {
                 </div>
               </InfoCard>
 
-              <InfoCard label="创建时间">{formatDate(contentRecord.timestamp)}</InfoCard>
+              <InfoCard label="创建时间">
+                {formatContentDate(contentRecord.timestamp)}
+              </InfoCard>
               <InfoCard label="最新版本">
                 v{contentRecord.latestVersion.toString()} / {versionCount.toString()} 个版本
               </InfoCard>
               <InfoCard label="最后更新时间">
-                {formatDate(contentRecord.lastUpdatedAt)}
+                {formatContentDate(contentRecord.lastUpdatedAt)}
               </InfoCard>
               <InfoCard label="票数">
                 <div className="flex items-center gap-2">
@@ -807,8 +785,8 @@ export default function ContentDetailPage() {
           </SectionCard>
 
           <SectionCard
-            title="版本历史"
-            description="历史 CID 会继续保留并作为链上版本记录展示。"
+            title={CONTENT_DETAIL_COPY.versionHistoryTitle}
+            description={CONTENT_DETAIL_COPY.versionHistoryDescription}
           >
             {loadingVersions ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
@@ -841,7 +819,7 @@ export default function ContentDetailPage() {
                             版本 v{version.version.toString()}
                           </div>
                           <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            记录时间：{formatDate(version.timestamp)}
+                            记录时间：{formatContentDate(version.timestamp)}
                           </div>
                         </div>
 
@@ -912,8 +890,8 @@ export default function ContentDetailPage() {
 
         <div className="space-y-6">
           <SectionCard
-            title="内容操作"
-            description="内容未删除时可以继续投票；奖励记账仅允许作者本人发起，后续新增票数也可以继续记账。"
+            title={CONTENT_DETAIL_COPY.actionsTitle}
+            description={CONTENT_DETAIL_COPY.actionsDescription}
           >
             <div className="space-y-3">
               <button
@@ -954,8 +932,8 @@ export default function ContentDetailPage() {
           </SectionCard>
 
           <SectionCard
-            title="新版本编辑"
-            description="更新内容会创建一个新的链上版本，并保留旧 CID 作为历史版本。"
+            title={CONTENT_DETAIL_COPY.editTitle}
+            description={CONTENT_DETAIL_COPY.editDescription}
           >
               <div className="space-y-4">
                 <input

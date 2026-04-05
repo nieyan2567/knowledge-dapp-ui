@@ -17,6 +17,12 @@ import { privateKeyToAccount } from "viem/accounts";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { getKnowledgeChain } from "@/lib/chains";
 import { getServerEnv } from "@/lib/env";
+import {
+  FAUCET_COPY,
+  getFaucetCooldownMessage,
+  getFaucetMinBalanceMessage,
+  getFaucetRateLimitMessage,
+} from "@/lib/faucet/copy";
 import { captureServerEvent } from "@/lib/observability/server";
 import { getRedis } from "@/lib/redis";
 
@@ -90,7 +96,7 @@ export class FaucetError extends Error {
 }
 
 export class FaucetInfraError extends FaucetError {
-  constructor(message = "Faucet 服务暂时不可用，请稍后再试。") {
+  constructor(message: string = FAUCET_COPY.errors.serviceUnavailable) {
     super(message, 503);
     this.name = "FaucetInfraError";
   }
@@ -753,7 +759,7 @@ export async function checkFaucetClaimEligibility(
     return {
       ok: false,
       status: 429,
-      error: `Faucet 冷却中，请在 ${cooldownRemainingSeconds} 秒后重试。`,
+      error: getFaucetCooldownMessage(cooldownRemainingSeconds),
     };
   }
 
@@ -764,7 +770,7 @@ export async function checkFaucetClaimEligibility(
     return {
       ok: false,
       status: 503,
-      error: "Faucet 当前已暂停，请稍后再试。",
+      error: FAUCET_COPY.errors.paused,
     };
   }
 
@@ -777,9 +783,9 @@ export async function checkFaucetClaimEligibility(
     return {
       ok: false,
       status: 400,
-      error: `钱包余额已达到 Faucet 门槛（${formatFaucetAmount(
-        config.minAllowedBalance
-      )}），暂时无需领取。`,
+      error: getFaucetMinBalanceMessage(
+        formatFaucetAmount(config.minAllowedBalance)
+      ),
     };
   }
 
@@ -787,7 +793,7 @@ export async function checkFaucetClaimEligibility(
     return {
       ok: false,
       status: 503,
-      error: "FaucetVault 余额不足，请稍后再试。",
+      error: FAUCET_COPY.errors.vaultBalanceLow,
     };
   }
 
@@ -795,7 +801,7 @@ export async function checkFaucetClaimEligibility(
     return {
       ok: false,
       status: 429,
-      error: "当前 Faucet 周期预算已用尽，请等待下一个预算周期。",
+      error: FAUCET_COPY.errors.budgetExhausted,
     };
   }
 
@@ -900,7 +906,7 @@ async function incrementRateLimitCounter(
   }
 
   const ttl = await getPositiveTtl(redis, key);
-  throw new FaucetRateLimitError(`请求过于频繁，请在 ${ttl} 秒后重试。`);
+  throw new FaucetRateLimitError(getFaucetRateLimitMessage(ttl));
 }
 
 export async function enforceFaucetRateLimit(

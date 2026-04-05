@@ -17,6 +17,7 @@ import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 import { BRANDING } from "@/lib/branding";
 import { fetchLatestProposal } from "@/lib/proposal-events";
 import { fetchRewardActivity } from "@/lib/reward-events";
+import { PAGE_TEST_IDS } from "@/lib/test-ids";
 import { asBigInt, asContentData } from "@/lib/web3-types";
 import type { ContentCardData } from "@/types/content";
 import type { ProposalItem } from "@/types/governance";
@@ -344,6 +345,7 @@ export default function HomePage() {
         eyebrow="Dashboard · Content · Governance · Rewards"
         title="Dashboard"
         description="聚合展示最近奖励变化与最新链上动作，方便从首页快速进入对应内容或提案。"
+        testId={PAGE_TEST_IDS.dashboard}
         right={
           <button
             type="button"
