@@ -15,17 +15,24 @@ import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 import { BRANDING } from "@/lib/branding";
 import { reportClientError } from "@/lib/observability/client";
 import {
+  formatRewardBlockSummary,
+  formatRewardDate,
+  formatRewardTotalItems,
+  getRewardHistoryFilterLabel,
+  REWARD_HISTORY_FILTERS,
+  REWARD_PAGE_SIZE_OPTIONS,
+  REWARDS_PAGE_COPY,
+} from "@/lib/rewards-page-helpers";
+import {
+  fetchRewardActivity,
   type RewardHistoryItem,
   type RewardSourceItem,
-  fetchRewardActivity,
 } from "@/lib/reward-events";
+import { PAGE_TEST_IDS } from "@/lib/test-ids";
 import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt } from "@/lib/web3-types";
 
-const PAGE_SIZE_OPTIONS = [3, 5, 10] as const;
-const HISTORY_FILTERS = ["all", "accrued", "claimed"] as const;
-
-type HistoryFilter = (typeof HISTORY_FILTERS)[number];
+type HistoryFilter = (typeof REWARD_HISTORY_FILTERS)[number];
 
 function reportRewardsPageError(message: string, error: unknown) {
   void reportClientError({
@@ -34,16 +41,6 @@ function reportRewardsPageError(message: string, error: unknown) {
     severity: "error",
     handled: true,
     error,
-  });
-}
-
-function formatRewardDate(timestamp?: bigint) {
-  if (timestamp === undefined) {
-    return "时间未知";
-  }
-
-  return new Date(Number(timestamp) * 1000).toLocaleString("zh-CN", {
-    hour12: false,
   });
 }
 
@@ -63,10 +60,14 @@ export default function RewardsPage() {
   const [rewardHistory, setRewardHistory] = useState<RewardHistoryItem[]>([]);
   const [rewardSources, setRewardSources] = useState<RewardSourceItem[]>([]);
   const [historyPage, setHistoryPage] = useState(1);
-  const [historyPageSize, setHistoryPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(3);
+  const [historyPageSize, setHistoryPageSize] = useState<
+    (typeof REWARD_PAGE_SIZE_OPTIONS)[number]
+  >(3);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
   const [sourcePage, setSourcePage] = useState(1);
-  const [sourcePageSize, setSourcePageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(3);
+  const [sourcePageSize, setSourcePageSize] = useState<
+    (typeof REWARD_PAGE_SIZE_OPTIONS)[number]
+  >(3);
 
   const { data: pendingRewards, refetch: refetchPendingRewards } = useReadContract({
     address: CONTRACTS.TreasuryNative as `0x${string}`,
@@ -116,7 +117,7 @@ export default function RewardsPage() {
       setRewardSources(rewardSources);
     } catch (error) {
       reportRewardsPageError("Failed to load reward activity", error);
-      toast.error("加载奖励记录失败");
+      toast.error(REWARDS_PAGE_COPY.loadActivityFailed);
     } finally {
       setLoadingRewardActivity(false);
     }
@@ -161,7 +162,10 @@ export default function RewardsPage() {
     [historyFilter, rewardHistory]
   );
 
-  const historyTotalPages = Math.max(1, Math.ceil(filteredRewardHistory.length / historyPageSize));
+  const historyTotalPages = Math.max(
+    1,
+    Math.ceil(filteredRewardHistory.length / historyPageSize)
+  );
   const sourceTotalPages = Math.max(1, Math.ceil(rewardSources.length / sourcePageSize));
 
   useEffect(() => {
@@ -192,12 +196,12 @@ export default function RewardsPage() {
 
   async function handleClaim() {
     if (!address) {
-      toast.error("请先连接钱包");
+      toast.error(REWARDS_PAGE_COPY.connectWalletFirst);
       return;
     }
 
     if (!pending) {
-      toast.error("暂无可领取奖励");
+      toast.error(REWARDS_PAGE_COPY.noClaimableRewards);
       return;
     }
 
@@ -213,9 +217,9 @@ export default function RewardsPage() {
           functionName: "claim",
           account: address,
         },
-        loading: "正在提交领取奖励交易...",
-        success: "领取奖励交易已提交",
-        fail: "领取奖励失败",
+        loading: REWARDS_PAGE_COPY.claimLoading,
+        success: REWARDS_PAGE_COPY.claimSuccess,
+        fail: REWARDS_PAGE_COPY.claimFailed,
       });
 
       if (!hash) {
@@ -231,15 +235,18 @@ export default function RewardsPage() {
   return (
     <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
       <PageHeader
-        eyebrow="Treasury / Claimable Rewards"
-        title="Rewards Center"
-        description="查看当前钱包的可领取奖励、奖励历史和奖励来源。"
+        eyebrow={REWARDS_PAGE_COPY.headerEyebrow}
+        title={REWARDS_PAGE_COPY.headerTitle}
+        description={REWARDS_PAGE_COPY.headerDescription}
+        testId={PAGE_TEST_IDS.rewards}
       />
 
       <section className="grid gap-3 md:grid-cols-3">
         <div className="flex h-28 flex-col rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="mb-2.5 flex items-center justify-between">
-            <div className="text-xs text-slate-500 dark:text-slate-400">待领取奖励</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              {REWARDS_PAGE_COPY.pendingRewardsLabel}
+            </div>
             <Wallet className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
           </div>
 
@@ -252,18 +259,22 @@ export default function RewardsPage() {
               disabled={loading || !pending}
               className="rounded-full bg-slate-950 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
             >
-              {loading ? "领取中..." : "领取"}
+              {loading
+                ? REWARDS_PAGE_COPY.claimButtonLoading
+                : REWARDS_PAGE_COPY.claimButtonIdle}
             </button>
           </div>
 
           <div className="mt-auto pt-1.5 text-xs text-slate-500 dark:text-slate-400">
-            当前钱包可从金库领取的累计奖励。
+            {REWARDS_PAGE_COPY.pendingRewardsHint}
           </div>
         </div>
 
         <div className="flex h-28 flex-col rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="mb-2.5 flex items-center justify-between">
-            <div className="text-xs text-slate-500 dark:text-slate-400">周期预算使用</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              {REWARDS_PAGE_COPY.budgetUsageLabel}
+            </div>
             <Coins className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
           </div>
 
@@ -277,14 +288,19 @@ export default function RewardsPage() {
             </div>
 
             <div className="text-xs text-slate-500 dark:text-slate-400">
-              已使用 {spent} / {budget} {BRANDING.nativeTokenSymbol}
+              {REWARDS_PAGE_COPY.budgetUsageHint
+                .replace("{spent}", String(spent))
+                .replace("{budget}", String(budget))
+                .replace("{symbol}", BRANDING.nativeTokenSymbol)}
             </div>
           </div>
         </div>
 
         <div className="flex h-28 flex-col rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="mb-2.5 flex items-center justify-between">
-            <div className="text-xs text-slate-500 dark:text-slate-400">周期已发放</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              {REWARDS_PAGE_COPY.issuedInEpochLabel}
+            </div>
             <ShieldCheck className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
           </div>
 
@@ -293,32 +309,32 @@ export default function RewardsPage() {
           </div>
 
           <div className="mt-auto pt-1.5 text-xs text-slate-500 dark:text-slate-400">
-            当前预算周期内已经发放的奖励。
+            {REWARDS_PAGE_COPY.issuedInEpochHint}
           </div>
         </div>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <SectionCard
-          title="历史奖励记录"
-          description="查看最近的奖励记账和奖励领取记录。"
+          title={REWARDS_PAGE_COPY.historyTitle}
+          description={REWARDS_PAGE_COPY.historyDescription}
         >
           {!address ? (
             <div className="text-sm text-slate-500 dark:text-slate-400">
-              连接钱包后即可查看你的奖励历史记录。
+              {REWARDS_PAGE_COPY.connectWalletForHistory}
             </div>
           ) : loadingRewardActivity ? (
             <div className="text-sm text-slate-500 dark:text-slate-400">
-              正在加载奖励记录...
+              {REWARDS_PAGE_COPY.loadingHistory}
             </div>
           ) : rewardHistory.length === 0 ? (
             <div className="text-sm text-slate-500 dark:text-slate-400">
-              暂无奖励历史记录。
+              {REWARDS_PAGE_COPY.emptyHistory}
             </div>
           ) : (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">
-                {HISTORY_FILTERS.map((filter) => (
+                {REWARD_HISTORY_FILTERS.map((filter) => (
                   <button
                     key={filter}
                     type="button"
@@ -329,7 +345,7 @@ export default function RewardsPage() {
                         : "border border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                     }`}
                   >
-                    {filter === "all" ? "全部" : filter === "accrued" ? "仅记账" : "仅领取"}
+                    {getRewardHistoryFilterLabel(filter)}
                   </button>
                 ))}
               </div>
@@ -349,17 +365,19 @@ export default function RewardsPage() {
                               : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
                           }`}
                         >
-                          {item.kind === "accrued" ? "已记账" : "已领取"}
+                          {item.kind === "accrued"
+                            ? REWARDS_PAGE_COPY.badgeAccrued
+                            : REWARDS_PAGE_COPY.badgeClaimed}
                         </span>
                         <span className="text-xs text-slate-500 dark:text-slate-400">
-                          区块 #{item.blockNumber.toString()}
+                          {formatRewardBlockSummary(item.blockNumber)}
                         </span>
                       </div>
 
                       <div className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">
                         {item.kind === "accrued"
                           ? item.contentTitle || `内容 #${item.contentId?.toString() ?? "-"}`
-                          : "奖励已领取到当前钱包"}
+                          : REWARDS_PAGE_COPY.claimReceivedByCurrentWallet}
                       </div>
 
                       <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -369,7 +387,7 @@ export default function RewardsPage() {
                               href={`/content/${item.contentId.toString()}`}
                               className="hover:text-slate-700 dark:hover:text-slate-200"
                             >
-                              查看内容详情
+                              {REWARDS_PAGE_COPY.viewContentDetail}
                             </Link>
                           ) : null}
                           {item.txHash ? (
@@ -379,7 +397,7 @@ export default function RewardsPage() {
                               rel="noreferrer"
                               className="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200"
                             >
-                              查看交易
+                              {REWARDS_PAGE_COPY.viewTransaction}
                               <ExternalLink className="h-3.5 w-3.5" />
                             </a>
                           ) : null}
@@ -416,20 +434,20 @@ export default function RewardsPage() {
         </SectionCard>
 
         <SectionCard
-          title="奖励来源"
-          description="按内容查看奖励来自哪篇内容。"
+          title={REWARDS_PAGE_COPY.rewardSourcesTitle}
+          description={REWARDS_PAGE_COPY.rewardSourcesDescription}
         >
           {!address ? (
             <div className="text-sm text-slate-500 dark:text-slate-400">
-              连接钱包后即可查看奖励来源。
+              {REWARDS_PAGE_COPY.connectWalletForSources}
             </div>
           ) : loadingRewardActivity ? (
             <div className="text-sm text-slate-500 dark:text-slate-400">
-              正在加载奖励来源...
+              {REWARDS_PAGE_COPY.loadingSources}
             </div>
           ) : rewardSources.length === 0 ? (
             <div className="text-sm text-slate-500 dark:text-slate-400">
-              暂无内容奖励来源。
+              {REWARDS_PAGE_COPY.emptySources}
             </div>
           ) : (
             <div className="space-y-3">
@@ -445,7 +463,9 @@ export default function RewardsPage() {
                         {source.title}
                       </div>
                       <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        内容 #{source.contentId.toString()} · 累计记账 {source.accrualCount} 次
+                        {REWARDS_PAGE_COPY.accrualCountSummary
+                          .replace("{contentId}", source.contentId.toString())
+                          .replace("{count}", String(source.accrualCount))}
                       </div>
                     </div>
 
@@ -454,7 +474,10 @@ export default function RewardsPage() {
                         {formatEther(source.totalAmount)} {BRANDING.nativeTokenSymbol}
                       </div>
                       <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        最近区块 #{source.latestBlock.toString()}
+                        {REWARDS_PAGE_COPY.latestBlockSummary.replace(
+                          "{blockNumber}",
+                          source.latestBlock.toString()
+                        )}
                       </div>
                     </div>
                   </div>
@@ -490,17 +513,17 @@ function PaginationControls({
 }: {
   page: number;
   totalPages: number;
-  pageSize: (typeof PAGE_SIZE_OPTIONS)[number];
+  pageSize: (typeof REWARD_PAGE_SIZE_OPTIONS)[number];
   totalItems: number;
   onPageChange: (page: number) => void;
-  onPageSizeChange: (size: (typeof PAGE_SIZE_OPTIONS)[number]) => void;
+  onPageSizeChange: (size: (typeof REWARD_PAGE_SIZE_OPTIONS)[number]) => void;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3 dark:border-slate-800">
       <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-        <span>每页</span>
+        <span>{REWARDS_PAGE_COPY.pageSizePrefix}</span>
         <div className="flex items-center gap-1">
-          {PAGE_SIZE_OPTIONS.map((size) => (
+          {REWARD_PAGE_SIZE_OPTIONS.map((size) => (
             <button
               key={size}
               onClick={() => onPageSizeChange(size)}
@@ -514,7 +537,7 @@ function PaginationControls({
             </button>
           ))}
         </div>
-        <span>共 {totalItems} 条</span>
+        <span>{formatRewardTotalItems(totalItems)}</span>
       </div>
 
       <div className="flex items-center gap-2">
@@ -523,17 +546,19 @@ function PaginationControls({
           disabled={page <= 1}
           className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
         >
-          上一页
+          {REWARDS_PAGE_COPY.paginationPrev}
         </button>
         <span className="text-xs text-slate-500 dark:text-slate-400">
-          第 {page} / {totalPages} 页
+          {REWARDS_PAGE_COPY.paginationPageSummary
+            .replace("{page}", String(page))
+            .replace("{totalPages}", String(totalPages))}
         </span>
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
           className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
         >
-          下一页
+          {REWARDS_PAGE_COPY.paginationNext}
         </button>
       </div>
     </div>

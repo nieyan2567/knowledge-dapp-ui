@@ -2,25 +2,26 @@
 
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatEther } from "viem";
 import { toast } from "sonner";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import {
   ArrowLeft,
-  BookOpen,
-  CheckCircle2,
   Coins,
   ExternalLink,
-  FileText,
   Heart,
   PencilLine,
   RotateCcw,
   Trash2,
-  User,
 } from "lucide-react";
 
-import { AddressBadge } from "@/components/address-badge";
+import {
+  ContentCurrentFileSection,
+  ContentSnapshotGrid,
+  ContentStatusSummaryGrid,
+  ContentVersionHistoryList,
+} from "@/components/content/content-detail-sections";
 import { CopyField } from "@/components/copy-field";
 import { FileDrop } from "@/components/file-drop";
 import { PageHeader } from "@/components/page-header";
@@ -30,9 +31,9 @@ import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useUploadAuth } from "@/hooks/useUploadAuth";
 import { BRANDING } from "@/lib/branding";
 import {
+  buildContentStatusSummary,
   CONTENT_DETAIL_COPY,
-  formatContentDate,
-  getVersionChangeSummary,
+  formatUploadVersionDescription,
 } from "@/lib/content-detail-helpers";
 import { getIpfsFileUrl } from "@/lib/ipfs";
 import { reportClientError } from "@/lib/observability/client";
@@ -258,7 +259,7 @@ export default function ContentDetailPage() {
     return (
       <main className="mx-auto max-w-7xl px-6 py-10">
         <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-          正在加载内容详情...
+          {CONTENT_DETAIL_COPY.loadingDetail}
         </div>
       </main>
     );
@@ -272,11 +273,11 @@ export default function ContentDetailPage() {
           className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
         >
           <ArrowLeft className="h-4 w-4" />
-          返回内容列表
+          {CONTENT_DETAIL_COPY.backToList}
         </Link>
 
         <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-          未找到该内容。
+          {CONTENT_DETAIL_COPY.notFound}
         </div>
       </main>
     );
@@ -298,44 +299,13 @@ export default function ContentDetailPage() {
       : hasReachedMaxVersions
         ? `已达到当前内容的最大版本数上限（${maxVersionsPerContent?.toString() ?? versionCount.toString()}）。`
         : null;
-  const remainingVersionSlots =
-    maxVersionsPerContent !== undefined
-      ? Math.max(Number(maxVersionsPerContent - versionCount), 0)
-      : null;
-  const contentStatusSummary = [
-    {
-      label: "作者权限",
-      value: isAuthor ? "当前账号可编辑" : "当前账号仅可查看",
-      description: isAuthor
-        ? "你可以管理版本、删除和恢复状态。"
-        : "只有作者地址可以提交新版本或恢复内容。",
-    },
-    {
-      label: "内容状态",
-      value: contentRecord.deleted ? "已软删除" : "正常展示中",
-      description: contentRecord.deleted
-        ? "恢复后才能继续创建新版本。"
-        : "当前内容仍可参与浏览、投票与奖励流程。",
-    },
-    {
-      label: "新版本权限",
-      value: newVersionBlockedReason ? "当前不可创建" : "当前可创建新版本",
-      description:
-        newVersionBlockedReason ??
-        "标题、描述和文件变更都可以提交为新版本。",
-    },
-    {
-      label: "版本额度",
-      value:
-        remainingVersionSlots === null
-          ? `${versionCount.toString()} 个已用版本`
-          : `剩余 ${remainingVersionSlots} / ${maxVersionsPerContent?.toString()}`,
-      description:
-        remainingVersionSlots === null
-          ? "当前合约未返回版本上限。"
-          : `当前已使用 ${versionCount.toString()} 个版本名额。`,
-    },
-  ] as const;
+  const contentStatusSummary = buildContentStatusSummary({
+    isAuthor,
+    deleted: contentRecord.deleted,
+    newVersionBlockedReason,
+    versionCount,
+    maxVersionsPerContent,
+  });
 
   function handleVersionFileChange(selectedFile: File) {
     const uploadValidation = validateUploadFile(selectedFile);
@@ -360,7 +330,7 @@ export default function ContentDetailPage() {
     }
 
     if (!versionFile) {
-      toast.error("请先选择新版本文件");
+      toast.error(CONTENT_DETAIL_COPY.uploadVersionFileRequired);
       return;
     }
 
@@ -397,7 +367,7 @@ export default function ContentDetailPage() {
           };
 
           if (!response.ok || !result.cid || !result.url) {
-            throw new Error(result.error || "新版本文件上传失败");
+            throw new Error(result.error || CONTENT_DETAIL_COPY.uploadVersionFailed);
           }
 
           return {
@@ -405,9 +375,9 @@ export default function ContentDetailPage() {
             url: result.url,
           };
         })(),
-        "正在上传新版本文件到 IPFS...",
-        "新版本文件上传成功",
-        "新版本文件上传失败"
+        CONTENT_DETAIL_COPY.uploadVersionLoadingToast,
+        CONTENT_DETAIL_COPY.uploadVersionSuccess,
+        CONTENT_DETAIL_COPY.uploadVersionFailed
       );
 
       setEditCid(data.cid);
@@ -424,7 +394,7 @@ export default function ContentDetailPage() {
 
   async function handleVote() {
     if (!address) {
-      toast.error("请先连接钱包");
+      toast.error(CONTENT_DETAIL_COPY.connectWalletFirst);
       return;
     }
 
@@ -438,9 +408,9 @@ export default function ContentDetailPage() {
         args: [contentRecord.id],
         account: address,
       },
-      loading: "正在提交投票...",
-      success: "投票交易已提交",
-      fail: "投票失败",
+      loading: CONTENT_DETAIL_COPY.voteLoading,
+      success: CONTENT_DETAIL_COPY.voteSuccess,
+      fail: CONTENT_DETAIL_COPY.voteFail,
     });
 
     if (!hash) return;
@@ -454,7 +424,7 @@ export default function ContentDetailPage() {
     }
 
     if (!isAuthor) {
-      toast.error("只有内容作者可以发起奖励记账");
+      toast.error(CONTENT_DETAIL_COPY.accrueRewardAuthorOnlyShort);
       return;
     }
 
@@ -468,9 +438,9 @@ export default function ContentDetailPage() {
         args: [contentRecord.id],
         account: address,
       },
-      loading: "正在提交奖励记账...",
-      success: "奖励记账交易已提交",
-      fail: "奖励记账失败",
+      loading: CONTENT_DETAIL_COPY.accrueRewardLoading,
+      success: CONTENT_DETAIL_COPY.accrueRewardSuccess,
+      fail: CONTENT_DETAIL_COPY.accrueRewardFail,
     });
 
     if (!hash) return;
@@ -484,7 +454,7 @@ export default function ContentDetailPage() {
     }
 
     if (newVersionBlockedReason) {
-      toast.error("当前内容状态不允许创建新版本");
+      toast.error(CONTENT_DETAIL_COPY.updateBlocked);
       return;
     }
 
@@ -522,9 +492,9 @@ export default function ContentDetailPage() {
           value: updateFee ?? 0n,
           account: address,
         },
-        loading: "正在提交新版本...",
-        success: "新版本交易已提交",
-        fail: "创建新版本失败",
+        loading: CONTENT_DETAIL_COPY.updateLoading,
+        success: CONTENT_DETAIL_COPY.updateSuccess,
+        fail: CONTENT_DETAIL_COPY.updateFail,
       });
 
       if (!hash) return;
@@ -544,7 +514,7 @@ export default function ContentDetailPage() {
     }
 
     if (!canDeleteContent) {
-      toast.error("当前内容状态不允许删除");
+      toast.error(CONTENT_DETAIL_COPY.deleteBlocked);
       return;
     }
 
@@ -561,9 +531,9 @@ export default function ContentDetailPage() {
           args: [contentRecord.id],
           account: address,
         },
-        loading: "正在提交删除交易...",
-        success: "删除交易已提交",
-        fail: "删除失败",
+        loading: CONTENT_DETAIL_COPY.deleteLoading,
+        success: CONTENT_DETAIL_COPY.deleteSuccess,
+        fail: CONTENT_DETAIL_COPY.deleteFail,
       });
 
       if (!hash) return;
@@ -580,7 +550,7 @@ export default function ContentDetailPage() {
     }
 
     if (!canRestoreContent) {
-      toast.error("当前内容状态不允许恢复");
+      toast.error(CONTENT_DETAIL_COPY.restoreBlocked);
       return;
     }
 
@@ -597,9 +567,9 @@ export default function ContentDetailPage() {
           args: [contentRecord.id],
           account: address,
         },
-        loading: "正在提交恢复交易...",
-        success: "恢复交易已提交",
-        fail: "恢复失败",
+        loading: CONTENT_DETAIL_COPY.restoreTxLoading,
+        success: CONTENT_DETAIL_COPY.restoreTxSuccess,
+        fail: CONTENT_DETAIL_COPY.restoreTxFail,
       });
 
       if (!hash) return;
@@ -617,7 +587,7 @@ export default function ContentDetailPage() {
           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           <ArrowLeft className="h-4 w-4" />
-          返回内容列表
+          {CONTENT_DETAIL_COPY.backToList}
         </Link>
 
         <a
@@ -626,7 +596,7 @@ export default function ContentDetailPage() {
           rel="noreferrer"
           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
         >
-          查看当前 IPFS 文件
+          {CONTENT_DETAIL_COPY.previewCurrentFile}
           <ExternalLink className="h-4 w-4" />
         </a>
       </div>
@@ -634,20 +604,11 @@ export default function ContentDetailPage() {
       <PageHeader
         eyebrow={`内容 #${contentRecord.id.toString()}`}
         title={contentRecord.title}
-        description={contentRecord.description || "暂无描述"}
+        description={contentRecord.description || CONTENT_DETAIL_COPY.noDescription}
         testId={PAGE_TEST_IDS.content}
       />
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {contentStatusSummary.map((item) => (
-          <StatusSummaryCard
-            key={item.label}
-            label={item.label}
-            value={item.value}
-            description={item.description}
-          />
-        ))}
-      </div>
+      <ContentStatusSummaryGrid items={contentStatusSummary} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
@@ -655,236 +616,42 @@ export default function ContentDetailPage() {
             title={CONTENT_DETAIL_COPY.currentFileTitle}
             description={CONTENT_DETAIL_COPY.currentFileDescription}
           >
-            <div className="space-y-5">
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  <BookOpen className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                  记录摘要
-                </div>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900/80">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      内容 ID
-                    </div>
-                    <div className="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100">
-                      #{contentRecord.id.toString()}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900/80">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      最新版本
-                    </div>
-                    <div className="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100">
-                      v{contentRecord.latestVersion.toString()}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900/80">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      状态
-                    </div>
-                    <div className="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {contentRecord.deleted ? "已删除" : "正常"}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900/80">
-                  <div className="flex items-start gap-2">
-                    <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      标题
-                    </span>
-                    <span className="min-w-0 flex-1 truncate font-medium text-slate-900 dark:text-slate-100">
-                      {contentRecord.title}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-start gap-2">
-                    <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      描述
-                    </span>
-                    <span className="flex-1 text-xs leading-5 text-slate-700 dark:text-slate-300">
-                      {contentRecord.description || "暂无描述"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <a
-                href={previewUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="group block rounded-3xl border border-slate-200 bg-slate-50 p-8 transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:hover:border-slate-700 dark:hover:bg-slate-800"
-              >
-                <div className="flex flex-col items-center justify-center gap-4 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">
-                    <FileText className="h-8 w-8" />
-                  </div>
-
-                  <div>
-                    <div className="text-base font-semibold text-slate-950 dark:text-slate-100">
-                      打开当前文件
-                    </div>
-                    <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      当前激活版本为 v{contentRecord.latestVersion.toString()}
-                    </div>
-                  </div>
-
-                  <div className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 group-hover:text-blue-700 dark:text-blue-400 dark:group-hover:text-blue-300">
-                    打开文件
-                    <ExternalLink className="h-4 w-4" />
-                  </div>
-                </div>
-              </a>
-
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/50">
-                <div className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  当前元数据
-                </div>
-                <div className="space-y-3">
-                  <CopyField label="当前 CID" value={content.ipfsHash} />
-                  <CopyField label="网关地址" value={previewUrl} />
-                </div>
-              </div>
-            </div>
+            <ContentCurrentFileSection
+              contentId={contentRecord.id}
+              latestVersion={contentRecord.latestVersion}
+              deleted={contentRecord.deleted}
+              title={contentRecord.title}
+              description={contentRecord.description}
+              previewUrl={previewUrl}
+              currentCid={content.ipfsHash}
+            />
           </SectionCard>
 
           <SectionCard
             title={CONTENT_DETAIL_COPY.snapshotTitle}
             description={CONTENT_DETAIL_COPY.snapshotDescription}
           >
-            <div className="grid gap-4 md:grid-cols-2">
-              <InfoCard label="作者">
-                <div className="flex items-center gap-2 text-sm text-slate-900 dark:text-slate-100">
-                  <User className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                  <AddressBadge address={contentRecord.author} />
-                </div>
-              </InfoCard>
-
-              <InfoCard label="创建时间">
-                {formatContentDate(contentRecord.timestamp)}
-              </InfoCard>
-              <InfoCard label="最新版本">
-                v{contentRecord.latestVersion.toString()} / {versionCount.toString()} 个版本
-              </InfoCard>
-              <InfoCard label="最后更新时间">
-                {formatContentDate(contentRecord.lastUpdatedAt)}
-              </InfoCard>
-              <InfoCard label="票数">
-                <div className="flex items-center gap-2">
-                  <Heart className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                  {contentRecord.voteCount.toString()}
-                </div>
-              </InfoCard>
-              <InfoCard label="奖励状态">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                  {rewardAccrualCount > 0n
-                    ? `第 ${rewardAccrualCount.toString()} 次记账`
-                    : "未记账"}
-                </div>
-              </InfoCard>
-            </div>
+            <ContentSnapshotGrid
+              author={contentRecord.author}
+              createdAt={contentRecord.timestamp}
+              latestVersion={contentRecord.latestVersion}
+              versionCount={versionCount}
+              lastUpdatedAt={contentRecord.lastUpdatedAt}
+              voteCount={contentRecord.voteCount}
+              rewardAccrualCount={rewardAccrualCount}
+            />
           </SectionCard>
 
           <SectionCard
             title={CONTENT_DETAIL_COPY.versionHistoryTitle}
             description={CONTENT_DETAIL_COPY.versionHistoryDescription}
           >
-            {loadingVersions ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
-                正在加载版本历史...
-              </div>
-            ) : versions.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
-                暂无版本记录。
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {versions.map((version, index) => {
-                  const isCurrentVersion =
-                    version.version === contentRecord.latestVersion;
-                  const versionUrl = getIpfsFileUrl(version.ipfsHash);
-                  const previousVersion = versions[index + 1];
-                  const changeSummary = getVersionChangeSummary(
-                    version,
-                    previousVersion
-                  );
-
-                  return (
-                    <div
-                      key={version.version.toString()}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/50"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
-                            版本 v{version.version.toString()}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            记录时间：{formatContentDate(version.timestamp)}
-                          </div>
-                        </div>
-
-                        <div
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            isCurrentVersion
-                              ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
-                              : "bg-white text-slate-600 dark:bg-slate-900 dark:text-slate-300"
-                          }`}
-                        >
-                          {isCurrentVersion ? "当前版本" : "历史版本"}
-                        </div>
-                      </div>
-
-                      <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
-                        <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 dark:border-slate-700 dark:bg-slate-900/80">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            变更摘要
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {changeSummary.map((item) => (
-                              <span
-                                key={`${version.version.toString()}-${item}`}
-                                className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                              >
-                                {item}
-                              </span>
-                            ))}
-                          </div>
-                          <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                            {previousVersion
-                              ? `相较 v${previousVersion.version.toString()} 的变化`
-                              : "这是内容的初始版本记录。"}
-                          </div>
-                        </div>
-                        <div>标题：{version.title}</div>
-                        <div>描述：{version.description || "暂无描述"}</div>
-                        <div className="break-all text-xs text-slate-500 dark:text-slate-400">
-                          CID：{version.ipfsHash}
-                        </div>
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap gap-3">
-                        <a
-                          href={versionUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                        >
-                          打开文件
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyToClipboard(version.ipfsHash, "CID")}
-                          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                        >
-                          复制 CID
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <ContentVersionHistoryList
+              loadingVersions={loadingVersions}
+              versions={versions}
+              latestVersion={contentRecord.latestVersion}
+              onCopyCid={handleCopyToClipboard}
+            />
           </SectionCard>
         </div>
 
@@ -900,7 +667,7 @@ export default function ContentDetailPage() {
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
               >
                 <Heart className="h-4 w-4" />
-                投票
+                {CONTENT_DETAIL_COPY.voteButton}
               </button>
 
               <button
@@ -909,12 +676,12 @@ export default function ContentDetailPage() {
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <Coins className="h-4 w-4" />
-                奖励记账
+                {CONTENT_DETAIL_COPY.accrueRewardButton}
               </button>
 
               {!isAuthor ? (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-500 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-400">
-                  当前账号不是内容作者，不能为这条内容发起奖励记账。
+                  {CONTENT_DETAIL_COPY.accrueRewardAuthorOnly}
                 </div>
               ) : null}
 
@@ -925,7 +692,9 @@ export default function ContentDetailPage() {
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 px-5 py-3 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
                 >
                   <RotateCcw className="h-4 w-4" />
-                  {restoring ? "正在恢复..." : "恢复内容"}
+                  {restoring
+                    ? CONTENT_DETAIL_COPY.restoreLoading
+                    : CONTENT_DETAIL_COPY.restoreButton}
                 </button>
               ) : null}
             </div>
@@ -940,7 +709,7 @@ export default function ContentDetailPage() {
                   value={editTitle}
                   onChange={(event) => setEditTitle(event.target.value)}
                   disabled={!!newVersionBlockedReason || savingEdit || uploadingVersionFile}
-                  placeholder="内容标题"
+                  placeholder={CONTENT_DETAIL_COPY.titlePlaceholder}
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
                 />
 
@@ -948,18 +717,18 @@ export default function ContentDetailPage() {
                   value={editDescription}
                   onChange={(event) => setEditDescription(event.target.value)}
                   disabled={!!newVersionBlockedReason || savingEdit || uploadingVersionFile}
-                  placeholder="内容描述"
+                  placeholder={CONTENT_DETAIL_COPY.descriptionPlaceholder}
                   rows={4}
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
                 />
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
                   <div className="mb-3 text-sm font-medium text-slate-900 dark:text-slate-100">
-                    上传新版本文件
+                    {CONTENT_DETAIL_COPY.uploadVersionTitle}
                   </div>
                   <FileDrop file={versionFile} onChange={handleVersionFileChange} />
                   <div className="mt-3 text-xs leading-6 text-slate-500 dark:text-slate-400">
-                    单文件大小上限：{uploadMaxFileSizeText}。上传成功后会自动把新 CID 回填到下方输入框。
+                    {formatUploadVersionDescription(uploadMaxFileSizeText)}
                   </div>
                   <button
                     onClick={handleUploadVersionFile}
@@ -973,10 +742,10 @@ export default function ContentDetailPage() {
                     className="mt-3 w-full rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     {isAuthenticating
-                      ? "正在验证上传身份..."
+                      ? CONTENT_DETAIL_COPY.uploadVersionAuthenticating
                       : uploadingVersionFile
-                        ? "正在上传新版本文件..."
-                        : "上传新版本文件"}
+                        ? CONTENT_DETAIL_COPY.uploadVersionLoading
+                        : CONTENT_DETAIL_COPY.uploadVersionIdle}
                   </button>
                 </div>
 
@@ -984,28 +753,34 @@ export default function ContentDetailPage() {
                   value={editCid}
                   onChange={(event) => setEditCid(event.target.value)}
                   disabled={!!newVersionBlockedReason || savingEdit || uploadingVersionFile}
-                  placeholder="新的 IPFS CID"
+                  placeholder={CONTENT_DETAIL_COPY.newCidPlaceholder}
                   className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
                 />
 
-                <CopyField label="当前 CID" value={contentRecord.ipfsHash} />
+                <CopyField
+                  label={CONTENT_DETAIL_COPY.currentCidLabel}
+                  value={contentRecord.ipfsHash}
+                />
                 {uploadedVersionUrl ? (
-                  <CopyField label="新版本网关地址" value={uploadedVersionUrl} />
+                  <CopyField
+                    label={CONTENT_DETAIL_COPY.newVersionGatewayUrlLabel}
+                    value={uploadedVersionUrl}
+                  />
                 ) : null}
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
                   <div className="font-medium text-slate-900 dark:text-slate-100">
-                    新版本更新费用
+                    {CONTENT_DETAIL_COPY.updateFeeTitle}
                   </div>
                   <div className="mt-1">
                     {updateFee === undefined
-                      ? "正在读取费用..."
+                      ? CONTENT_DETAIL_COPY.loadingFee
                       : updateFee > 0n
                         ? `${formatEther(updateFee)} ${BRANDING.nativeTokenSymbol}`
-                        : "当前免费"}
+                        : CONTENT_DETAIL_COPY.freeNow}
                   </div>
                   <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    创建新版本时会把这笔费用转入协议金库，用于约束低成本刷版本。
+                    {CONTENT_DETAIL_COPY.updateFeeDescription}
                   </div>
                 </div>
 
@@ -1017,10 +792,10 @@ export default function ContentDetailPage() {
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
                   {canEditContent
-                    ? "你现在可以直接修改标题和描述，也可以先上传一个新的文件生成新 CID，再提交链上更新。"
+                    ? CONTENT_DETAIL_COPY.editHintEditable
                     : isAuthor
-                      ? "当前内容状态受到合约规则限制，表单仍可查看，但提交时会按链上规则校验。"
-                      : "你可以先准备标题、描述和新 CID；只有作者地址才能真正提交新版本。"}
+                      ? CONTENT_DETAIL_COPY.editHintAuthorBlocked
+                      : CONTENT_DETAIL_COPY.editHintNonAuthor}
                 </div>
 
                 <div className="flex flex-wrap gap-3">
@@ -1035,7 +810,9 @@ export default function ContentDetailPage() {
                     className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
                   >
                     <PencilLine className="h-4 w-4" />
-                    {savingEdit ? "正在创建新版本..." : "创建新版本"}
+                    {savingEdit
+                      ? CONTENT_DETAIL_COPY.createVersionLoading
+                      : CONTENT_DETAIL_COPY.createVersionIdle}
                   </button>
 
                   <button
@@ -1054,11 +831,11 @@ export default function ContentDetailPage() {
                     )}
                     {canRestoreContent
                       ? restoring
-                        ? "正在恢复..."
-                        : "恢复内容"
+                        ? CONTENT_DETAIL_COPY.restoreLoading
+                        : CONTENT_DETAIL_COPY.restoreButton
                       : deleting
-                        ? "正在删除..."
-                        : "软删除"}
+                        ? CONTENT_DETAIL_COPY.deleteButtonLoading
+                        : CONTENT_DETAIL_COPY.deleteButton}
                   </button>
                 </div>
               </div>
@@ -1067,46 +844,5 @@ export default function ContentDetailPage() {
         </div>
       </div>
     </main>
-  );
-}
-
-function InfoCard({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-        {label}
-      </div>
-      <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{children}</div>
-    </div>
-  );
-}
-
-function StatusSummaryCard({
-  label,
-  value,
-  description,
-}: {
-  label: string;
-  value: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/50">
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-        {label}
-      </div>
-      <div className="mt-1 text-sm font-semibold text-slate-950 dark:text-slate-100">
-        {value}
-      </div>
-      <div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-        {description}
-      </div>
-    </div>
   );
 }

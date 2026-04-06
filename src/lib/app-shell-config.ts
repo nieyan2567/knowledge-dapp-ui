@@ -6,7 +6,7 @@ export const APP_SHELL_COPY = {
   workspaceLabel: "Workspace",
   footerLabel: "Local DAO Workspace",
   connectWallet: "连接钱包",
-  wrongNetwork: "Wrong Network",
+  wrongNetwork: "网络错误",
   defaultPageTitle: "Knowledge DApp",
 } as const;
 

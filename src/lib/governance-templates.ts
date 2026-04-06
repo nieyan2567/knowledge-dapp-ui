@@ -2,10 +2,10 @@ import { formatEther } from "viem";
 
 import { ABIS, CONTRACTS } from "@/contracts";
 import { BRANDING } from "@/lib/branding";
+import { GOVERNANCE_TEMPLATES } from "@/lib/governance-template-definitions";
 import {
   buildEncodedGovernanceAction,
   createGovernanceDraftId,
-  type FailedValidation as GovernanceFailedValidation,
   failValidation,
   formatGovernanceAddress,
   isFailedValidation,
@@ -15,15 +15,13 @@ import {
   parseRequiredTokenAmount,
   parseRequiredUint,
   readGovernanceBoolean,
-  readGovernanceString,
   type ValidationResult as GovernanceValidationResult,
 } from "@/lib/governance-template-utils";
-import type { Address, HexString } from "@/types/contracts";
+import type { Address } from "@/types/contracts";
 import type {
   GovernanceDraftAction,
   GovernanceEncodedAction,
   GovernanceRiskLevel,
-  GovernanceTemplateDefinition,
 } from "@/types/governance";
 
 type TemplateCodec = {
@@ -34,444 +32,13 @@ type TemplateCodec = {
 };
 
 type ValidationResult = GovernanceValidationResult;
-type FailedValidation = GovernanceFailedValidation;
-
 const createDraftId = createGovernanceDraftId;
 const ok = okValidation;
 const fail = failValidation;
 const isFailed = isFailedValidation;
-const readString = readGovernanceString;
 const readBoolean = readGovernanceBoolean;
 const formatAddress = formatGovernanceAddress;
 const buildEncodedAction = buildEncodedGovernanceAction;
-
-const GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
-  {
-    id: "content.setRewardRules",
-    category: "content",
-    label: "更新奖励规则",
-    description: "更新内容奖励规则。",
-    riskLevel: "low",
-    target: CONTRACTS.KnowledgeContent as Address,
-    functionName: "setRewardRules",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "minVotesToReward",
-        label: "最小获奖票数",
-        type: "uint256",
-        required: true,
-        placeholder: "例如 10",
-        defaultValue: "10",
-      },
-      {
-        key: "rewardPerVote",
-        label: "单票奖励",
-        type: "tokenAmount",
-        required: true,
-        placeholder: "例如 0.001",
-        defaultValue: "0.001",
-      },
-    ],
-  },
-  {
-    id: "content.setContentPolicy",
-    category: "content",
-    label: "更新内容策略",
-    description: "更新内容编辑锁定、删除策略和版本上限。",
-    riskLevel: "medium",
-    target: CONTRACTS.KnowledgeContent as Address,
-    functionName: "setContentPolicy",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "editLockVotes",
-        label: "编辑锁定票数",
-        type: "uint256",
-        required: true,
-        placeholder: "例如 1",
-        defaultValue: "1",
-      },
-      {
-        key: "allowDeleteAfterVote",
-        label: "投票后允许删除",
-        type: "boolean",
-        required: true,
-        defaultValue: false,
-      },
-      {
-        key: "maxVersionsPerContent",
-        label: "单内容最大版本数",
-        type: "uint256",
-        required: true,
-        placeholder: "例如 20",
-        defaultValue: "20",
-      },
-    ],
-  },
-  {
-    id: "content.setContentFees",
-    category: "content",
-    label: "更新内容费用",
-    description: "调整内容发布费与新版本更新费。",
-    riskLevel: "medium",
-    target: CONTRACTS.KnowledgeContent as Address,
-    functionName: "setContentFees",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "registerFee",
-        label: "发布费用",
-        type: "tokenAmount",
-        required: true,
-        placeholder: "例如 0.01",
-        defaultValue: "0.01",
-      },
-      {
-        key: "updateFee",
-        label: "更新费用",
-        type: "tokenAmount",
-        required: true,
-        placeholder: "例如 0.005",
-        defaultValue: "0.005",
-      },
-    ],
-  },
-  {
-    id: "stake.setCooldownSeconds",
-    category: "stake",
-    label: "更新退出冷却期",
-    description: "更新质押退出后的冷却时间。",
-    riskLevel: "medium",
-    target: CONTRACTS.NativeVotes as Address,
-    functionName: "setCooldownSeconds",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "cooldownSeconds",
-        label: "退出冷却期（秒）",
-        type: "uint256",
-        required: true,
-        placeholder: "例如 3600",
-        defaultValue: "3600",
-      },
-    ],
-  },
-  {
-    id: "stake.setActivationBlocks",
-    category: "stake",
-    label: "更新质押激活延迟",
-    description: "更新质押存入后获得投票权前的等待区块数。",
-    riskLevel: "medium",
-    target: CONTRACTS.NativeVotes as Address,
-    functionName: "setActivationBlocks",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "activationBlocks",
-        label: "激活延迟（区块）",
-        type: "uint256",
-        required: true,
-        placeholder: "例如 10",
-        defaultValue: "10",
-      },
-    ],
-  },
-  {
-    id: "treasury.setBudget",
-    category: "treasury",
-    label: "更新金库预算",
-    description: "更新金库周期和预算。",
-    riskLevel: "medium",
-    target: CONTRACTS.TreasuryNative as Address,
-    functionName: "setBudget",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "epochDuration",
-        label: "周期时长（秒）",
-        type: "uint256",
-        required: true,
-        placeholder: "例如 604800",
-        defaultValue: "604800",
-      },
-      {
-        key: "epochBudget",
-        label: "周期预算",
-        type: "tokenAmount",
-        required: true,
-        placeholder: "例如 100",
-        defaultValue: "100",
-      },
-    ],
-  },
-  {
-    id: "revenueVault.setFaucetConfig",
-    category: "treasury",
-    label: "更新 Faucet 补充策略",
-    description: "调整 RevenueVault 向 FaucetVault 的分账比例与自动补充阈值。",
-    riskLevel: "medium",
-    target: CONTRACTS.RevenueVault as Address,
-    functionName: "setFaucetConfig",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "faucetWallet",
-        label: "FaucetVault 地址",
-        type: "address",
-        required: true,
-        placeholder: "0x...",
-        defaultValue: (CONTRACTS.FaucetVault as string | undefined) ?? "",
-      },
-      {
-        key: "faucetShareBps",
-        label: "Faucet 分成基点",
-        type: "uint256",
-        required: true,
-        placeholder: "例如 3000",
-        defaultValue: "3000",
-      },
-      {
-        key: "minFaucetPayout",
-        label: "最小补充金额",
-        type: "tokenAmount",
-        required: true,
-        placeholder: "例如 0.5",
-        defaultValue: "0.5",
-      },
-      {
-        key: "autoFaucetEnabled",
-        label: "自动补充",
-        type: "boolean",
-        required: true,
-        defaultValue: true,
-      },
-    ],
-  },
-  {
-    id: "faucet.setSigner",
-    category: "treasury",
-    label: "轮换 Faucet 签名地址",
-    description: "更新 Faucet 后端授权签名地址。",
-    riskLevel: "high",
-    target: CONTRACTS.FaucetVault as Address,
-    functionName: "setSigner",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "signer",
-        label: "新签名地址",
-        type: "address",
-        required: true,
-        placeholder: "0x...",
-      },
-    ],
-  },
-  {
-    id: "faucet.setClaimConfig",
-    category: "treasury",
-    label: "更新 Faucet 领取规则",
-    description: "调整单次领取金额、余额门槛和领取冷却时间。",
-    riskLevel: "medium",
-    target: CONTRACTS.FaucetVault as Address,
-    functionName: "setClaimConfig",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "claimAmount",
-        label: "单次领取金额",
-        type: "tokenAmount",
-        required: true,
-        placeholder: "例如 2",
-        defaultValue: "2",
-      },
-      {
-        key: "minAllowedBalance",
-        label: "余额门槛",
-        type: "tokenAmount",
-        required: true,
-        placeholder: "例如 1",
-        defaultValue: "1",
-      },
-      {
-        key: "claimCooldown",
-        label: "领取冷却（秒）",
-        type: "uint256",
-        required: true,
-        placeholder: "例如 86400",
-        defaultValue: "86400",
-      },
-    ],
-  },
-  {
-    id: "faucet.setBudgetConfig",
-    category: "treasury",
-    label: "更新 Faucet 周期预算",
-    description: "调整 Faucet 的预算周期和周期总额度。",
-    riskLevel: "medium",
-    target: CONTRACTS.FaucetVault as Address,
-    functionName: "setBudgetConfig",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "epochDuration",
-        label: "预算周期（秒）",
-        type: "uint256",
-        required: true,
-        placeholder: "例如 86400",
-        defaultValue: "86400",
-      },
-      {
-        key: "epochBudget",
-        label: "周期预算",
-        type: "tokenAmount",
-        required: true,
-        placeholder: "例如 20",
-        defaultValue: "20",
-      },
-    ],
-  },
-  {
-    id: "governor.setProposalThreshold",
-    category: "governor",
-    label: "更新提案门槛",
-    description: "更新提案门槛。",
-    riskLevel: "medium",
-    target: CONTRACTS.KnowledgeGovernor as Address,
-    functionName: "setProposalThreshold",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "proposalThreshold",
-        label: "提案门槛",
-        type: "tokenAmount",
-        required: true,
-        placeholder: "例如 100",
-        defaultValue: "100",
-      },
-    ],
-  },
-  {
-    id: "governor.setProposalFee",
-    category: "governor",
-    label: "更新提案费用",
-    description: "调整发起治理提案时需要附带的协议费用。",
-    riskLevel: "medium",
-    target: CONTRACTS.KnowledgeGovernor as Address,
-    functionName: "setProposalFee",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "proposalFee",
-        label: "提案费用",
-        type: "tokenAmount",
-        required: true,
-        placeholder: "例如 0.05",
-        defaultValue: "0.05",
-      },
-    ],
-  },
-  {
-    id: "governor.setVotingDelay",
-    category: "governor",
-    label: "更新投票延迟",
-    description: "更新提案创建后的投票延迟。",
-    riskLevel: "low",
-    target: CONTRACTS.KnowledgeGovernor as Address,
-    functionName: "setVotingDelay",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "votingDelay",
-        label: "投票延迟（区块）",
-        type: "uint256",
-        required: true,
-        placeholder: "例如 1",
-        defaultValue: "1",
-      },
-    ],
-  },
-  {
-    id: "governor.setVotingPeriod",
-    category: "governor",
-    label: "更新投票周期",
-    description: "更新投票持续周期。",
-    riskLevel: "low",
-    target: CONTRACTS.KnowledgeGovernor as Address,
-    functionName: "setVotingPeriod",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "votingPeriod",
-        label: "投票周期（区块）",
-        type: "uint256",
-        required: true,
-        placeholder: "例如 10",
-        defaultValue: "10",
-      },
-    ],
-  },
-  {
-    id: "governor.setLateQuorumVoteExtension",
-    category: "governor",
-    label: "更新延迟法定人数延长期",
-    description: "更新在法定人数较晚达成时追加的投票延长期。",
-    riskLevel: "medium",
-    target: CONTRACTS.KnowledgeGovernor as Address,
-    functionName: "setLateQuorumVoteExtension",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "lateQuorumVoteExtension",
-        label: "延迟法定人数延长期（区块）",
-        type: "uint256",
-        required: true,
-        placeholder: "例如 20",
-        defaultValue: "20",
-      },
-    ],
-  },
-  {
-    id: "governor.updateQuorumNumerator",
-    category: "governor",
-    label: "更新法定人数分子",
-    description: "更新法定人数分子。",
-    riskLevel: "medium",
-    target: CONTRACTS.KnowledgeGovernor as Address,
-    functionName: "updateQuorumNumerator",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "quorumNumerator",
-        label: "法定人数分子",
-        type: "uint256",
-        required: true,
-        placeholder: "例如 4",
-        defaultValue: "4",
-      },
-    ],
-  },
-  {
-    id: "timelock.updateDelay",
-    category: "timelock",
-    label: "更新时间锁延迟",
-    description: "更新时间锁的最小延迟。",
-    riskLevel: "high",
-    target: CONTRACTS.TimelockController as Address,
-    functionName: "updateDelay",
-    valueMode: "fixedZero",
-    fields: [
-      {
-        key: "delaySeconds",
-        label: "最小延迟（秒）",
-        type: "uint256",
-        required: true,
-        placeholder: "例如 3600",
-        defaultValue: "3600",
-      },
-    ],
-  },
-];
 
 const templateCodecs: Record<string, TemplateCodec> = {
   "content.setRewardRules": {
@@ -479,7 +46,7 @@ const templateCodecs: Record<string, TemplateCodec> = {
       const minVotesToReward = parseRequiredUint(
         values,
         "minVotesToReward",
-        "最小获奖票数"
+        "最少获奖票数"
       );
       if (isFailed(minVotesToReward)) return minVotesToReward;
 
@@ -496,7 +63,7 @@ const templateCodecs: Record<string, TemplateCodec> = {
       const minVotesToReward = parseRequiredUint(
         values,
         "minVotesToReward",
-        "最小获奖票数"
+        "最少获奖票数"
       );
       const rewardPerVote = parseRequiredTokenAmount(
         values,
@@ -515,7 +82,7 @@ const templateCodecs: Record<string, TemplateCodec> = {
         functionName: "setRewardRules",
         args: [minVotesToReward, rewardPerVote],
         title: "更新奖励规则",
-        description: `将最小获奖票数设为 ${minVotesToReward.toString()}，单票奖励设为 ${formatEther(rewardPerVote)} ${BRANDING.nativeTokenSymbol}`,
+        description: `将最少获奖票数设为 ${minVotesToReward.toString()}，单票奖励设为 ${formatEther(rewardPerVote)} ${BRANDING.nativeTokenSymbol}`,
         riskLevel: "low",
       });
     },
@@ -968,7 +535,7 @@ const templateCodecs: Record<string, TemplateCodec> = {
       const lateQuorumVoteExtension = parseRequiredUint(
         values,
         "lateQuorumVoteExtension",
-        "延迟法定人数延长期"
+        "法定人数延长期"
       );
       return isFailed(lateQuorumVoteExtension) ? lateQuorumVoteExtension : ok();
     },
@@ -976,10 +543,10 @@ const templateCodecs: Record<string, TemplateCodec> = {
       const lateQuorumVoteExtension = parseRequiredUint(
         values,
         "lateQuorumVoteExtension",
-        "延迟法定人数延长期"
+        "法定人数延长期"
       );
       if (isFailed(lateQuorumVoteExtension)) {
-        throw new Error("无效的延迟法定人数延长期提案");
+        throw new Error("无效的法定人数延长期提案");
       }
 
       return buildEncodedAction({
@@ -988,8 +555,8 @@ const templateCodecs: Record<string, TemplateCodec> = {
         abi: ABIS.KnowledgeGovernor,
         functionName: "setLateQuorumVoteExtension",
         args: [lateQuorumVoteExtension],
-        title: "更新延迟法定人数延长期",
-        description: `将延迟法定人数延长期更新为 ${lateQuorumVoteExtension.toString()} 个区块`,
+        title: "更新法定人数延长期",
+        description: `将法定人数延长期更新为 ${lateQuorumVoteExtension.toString()} 个区块`,
         riskLevel: "medium",
       });
     },

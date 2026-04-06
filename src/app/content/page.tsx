@@ -19,6 +19,18 @@ import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useUploadAuth } from "@/hooks/useUploadAuth";
 import { BRANDING } from "@/lib/branding";
+import {
+  CONTENT_FETCH_CHUNK_SIZE,
+  CONTENT_PAGE_COPY,
+  CONTENTS_PER_PAGE,
+  filterContentList,
+  formatContentCountSummary,
+  formatContentPaginationSummary,
+  formatUploadPolicyDescription,
+  paginateContentList,
+  parseContentResults,
+  sortContentList,
+} from "@/lib/content-page-helpers";
 import { reportClientError } from "@/lib/observability/client";
 import { PAGE_TEST_IDS } from "@/lib/test-ids";
 import { txToast, writeTxToast } from "@/lib/tx-toast";
@@ -30,35 +42,11 @@ import {
 import { asContentData } from "@/lib/web3-types";
 import type { ContentCardData } from "@/types/content";
 
-const CONTENT_FETCH_CHUNK_SIZE = 20;
-const CONTENTS_PER_PAGE = 8;
-
 type ContentSortKey =
   | "updated_desc"
   | "created_desc"
   | "votes_desc"
   | "versions_desc";
-
-function parseContentResults(
-  results: readonly unknown[],
-  rewardAccrualCounts: readonly bigint[]
-): ContentCardData[] {
-  return results
-    .map((item, index) => {
-      const content = asContentData(item);
-
-      if (!content || content.deleted) {
-        return null;
-      }
-
-      return {
-        ...content,
-        rewardAccrualCount: rewardAccrualCounts[index] ?? 0n,
-      };
-    })
-    .filter((item): item is ContentCardData => !!item)
-    .reverse();
-}
 
 function reportContentPageError(
   message: string,
@@ -145,7 +133,11 @@ export default function ContentPage() {
           )
         )) as bigint[];
 
-        const parsedChunk = parseContentResults(chunkResults, rewardAccrualCounts);
+        const parsedChunk = parseContentResults(
+          chunkResults,
+          rewardAccrualCounts,
+          asContentData
+        );
         parsedContents.push(...parsedChunk);
       }
 
@@ -168,7 +160,7 @@ export default function ContentPage() {
       setContentList(parsed);
     } catch (error) {
       reportContentPageError("Failed to refresh content list", error);
-      toast.error("鍔犺浇鍐呭鍒楄〃澶辫触");
+      toast.error(CONTENT_PAGE_COPY.loadListFailed);
     } finally {
       setLoadingList(false);
     }
@@ -194,7 +186,7 @@ export default function ContentPage() {
       } catch (error) {
         reportContentPageError("Failed to load content list", error);
         if (!cancelled) {
-          toast.error("鍔犺浇鍐呭鍒楄〃澶辫触");
+          toast.error(CONTENT_PAGE_COPY.loadListFailed);
         }
       } finally {
         if (!cancelled) {
@@ -211,53 +203,16 @@ export default function ContentPage() {
   }, [contentCount, publicClient, readContents]);
 
   const filteredContents = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-    const normalizedAddress = address?.toLowerCase();
-
-    return contentList.filter((item) => {
-      if (
-        scope === "mine" &&
-        (!normalizedAddress || item.author.toLowerCase() !== normalizedAddress)
-      ) {
-        return false;
-      }
-
-      if (!keyword) {
-        return true;
-      }
-
-      return (
-        item.title.toLowerCase().includes(keyword) ||
-        item.description.toLowerCase().includes(keyword) ||
-        item.ipfsHash.toLowerCase().includes(keyword)
-      );
-    });
+    return filterContentList(contentList, scope, address, search);
   }, [address, contentList, scope, search]);
 
   const sortedContents = useMemo(() => {
-    const items = [...filteredContents];
-
-    items.sort((left, right) => {
-      switch (sortBy) {
-        case "created_desc":
-          return Number(right.timestamp - left.timestamp);
-        case "votes_desc":
-          return Number(right.voteCount - left.voteCount);
-        case "versions_desc":
-          return Number(right.latestVersion - left.latestVersion);
-        case "updated_desc":
-        default:
-          return Number(right.lastUpdatedAt - left.lastUpdatedAt);
-      }
-    });
-
-    return items;
+    return sortContentList(filteredContents, sortBy);
   }, [filteredContents, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(sortedContents.length / CONTENTS_PER_PAGE));
   const pagedContents = useMemo(() => {
-    const start = (page - 1) * CONTENTS_PER_PAGE;
-    return sortedContents.slice(start, start + CONTENTS_PER_PAGE);
+    return paginateContentList(sortedContents, page, CONTENTS_PER_PAGE);
   }, [page, sortedContents]);
 
   useEffect(() => {
@@ -272,7 +227,7 @@ export default function ContentPage() {
 
   async function handleUploadToIpfs() {
     if (!file) {
-      toast.error("璇峰厛閫夋嫨鏂囦欢");
+      toast.error(CONTENT_PAGE_COPY.selectFileFirst);
       return;
     }
 
@@ -309,7 +264,7 @@ export default function ContentPage() {
           };
 
           if (!response.ok || !result.cid || !result.url) {
-            throw new Error(result.error || "鏂囦欢涓婁紶澶辫触");
+            throw new Error(result.error || CONTENT_PAGE_COPY.uploadFailed);
           }
 
           return {
@@ -317,9 +272,9 @@ export default function ContentPage() {
             url: result.url,
           };
         })(),
-        "姝ｅ湪涓婁紶鏂囦欢鍒?IPFS...",
-        "鏂囦欢涓婁紶鎴愬姛",
-        "鏂囦欢涓婁紶澶辫触"
+        CONTENT_PAGE_COPY.uploadLoading,
+        CONTENT_PAGE_COPY.uploadSuccess,
+        CONTENT_PAGE_COPY.uploadFailed
       );
 
       setUploadedCid(data.cid);
@@ -346,22 +301,22 @@ export default function ContentPage() {
 
   async function handleRegisterContent() {
     if (!address) {
-      toast.error("请先连接钱包");
+      toast.error(CONTENT_PAGE_COPY.connectWalletFirst);
       return;
     }
 
     if (!uploadedCid) {
-      toast.error("请先上传文件到 IPFS");
+      toast.error(CONTENT_PAGE_COPY.uploadToIpfsFirst);
       return;
     }
 
     if (!title.trim()) {
-      toast.error("请输入内容标题");
+      toast.error(CONTENT_PAGE_COPY.titleRequired);
       return;
     }
 
     if (registerFee === undefined) {
-      toast.error("发布费用尚未加载完成");
+      toast.error(CONTENT_PAGE_COPY.registerFeeLoading);
       return;
     }
 
@@ -379,9 +334,9 @@ export default function ContentPage() {
           value: typeof registerFee === "bigint" ? registerFee : 0n,
           account: address,
         },
-        loading: "正在提交链上登记交易...",
-        success: "链上登记交易已提交",
-        fail: "链上登记失败",
+        loading: CONTENT_PAGE_COPY.registerLoading,
+        success: CONTENT_PAGE_COPY.registerSuccess,
+        fail: CONTENT_PAGE_COPY.registerFailed,
       });
 
       if (!hash) {
@@ -407,9 +362,9 @@ export default function ContentPage() {
   return (
     <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
       <PageHeader
-        eyebrow="Content Registry · Local IPFS"
-        title="Content Hub"
-        description="先完成钱包身份验证，再上传文件到本地 IPFS，最后将 CID 和元数据登记到链上。"
+        eyebrow={CONTENT_PAGE_COPY.headerEyebrow}
+        title={CONTENT_PAGE_COPY.headerTitle}
+        description={CONTENT_PAGE_COPY.headerDescription}
         testId={PAGE_TEST_IDS.content}
       />
 
@@ -417,16 +372,16 @@ export default function ContentPage() {
         <div className="space-y-4 lg:col-span-2">
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-xl font-semibold text-slate-950 dark:text-slate-100">
-              内容列表
+              {CONTENT_PAGE_COPY.listTitle}
             </h2>
             <div className="text-sm text-slate-500 dark:text-slate-400">
-              共 {sortedContents.length} 条
+              {formatContentCountSummary(sortedContents.length)}
             </div>
           </div>
 
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_180px_180px]">
             <input
-              placeholder="搜索标题、描述或 CID..."
+              placeholder={CONTENT_PAGE_COPY.searchPlaceholder}
               className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -437,8 +392,8 @@ export default function ContentPage() {
               onChange={(event) => setScope(event.target.value as "all" | "mine")}
               className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-400"
             >
-              <option value="all">全部内容</option>
-              <option value="mine">我的内容</option>
+              <option value="all">{CONTENT_PAGE_COPY.scopeAll}</option>
+              <option value="mine">{CONTENT_PAGE_COPY.scopeMine}</option>
             </select>
 
             <select
@@ -446,20 +401,20 @@ export default function ContentPage() {
               onChange={(event) => setSortBy(event.target.value as ContentSortKey)}
               className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-400"
             >
-              <option value="updated_desc">按最近更新</option>
-              <option value="created_desc">按创建时间</option>
-              <option value="votes_desc">按投票数</option>
-              <option value="versions_desc">按版本数</option>
+              <option value="updated_desc">{CONTENT_PAGE_COPY.sortUpdated}</option>
+              <option value="created_desc">{CONTENT_PAGE_COPY.sortCreated}</option>
+              <option value="votes_desc">{CONTENT_PAGE_COPY.sortVotes}</option>
+              <option value="versions_desc">{CONTENT_PAGE_COPY.sortVersions}</option>
             </select>
           </div>
 
           {loadingList ? (
             <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-              正在加载内容列表...
+              {CONTENT_PAGE_COPY.loadingList}
             </div>
           ) : sortedContents.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-              暂无匹配内容，请先上传并登记第一条内容。
+              {CONTENT_PAGE_COPY.emptyList}
             </div>
           ) : (
             <div className="space-y-4">
@@ -475,10 +430,11 @@ export default function ContentPage() {
 
               <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  第 {page} / {totalPages} 页
-                  <span className="ml-2 text-slate-500 dark:text-slate-400">
-                    每页 {CONTENTS_PER_PAGE} 条
-                  </span>
+                  {formatContentPaginationSummary(
+                    page,
+                    totalPages,
+                    CONTENTS_PER_PAGE
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -487,7 +443,7 @@ export default function ContentPage() {
                     disabled={page <= 1}
                     className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
-                    上一页
+                    {CONTENT_PAGE_COPY.prevPage}
                   </button>
                   <button
                     type="button"
@@ -495,7 +451,7 @@ export default function ContentPage() {
                     disabled={page >= totalPages}
                     className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
-                    下一页
+                    {CONTENT_PAGE_COPY.nextPage}
                   </button>
                 </div>
               </div>
@@ -505,19 +461,19 @@ export default function ContentPage() {
 
         <div>
           <SectionCard
-            title="上传内容"
-            description="首次上传会要求钱包签名完成身份验证，验证成功后才会调用 IPFS 上传接口。"
+            title={CONTENT_PAGE_COPY.uploadTitle}
+            description={CONTENT_PAGE_COPY.uploadDescription}
           >
             <div className="space-y-4">
               <input
-                placeholder="内容标题"
+                placeholder={CONTENT_PAGE_COPY.titlePlaceholder}
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
               />
 
               <textarea
-                placeholder="内容描述"
+                placeholder={CONTENT_PAGE_COPY.descriptionPlaceholder}
                 value={desc}
                 onChange={(event) => setDesc(event.target.value)}
                 rows={4}
@@ -527,24 +483,22 @@ export default function ContentPage() {
               <FileDrop file={file} onChange={handleFileChange} />
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
-                单文件大小上限：{uploadMaxFileSizeText}。当前默认拒绝高风险格式，例如
-                HTML、JS、SVG、EXE、BAT、PS1、SH 等文件。服务端会重新识别文件真实类型，
-                并对文本内容做风险扫描。
+                {formatUploadPolicyDescription(uploadMaxFileSizeText)}
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
                 <div className="font-medium text-slate-900 dark:text-slate-100">
-                  发布费用
+                  {CONTENT_PAGE_COPY.registerFeeTitle}
                 </div>
                 <div className="mt-1">
                   {typeof registerFee === "bigint"
                     ? registerFee > 0n
                       ? `${formatEther(registerFee)} ${BRANDING.nativeTokenSymbol}`
-                      : "当前免费"
-                    : "正在读取费用..."}
+                      : CONTENT_PAGE_COPY.freeNow
+                    : CONTENT_PAGE_COPY.loadingFee}
                 </div>
                 <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  链上登记时会把这笔费用转入协议金库，用于形成内容发布的消耗口。
+                  {CONTENT_PAGE_COPY.registerFeeDescription}
                 </div>
               </div>
 
@@ -554,16 +508,16 @@ export default function ContentPage() {
                 className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
               >
                 {isAuthenticating
-                  ? "正在验证身份..."
+                  ? CONTENT_PAGE_COPY.authenticating
                   : uploading
-                    ? "正在上传..."
-                    : "上传到本地 IPFS"}
+                    ? CONTENT_PAGE_COPY.uploading
+                    : CONTENT_PAGE_COPY.uploadToLocalIpfs}
               </button>
 
               {uploadedCid && (
                 <div className="space-y-3">
                   <CopyField label="CID" value={uploadedCid} />
-                  <CopyField label="本地网关 URL" value={uploadedUrl} />
+                  <CopyField label={CONTENT_PAGE_COPY.localGatewayUrl} value={uploadedUrl} />
                 </div>
               )}
 
@@ -572,7 +526,9 @@ export default function ContentPage() {
                 disabled={!uploadedCid || registering || registerFee === undefined}
                 className="w-full rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                {registering ? "正在登记..." : "链上登记"}
+                {registering
+                  ? CONTENT_PAGE_COPY.registering
+                  : CONTENT_PAGE_COPY.registerOnchain}
               </button>
             </div>
           </SectionCard>

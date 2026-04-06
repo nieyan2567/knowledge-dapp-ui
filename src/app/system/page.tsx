@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { formatEther } from "viem";
 import { useReadContract } from "wagmi";
 
@@ -10,18 +10,12 @@ import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 import { BRANDING } from "@/lib/branding";
+import { PAGE_TEST_IDS } from "@/lib/test-ids";
+import { formatSystemBoolean, SYSTEM_PAGE_COPY } from "@/lib/system-page-helpers";
 import { asBigInt } from "@/lib/web3-types";
 
 function explorerAddressUrl(address: string) {
   return `${BRANDING.explorerUrl}/address/${address}`;
-}
-
-function formatBoolean(value: unknown) {
-  if (typeof value !== "boolean") {
-    return "-";
-  }
-
-  return value ? "是" : "否";
 }
 
 export default function SystemPage() {
@@ -151,9 +145,10 @@ export default function SystemPage() {
   return (
     <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
       <PageHeader
-        eyebrow="Contracts · Roles · Treasury"
-        title="System Overview"
-        description="查看当前合约绑定关系、治理参数以及金库状态。"
+        eyebrow={SYSTEM_PAGE_COPY.headerEyebrow}
+        title={SYSTEM_PAGE_COPY.headerTitle}
+        description={SYSTEM_PAGE_COPY.headerDescription}
+        testId={PAGE_TEST_IDS.system}
         right={
           <a
             href={BRANDING.explorerUrl}
@@ -161,7 +156,7 @@ export default function SystemPage() {
             rel="noreferrer"
             className="inline-flex items-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
-            打开 {BRANDING.explorerName}
+            {SYSTEM_PAGE_COPY.openExplorer}
           </a>
         }
       />
@@ -169,146 +164,113 @@ export default function SystemPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <SectionCard title="KnowledgeContent">
           <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
-            <div className="flex items-center justify-between gap-3">
-              <span>合约地址</span>
+            <SystemRow label={SYSTEM_PAGE_COPY.contractAddress}>
               <AddressBadge address={CONTRACTS.KnowledgeContent} />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>所有者</span>
+            </SystemRow>
+            <SystemRow label={SYSTEM_PAGE_COPY.owner}>
               <AddressBadge address={String(contentOwner ?? "")} />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>投票合约</span>
+            </SystemRow>
+            <SystemRow label={SYSTEM_PAGE_COPY.votesContract}>
               <AddressBadge address={String(votesContract ?? "")} />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>金库合约</span>
+            </SystemRow>
+            <SystemRow label={SYSTEM_PAGE_COPY.treasuryContract}>
               <AddressBadge address={String(treasury ?? "")} />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>编辑锁定票数</span>
-              <span className="font-medium text-slate-900 dark:text-slate-100">
-                {editLockVotes ? String(editLockVotes) : "-"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>投票后允许删除</span>
-              <span className="font-medium text-slate-900 dark:text-slate-100">
-                {formatBoolean(allowDeleteAfterVote)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>单内容最大版本数</span>
-              <span className="font-medium text-slate-900 dark:text-slate-100">
-                {maxVersionsPerContent ? String(maxVersionsPerContent) : "-"}
-              </span>
-            </div>
+            </SystemRow>
+            <SystemRow label={SYSTEM_PAGE_COPY.editLockVotes}>
+              {editLockVotes ? String(editLockVotes) : "-"}
+            </SystemRow>
+            <SystemRow label={SYSTEM_PAGE_COPY.allowDeleteAfterVote}>
+              {formatSystemBoolean(allowDeleteAfterVote)}
+            </SystemRow>
+            <SystemRow label={SYSTEM_PAGE_COPY.maxVersionsPerContent}>
+              {maxVersionsPerContent ? String(maxVersionsPerContent) : "-"}
+            </SystemRow>
 
-            <div className="pt-2">
-              <a
-                href={explorerAddressUrl(CONTRACTS.KnowledgeContent)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                在 {BRANDING.explorerName} 查看
-              </a>
-            </div>
+            <SystemExplorerLink address={CONTRACTS.KnowledgeContent} />
           </div>
         </SectionCard>
 
         <SectionCard title="TreasuryNative">
           <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
-            <div className="flex items-center justify-between gap-3">
-              <span>合约地址</span>
+            <SystemRow label={SYSTEM_PAGE_COPY.contractAddress}>
               <AddressBadge address={CONTRACTS.TreasuryNative} />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>所有者</span>
+            </SystemRow>
+            <SystemRow label={SYSTEM_PAGE_COPY.owner}>
               <AddressBadge address={String(treasuryOwner ?? "")} />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>周期预算</span>
-              <span className="font-medium text-slate-900 dark:text-slate-100">
-                {epochBudgetValue ? formatEther(epochBudgetValue) : "0"} {BRANDING.nativeTokenSymbol}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>周期已用</span>
-              <span className="font-medium text-slate-900 dark:text-slate-100">
-                {epochSpentValue ? formatEther(epochSpentValue) : "0"} {BRANDING.nativeTokenSymbol}
-              </span>
-            </div>
+            </SystemRow>
+            <SystemRow label={SYSTEM_PAGE_COPY.cycleBudget}>
+              {epochBudgetValue ? formatEther(epochBudgetValue) : "0"}{" "}
+              {BRANDING.nativeTokenSymbol}
+            </SystemRow>
+            <SystemRow label={SYSTEM_PAGE_COPY.cycleSpent}>
+              {epochSpentValue ? formatEther(epochSpentValue) : "0"}{" "}
+              {BRANDING.nativeTokenSymbol}
+            </SystemRow>
 
-            <div className="pt-2">
-              <a
-                href={explorerAddressUrl(CONTRACTS.TreasuryNative)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                在 {BRANDING.explorerName} 查看
-              </a>
-            </div>
+            <SystemExplorerLink address={CONTRACTS.TreasuryNative} />
           </div>
         </SectionCard>
 
         <SectionCard title="Governor">
           <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
-            <div className="flex items-center justify-between gap-3">
-              <span>合约地址</span>
+            <SystemRow label={SYSTEM_PAGE_COPY.contractAddress}>
               <AddressBadge address={CONTRACTS.KnowledgeGovernor} />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>治理代币</span>
+            </SystemRow>
+            <SystemRow label={SYSTEM_PAGE_COPY.governanceToken}>
               <AddressBadge address={String(governorToken ?? "")} />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>法定人数延长</span>
-              <span className="font-medium text-slate-900 dark:text-slate-100">
-                {lateQuorumVoteExtension ? String(lateQuorumVoteExtension) : "-"} 个区块
-              </span>
-            </div>
+            </SystemRow>
+            <SystemRow label={SYSTEM_PAGE_COPY.lateQuorumExtension}>
+              {lateQuorumVoteExtension ? String(lateQuorumVoteExtension) : "-"}{" "}
+              {SYSTEM_PAGE_COPY.blockUnit}
+            </SystemRow>
 
-            <div className="pt-2">
-              <a
-                href={explorerAddressUrl(CONTRACTS.KnowledgeGovernor)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                在 {BRANDING.explorerName} 查看
-              </a>
-            </div>
+            <SystemExplorerLink address={CONTRACTS.KnowledgeGovernor} />
           </div>
         </SectionCard>
 
         <SectionCard title="Timelock">
           <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
-            <div className="flex items-center justify-between gap-3">
-              <span>合约地址</span>
+            <SystemRow label={SYSTEM_PAGE_COPY.contractAddress}>
               <AddressBadge address={CONTRACTS.TimelockController} />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>最小延迟</span>
-              <span className="font-medium text-slate-900 dark:text-slate-100">
-                {minDelayValue ? String(minDelayValue) : "-"} 秒
-              </span>
-            </div>
+            </SystemRow>
+            <SystemRow label={SYSTEM_PAGE_COPY.minDelay}>
+              {minDelayValue ? String(minDelayValue) : "-"} {SYSTEM_PAGE_COPY.secondsUnit}
+            </SystemRow>
 
-            <div className="pt-2">
-              <a
-                href={explorerAddressUrl(CONTRACTS.TimelockController)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                在 {BRANDING.explorerName} 查看
-              </a>
-            </div>
+            <SystemExplorerLink address={CONTRACTS.TimelockController} />
           </div>
         </SectionCard>
       </div>
     </main>
+  );
+}
+
+function SystemRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span>{label}</span>
+      <span className="font-medium text-slate-900 dark:text-slate-100">{children}</span>
+    </div>
+  );
+}
+
+function SystemExplorerLink({ address }: { address: string }) {
+  return (
+    <div className="pt-2">
+      <a
+        href={explorerAddressUrl(address)}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+      >
+        {SYSTEM_PAGE_COPY.explorerAction}
+      </a>
+    </div>
   );
 }

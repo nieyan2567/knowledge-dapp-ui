@@ -3,13 +3,13 @@ import { BRANDING } from "@/lib/branding";
 export const FAUCET_COPY = {
   errors: {
     invalidAddress: "无效的钱包地址",
-    challengeExpired: "签名挑战不存在或已过期，请重新发起请求",
-    challengeMismatch: "签名挑战与当前请求不匹配",
-    challengeContextMismatch: "签名挑战与当前设备或网络环境不匹配",
-    invalidSignature: "钱包签名无效",
-    requestInFlight: "该钱包或当前网络已有 Faucet 请求正在处理中，请稍后重试",
+    challengeExpired: "签名挑战不存在或已过期，请重新发起请求。",
+    challengeMismatch: "签名挑战与当前请求不匹配。",
+    challengeContextMismatch: "签名挑战与当前设备或网络环境不匹配。",
+    invalidSignature: "钱包签名无效。",
+    requestInFlight: "该钱包或当前网络已有 Faucet 请求正在处理中，请稍后重试。",
     serviceUnavailable: "Faucet 服务暂时不可用，请稍后再试。",
-    claimFailed: "Faucet 发放失败，请稍后重试",
+    claimFailed: "Faucet 发放失败，请稍后重试。",
     paused: "Faucet 当前已暂停，请稍后再试。",
     vaultBalanceLow: "FaucetVault 余额不足，请稍后再试。",
     budgetExhausted: "当前 Faucet 周期预算已用尽，请等待下一个预算周期。",
@@ -21,10 +21,11 @@ export const FAUCET_COPY = {
   },
   page: {
     connectWallet: "连接钱包",
+    loadingWallet: "加载钱包中...",
     backToApp: "返回应用",
     heroEyebrow: `${BRANDING.chainName} Starter Faucet`,
     heroTitle: "Get starter funds and complete your first onchain action.",
-    heroDescription: `这个 Faucet 会为新钱包发放少量 ${BRANDING.nativeTokenSymbol}，用于支付 Gas，并完成 ${BRANDING.appName} 中的首次上传、投票、领赏或质押操作。`,
+    heroDescription: `这个 Faucet 会为新钱包发放少量 ${BRANDING.nativeTokenSymbol}，用于支付 Gas，并完成 ${BRANDING.appName} 中的首次上传、投票、领奖或质押操作。`,
     walletBalanceLabel: "Wallet balance",
     openExplorer: "Open explorer",
     signatureCardTitle: "仅需钱包签名",
@@ -44,7 +45,7 @@ export const FAUCET_COPY = {
     claimButtonLoading: "正在申请启动资金...",
     helperText: `这个 Faucet 面向需要初始 Gas 的新钱包。如果你的钱包已经持有足够的 ${BRANDING.nativeTokenSymbol}，申请可能会被拒绝。`,
     successTitlePrefix: "启动资金已发放",
-    nextStepsTitle: "接下来可以做什么",
+    nextStepsTitle: "接下来可以做什么？",
     workflowTitle: "工作流程",
     rulesTitle: "规则说明",
     nextSteps: [
@@ -66,23 +67,38 @@ export const FAUCET_COPY = {
     claimRequestFailed: "Faucet 请求失败",
     claimSuccess: "启动资金已发放",
     signatureCancelled: "已取消钱包签名",
+    wrongNetwork: "网络错误",
+  },
+  formatters: {
+    cooldown(seconds: number) {
+      return `Faucet 冷却中，请在 ${seconds} 秒后重试。`;
+    },
+    minBalance(minAllowedBalance: string) {
+      return `钱包余额已达到 Faucet 门槛（${minAllowedBalance}），暂时无需领取。`;
+    },
+    rateLimit(seconds: number) {
+      return `请求过于频繁，请在 ${seconds} 秒后重试。`;
+    },
+    successTitle(claimAmount?: string | null) {
+      return claimAmount
+        ? `${FAUCET_COPY.page.successTitlePrefix}（${claimAmount}）`
+        : FAUCET_COPY.page.successTitlePrefix;
+    },
   },
 } as const;
 
 export function getFaucetCooldownMessage(seconds: number) {
-  return `Faucet 冷却中，请在 ${seconds} 秒后重试。`;
+  return FAUCET_COPY.formatters.cooldown(seconds);
 }
 
 export function getFaucetMinBalanceMessage(minAllowedBalance: string) {
-  return `钱包余额已达到 Faucet 门槛（${minAllowedBalance}），暂时无需领取。`;
+  return FAUCET_COPY.formatters.minBalance(minAllowedBalance);
 }
 
 export function getFaucetRateLimitMessage(seconds: number) {
-  return `请求过于频繁，请在 ${seconds} 秒后重试。`;
+  return FAUCET_COPY.formatters.rateLimit(seconds);
 }
 
 export function getFaucetSuccessTitle(claimAmount?: string | null) {
-  return claimAmount
-    ? `${FAUCET_COPY.page.successTitlePrefix}（${claimAmount}）`
-    : FAUCET_COPY.page.successTitlePrefix;
+  return FAUCET_COPY.formatters.successTitle(claimAmount);
 }

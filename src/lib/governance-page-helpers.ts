@@ -1,9 +1,14 @@
 import type {
   GovernanceTemplateCategory,
   GovernanceTemplateDefinition,
+  ProposalItem,
 } from "@/types/governance";
 
 export const MAX_GOVERNANCE_DRAFT_ACTIONS = 5;
+
+export type GovernanceGroupedTemplates = Array<
+  [GovernanceTemplateCategory, GovernanceTemplateDefinition[]]
+>;
 
 export const GOVERNANCE_CATEGORY_LABELS: Record<
   GovernanceTemplateCategory,
@@ -111,5 +116,100 @@ export function groupGovernanceTemplates(
       ([left], [right]) =>
         getGovernanceCategoryOrder(left as GovernanceTemplateCategory) -
         getGovernanceCategoryOrder(right as GovernanceTemplateCategory)
-    ) as Array<[GovernanceTemplateCategory, GovernanceTemplateDefinition[]]>;
+    ) as GovernanceGroupedTemplates;
+}
+
+export function getActiveGovernanceStep(input: {
+  latestProposal?: ProposalItem;
+  latestProposalStateValue?: bigint;
+  latestProposalEtaValue?: bigint;
+  liveBlockNumber?: bigint;
+  nowTs: number;
+}) {
+  const {
+    latestProposal,
+    latestProposalEtaValue,
+    latestProposalStateValue,
+    liveBlockNumber,
+    nowTs,
+  } = input;
+
+  if (!latestProposal) {
+    return 1;
+  }
+
+  switch (Number(latestProposalStateValue ?? -1)) {
+    case 0:
+    case 1:
+      return 2;
+    case 4:
+      return 3;
+    case 5:
+      return latestProposalEtaValue !== undefined &&
+        latestProposalEtaValue > 0n &&
+        BigInt(nowTs) >= latestProposalEtaValue
+        ? 4
+        : 3;
+    case 7:
+      return 4;
+    case 2:
+    case 3:
+    case 6:
+      return 2;
+    default:
+      return liveBlockNumber === undefined
+        ? 2
+        : latestProposal.voteEnd >= liveBlockNumber
+          ? 2
+          : 3;
+  }
+}
+
+export function getCurrentGovernanceStageText(input: {
+  draftActionCount: number;
+  latestProposal?: ProposalItem;
+  latestProposalStateValue?: bigint;
+  latestProposalEtaValue?: bigint;
+  nowTs: number;
+  trimmedDescriptionLength: number;
+}) {
+  const {
+    draftActionCount,
+    latestProposal,
+    latestProposalEtaValue,
+    latestProposalStateValue,
+    nowTs,
+    trimmedDescriptionLength,
+  } = input;
+
+  if (!latestProposal) {
+    return draftActionCount > 0 || trimmedDescriptionLength > 0
+      ? "当前处于提案配置阶段"
+      : "当前暂无提案，可先配置治理动作";
+  }
+
+  switch (Number(latestProposalStateValue ?? -1)) {
+    case 0:
+      return "当前提案已提交，等待投票开始";
+    case 1:
+      return "当前提案处于投票阶段";
+    case 4:
+      return "当前提案已通过，等待加入队列";
+    case 5:
+      return latestProposalEtaValue !== undefined &&
+        latestProposalEtaValue > 0n &&
+        BigInt(nowTs) >= latestProposalEtaValue
+        ? "当前提案已到执行时间"
+        : "当前提案已排队，等待执行时间";
+    case 7:
+      return "当前提案已执行完成";
+    case 2:
+      return "当前最新提案已取消";
+    case 3:
+      return "当前最新提案未通过";
+    case 6:
+      return "当前最新提案已过期";
+    default:
+      return "当前正在同步最新提案状态";
+  }
 }

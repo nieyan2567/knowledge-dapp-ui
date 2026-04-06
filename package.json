@@ -7,12 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "check:text": "node scripts/check-text-health.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest --configLoader native",
     "test:run": "vitest run --configLoader native",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "check": "npm run lint && npm run typecheck && npm run test:run"
+    "check": "npm run lint && npm run typecheck && npm run check:text && npm run test:run"
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.10",

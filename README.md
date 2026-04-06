@@ -23,7 +23,7 @@
 ### Stake
 
 - 质押原生币到 `NativeVotes`
-- 激活待生效质押，获取投票权
+- 激活待生效质押，获得投票权
 - 发起退出申请，并在冷却期后提取
 
 ### Content
@@ -42,7 +42,7 @@
 ### Governance
 
 - 查看提案门槛、投票延迟和投票周期
-- 发起针对 `KnowledgeContent.setRewardRules(...)` 的治理提案
+- 发起针对治理参数和系统配置的治理提案
 - 浏览提案列表、查看详情、投票、排队和执行
 
 ### System
@@ -64,6 +64,7 @@
 - Redis
 - Zod
 - Vitest
+- Playwright
 
 ## 项目结构
 
@@ -136,7 +137,7 @@ npm run start
 
 ## 环境变量
 
-项目提供了 [.env.example](./.env.example) 作为模板。当前主要变量如下：
+项目提供 [.env.example](./.env.example) 作为模板。当前主要变量如下。
 
 ### 链与钱包
 
@@ -215,6 +216,7 @@ npm run lint
 npm run typecheck
 npm run test
 npm run test:run
+npm run test:e2e
 npm run check
 ```
 
@@ -223,22 +225,25 @@ npm run check
 - `lint`：运行 ESLint
 - `typecheck`：运行 TypeScript 类型检查
 - `test`：启动 Vitest 监听模式
-- `test:run`：执行一次性测试
-- `check`：依次执行 lint、typecheck 和 test:run
+- `test:run`：执行一次性单元测试
+- `test:e2e`：执行 Playwright 端到端测试
+- `check`：依次执行 `lint`、`typecheck` 和 `test:run`
 
-GitHub Actions 也已接入 CI，会在 push 和 pull request 时自动执行上述质量门禁。
+GitHub Actions 已接入 CI，会在 push 和 pull request 时自动执行质量门禁。
 
 ## 当前合约配置
 
-当前仓库里的部署配置来自 `src/contracts/deployment.json`：
+当前仓库中的部署配置来自 `src/contracts/deployment.json`：
 
 - Network: `consortium`
 - Chain ID: `20260`
 - NativeVotes: `0xf913CC093f66D705936f3c8376eF4CDaAD970a42`
 - KnowledgeContent: `0xd68fbD1ce33ed4A71Dc48780D377Be0466735b04`
 - TreasuryNative: `0x1f95175342cf3d46031bbCE29a339AfD8335db99`
-- TimelockController: `0xd0de0912991896691E3671157A2adada5B102aFB`
-- KnowledgeGovernor: `0x5f1F054903776a5025806Fc4FEeB0b0e55799A68`
+- FaucetVault: `0xd0de0912991896691E3671157A2adada5B102aFB`
+- RevenueVault: `0x5f1F054903776a5025806Fc4FEeB0b0e55799A68`
+- TimelockController: `0xb1bb987e0d1eEE912aD4c68BC587Dd2DE0826157`
+- KnowledgeGovernor: `0x68913B494138FA4C2dD78AAA60D4933B0De753E5`
 
 ## 上传鉴权流程
 
@@ -276,8 +281,8 @@ Faucet 当前采用“钱包地址 + IP”双限流：
 
 - 检查钱包余额是否已经高于 `FAUCET_MIN_BALANCE`
 - 检查是否仍在冷却期内
-- 检查 Faucet 私钥账户余额是否充足
-- 检查是否已经执行过 `/api/system/faucet/maintenance`
+- 检查 `FaucetVault` 和 relayer 余额是否充足
+- 检查是否已执行过 `/api/system/faucet/maintenance`
 - 检查 relayer 地址是否已被 `FAUCET_TOP_UP_FUNDER_PRIVATE_KEY` 成功补充 Gas
 
 ## 说明
