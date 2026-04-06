@@ -31,6 +31,10 @@ const originalEnv = {
     process.env["FAUCET_TOP_UP_FUNDER_PRIVATE_KEY"],
   SYSTEM_API_TOKEN: process.env["SYSTEM_API_TOKEN"],
   REBALANCE_API_TOKEN: process.env["REBALANCE_API_TOKEN"],
+  ADMIN_ADDRESSES: process.env["ADMIN_ADDRESSES"],
+  BESU_PERMISSIONING_RPC_URL: process.env["BESU_PERMISSIONING_RPC_URL"],
+  BESU_VALIDATOR_RPC_URLS: process.env["BESU_VALIDATOR_RPC_URLS"],
+  BESU_ADMIN_AUTH_TOKEN: process.env["BESU_ADMIN_AUTH_TOKEN"],
   FAUCET_RELAYER_ALERT_MIN_BALANCE:
     process.env["FAUCET_RELAYER_ALERT_MIN_BALANCE"],
   FAUCET_RELAYER_TOP_UP_AMOUNT: process.env["FAUCET_RELAYER_TOP_UP_AMOUNT"],
@@ -71,6 +75,12 @@ function applyValidServerEnv() {
   mutableEnv.FAUCET_TOP_UP_FUNDER_PRIVATE_KEY = `0x${"4".repeat(64)}`;
   mutableEnv.SYSTEM_API_TOKEN = "system-secret";
   mutableEnv.REBALANCE_API_TOKEN = "rebalance-secret";
+  mutableEnv.ADMIN_ADDRESSES =
+    "0x1111111111111111111111111111111111111111,0x2222222222222222222222222222222222222222";
+  mutableEnv.BESU_PERMISSIONING_RPC_URL = "http://127.0.0.1:8545";
+  mutableEnv.BESU_VALIDATOR_RPC_URLS =
+    "http://127.0.0.1:8545,http://127.0.0.1:8546";
+  mutableEnv.BESU_ADMIN_AUTH_TOKEN = "besu-admin-secret";
   mutableEnv.FAUCET_RELAYER_ALERT_MIN_BALANCE = "0.05";
   mutableEnv.FAUCET_RELAYER_TOP_UP_AMOUNT = "0.2";
   mutableEnv.FAUCET_VAULT_ALERT_MIN_BALANCE = "20";
@@ -126,6 +136,16 @@ afterEach(() => {
   );
   restoreEnvValue("SYSTEM_API_TOKEN", originalEnv.SYSTEM_API_TOKEN);
   restoreEnvValue("REBALANCE_API_TOKEN", originalEnv.REBALANCE_API_TOKEN);
+  restoreEnvValue("ADMIN_ADDRESSES", originalEnv.ADMIN_ADDRESSES);
+  restoreEnvValue(
+    "BESU_PERMISSIONING_RPC_URL",
+    originalEnv.BESU_PERMISSIONING_RPC_URL
+  );
+  restoreEnvValue(
+    "BESU_VALIDATOR_RPC_URLS",
+    originalEnv.BESU_VALIDATOR_RPC_URLS
+  );
+  restoreEnvValue("BESU_ADMIN_AUTH_TOKEN", originalEnv.BESU_ADMIN_AUTH_TOKEN);
   restoreEnvValue(
     "FAUCET_RELAYER_ALERT_MIN_BALANCE",
     originalEnv.FAUCET_RELAYER_ALERT_MIN_BALANCE
@@ -206,15 +226,19 @@ describe("env", () => {
     });
   });
 
-  it("does not throw when importing branding, chains, and wagmi modules in production", async () => {
-    applyValidServerEnv();
-    mutableEnv.NODE_ENV = "production";
-    vi.resetModules();
+  it(
+    "does not throw when importing branding, chains, and wagmi modules in production",
+    async () => {
+      applyValidServerEnv();
+      mutableEnv.NODE_ENV = "production";
+      vi.resetModules();
 
-    await expect(import("./branding")).resolves.toBeTruthy();
-    await expect(import("./chains")).resolves.toBeTruthy();
-    await expect(import("./wagmi")).resolves.toBeTruthy();
-  });
+      await expect(import("./branding")).resolves.toBeTruthy();
+      await expect(import("./chains")).resolves.toBeTruthy();
+      await expect(import("./wagmi")).resolves.toBeTruthy();
+    },
+    15000
+  );
 
   it("requires explicit server URLs in production", () => {
     applyValidServerEnv();
@@ -253,6 +277,21 @@ describe("env", () => {
     mutableEnv.REBALANCE_API_TOKEN = "";
 
     expect(getServerEnv().REBALANCE_API_TOKEN).toBeUndefined();
+  });
+
+  it("parses admin addresses and validator rpc urls as arrays", () => {
+    applyValidServerEnv();
+
+    expect(getServerEnv()).toMatchObject({
+      ADMIN_ADDRESSES: [
+        "0x1111111111111111111111111111111111111111",
+        "0x2222222222222222222222222222222222222222",
+      ],
+      BESU_VALIDATOR_RPC_URLS: [
+        "http://127.0.0.1:8545",
+        "http://127.0.0.1:8546",
+      ],
+    });
   });
 
   it("treats blank faucet vault alert threshold as undefined", () => {

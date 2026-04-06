@@ -12,6 +12,7 @@ import {
   Droplets,
   ExternalLink,
   LayoutDashboard,
+  LockKeyhole,
   Shield,
   UserRound,
   Vote,
@@ -41,6 +42,7 @@ const dangerButtonClass =
 const iconMap = {
   dashboard: LayoutDashboard,
   profile: UserRound,
+  admin: LockKeyhole,
   faucet: Droplets,
   stake: Wallet,
   content: BookOpen,

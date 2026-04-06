@@ -13,6 +13,7 @@ export const APP_SHELL_COPY = {
 export const INTERNAL_NAV_ITEMS = [
   { key: "dashboard", href: "/", label: "Dashboard", testId: NAV_LINK_TEST_IDS.dashboard },
   { key: "profile", href: "/profile", label: "Profile", testId: NAV_LINK_TEST_IDS.profile },
+  { key: "admin", href: "/admin", label: "Admin", testId: NAV_LINK_TEST_IDS.admin },
   { key: "faucet", href: "/faucet", label: "Faucet", testId: NAV_LINK_TEST_IDS.faucet },
   { key: "stake", href: "/stake", label: "Stake", testId: NAV_LINK_TEST_IDS.stake },
   { key: "content", href: "/content", label: "Content", testId: NAV_LINK_TEST_IDS.content },
@@ -31,6 +32,10 @@ export const EXTERNAL_NAV_ITEMS = [
 ] as const;
 
 export function getPageTitle(pathname: string) {
-  const item = INTERNAL_NAV_ITEMS.find((entry) => entry.href === pathname);
+  const item = INTERNAL_NAV_ITEMS.find((entry) =>
+    entry.href === "/"
+      ? pathname === "/"
+      : pathname === entry.href || pathname.startsWith(`${entry.href}/`)
+  );
   return item?.label || APP_SHELL_COPY.defaultPageTitle;
 }

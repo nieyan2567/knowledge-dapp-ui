@@ -54,6 +54,19 @@ const optionalUrl = z.preprocess(
   z.string().url().optional()
 );
 
+const optionalStringArray = z.preprocess(
+  emptyStringToUndefined,
+  z
+    .string()
+    .transform((value) =>
+      value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+    .optional()
+).transform((value) => value ?? []);
+
 const productionRequiredPublicUrls = [
   "NEXT_PUBLIC_BESU_RPC_URL",
   "NEXT_PUBLIC_BLOCKSCOUT_URL",
@@ -141,6 +154,13 @@ const serverEnvSchema = publicEnvSchema
       z.string().trim().min(1).optional()
     ),
     REBALANCE_API_TOKEN: z.preprocess(
+      emptyStringToUndefined,
+      z.string().trim().min(1).optional()
+    ),
+    ADMIN_ADDRESSES: optionalStringArray,
+    BESU_PERMISSIONING_RPC_URL: optionalUrl,
+    BESU_VALIDATOR_RPC_URLS: optionalStringArray,
+    BESU_ADMIN_AUTH_TOKEN: z.preprocess(
       emptyStringToUndefined,
       z.string().trim().min(1).optional()
     ),
@@ -292,6 +312,10 @@ function getServerEnvSource() {
       process.env.FAUCET_TOP_UP_FUNDER_PRIVATE_KEY,
     SYSTEM_API_TOKEN: process.env.SYSTEM_API_TOKEN,
     REBALANCE_API_TOKEN: process.env.REBALANCE_API_TOKEN,
+    ADMIN_ADDRESSES: process.env.ADMIN_ADDRESSES,
+    BESU_PERMISSIONING_RPC_URL: process.env.BESU_PERMISSIONING_RPC_URL,
+    BESU_VALIDATOR_RPC_URLS: process.env.BESU_VALIDATOR_RPC_URLS,
+    BESU_ADMIN_AUTH_TOKEN: process.env.BESU_ADMIN_AUTH_TOKEN,
     FAUCET_AMOUNT: process.env.FAUCET_AMOUNT,
     FAUCET_MIN_BALANCE: process.env.FAUCET_MIN_BALANCE,
     FAUCET_RELAYER_ALERT_MIN_BALANCE:
