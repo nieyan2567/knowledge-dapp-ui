@@ -18,3 +18,4 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.SYSTEM_API_TOKEN }}" \
             -H "Content-Type: application/json")
           echo "$response"
+          
