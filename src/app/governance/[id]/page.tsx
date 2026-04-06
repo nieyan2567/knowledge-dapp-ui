@@ -27,6 +27,7 @@ import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 import { BRANDING } from "@/lib/branding";
+import { GOVERNANCE_DETAIL_COPY } from "@/lib/governance-detail-helpers";
 import {
   getProposalStageCountdown,
   governanceStateBadgeClass as stateBadgeClass,
@@ -168,10 +169,12 @@ export default function ProposalDetailPage() {
     proposalEtaValue !== undefined &&
     proposalEtaValue > 0n &&
     BigInt(nowTs) >= proposalEtaValue;
+
   const actionSummaries = useMemo(
     () => (proposalDetail ? summarizeProposalActions(proposalDetail) : []),
     [proposalDetail]
   );
+
   const countdown = useMemo(
     () =>
       getProposalStageCountdown(
@@ -243,7 +246,7 @@ export default function ProposalDetailPage() {
 
   async function vote(support: 0 | 1 | 2) {
     if (!address || !proposalId) {
-      toast.error("请先连接钱包");
+      toast.error(GOVERNANCE_DETAIL_COPY.errors.connectWallet);
       return;
     }
 
@@ -257,9 +260,9 @@ export default function ProposalDetailPage() {
         args: [proposalId, support],
         account: address,
       },
-      loading: "提交投票...",
-      success: "投票成功",
-      fail: "投票失败",
+      loading: GOVERNANCE_DETAIL_COPY.loading.vote,
+      success: GOVERNANCE_DETAIL_COPY.success.vote,
+      fail: GOVERNANCE_DETAIL_COPY.fail.vote,
     });
 
     if (!hash) return;
@@ -268,7 +271,7 @@ export default function ProposalDetailPage() {
 
   async function queueProposal() {
     if (!proposalDetail || !address) {
-      toast.error("提案详情尚未加载，无法执行排队操作");
+      toast.error(GOVERNANCE_DETAIL_COPY.errors.detailMissingQueue);
       return;
     }
 
@@ -287,9 +290,9 @@ export default function ProposalDetailPage() {
         ],
         account: address,
       },
-      loading: "正在提交排队交易...",
-      success: "排队交易已提交",
-      fail: "排队失败",
+      loading: GOVERNANCE_DETAIL_COPY.loading.queue,
+      success: GOVERNANCE_DETAIL_COPY.success.queue,
+      fail: GOVERNANCE_DETAIL_COPY.fail.queue,
     });
 
     if (!hash) return;
@@ -298,7 +301,7 @@ export default function ProposalDetailPage() {
 
   async function executeProposal() {
     if (!proposalDetail || !address) {
-      toast.error("提案详情尚未加载，无法执行提案");
+      toast.error(GOVERNANCE_DETAIL_COPY.errors.detailMissingExecute);
       return;
     }
 
@@ -317,9 +320,9 @@ export default function ProposalDetailPage() {
         ],
         account: address,
       },
-      loading: "正在提交执行交易...",
-      success: "执行交易已提交",
-      fail: "执行失败",
+      loading: GOVERNANCE_DETAIL_COPY.loading.execute,
+      success: GOVERNANCE_DETAIL_COPY.success.execute,
+      fail: GOVERNANCE_DETAIL_COPY.fail.execute,
     });
 
     if (!hash) return;
@@ -338,28 +341,27 @@ export default function ProposalDetailPage() {
           className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
         >
           <ArrowLeft className="h-4 w-4" />
-          返回提案列表
+          {GOVERNANCE_DETAIL_COPY.backToList}
         </Link>
-
       </div>
 
       <PageHeader
-        eyebrow={`提案 #${proposalId.toString()}`}
-        title={proposalDetail?.description || "治理提案"}
-        description="在这里查看提案投票结果、动作摘要，并完成后续治理操作。"
+        eyebrow={GOVERNANCE_DETAIL_COPY.status.proposalEyebrow(proposalId)}
+        title={proposalDetail?.description || GOVERNANCE_DETAIL_COPY.pageTitleFallback}
+        description={GOVERNANCE_DETAIL_COPY.pageDescription}
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_380px] xl:items-start">
         <div className="space-y-6">
           <SectionCard
-            title="投票分布"
-            description="快速查看提案状态、总票数和各选项占比。"
+            title={GOVERNANCE_DETAIL_COPY.voteDistributionTitle}
+            description={GOVERNANCE_DETAIL_COPY.voteDistributionDescription}
           >
             <div className="space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/50">
                 <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                   <Gavel className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                  当前状态
+                  {GOVERNANCE_DETAIL_COPY.currentState}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-900/70 dark:text-slate-300">
@@ -376,41 +378,45 @@ export default function ProposalDetailPage() {
               <div className="grid gap-3 sm:grid-cols-4">
                 <InfoCard
                   compact
-                  label="总票数"
+                  label={GOVERNANCE_DETAIL_COPY.totalVotes}
                   value={totalVotes === 0n ? "0" : formatEther(totalVotes)}
                 />
                 <InfoCard
                   compact
-                  label="赞成票"
+                  label={GOVERNANCE_DETAIL_COPY.forVotes}
                   value={voteData.forVotes === 0n ? "0" : formatEther(voteData.forVotes)}
                 />
                 <InfoCard
                   compact
-                  label="反对票"
-                  value={voteData.againstVotes === 0n ? "0" : formatEther(voteData.againstVotes)}
+                  label={GOVERNANCE_DETAIL_COPY.againstVotes}
+                  value={
+                    voteData.againstVotes === 0n ? "0" : formatEther(voteData.againstVotes)
+                  }
                 />
                 <InfoCard
                   compact
-                  label="弃权票"
-                  value={voteData.abstainVotes === 0n ? "0" : formatEther(voteData.abstainVotes)}
+                  label={GOVERNANCE_DETAIL_COPY.abstainVotes}
+                  value={
+                    voteData.abstainVotes === 0n ? "0" : formatEther(voteData.abstainVotes)
+                  }
                 />
               </div>
 
               <div className="space-y-4">
                 <VoteBar
-                  label="赞成"
+                  label={GOVERNANCE_DETAIL_COPY.forLabel}
                   value={voteData.forVotes}
                   percent={forPercent}
                   color="bg-emerald-500"
                 />
                 <VoteBar
-                  label="反对"
+                  label={GOVERNANCE_DETAIL_COPY.againstLabel}
                   value={voteData.againstVotes}
                   percent={againstPercent}
                   color="bg-rose-500"
                 />
                 <VoteBar
-                  label="弃权"
+                  label={GOVERNANCE_DETAIL_COPY.abstainLabel}
                   value={voteData.abstainVotes}
                   percent={abstainPercent}
                   color="bg-slate-500"
@@ -420,20 +426,20 @@ export default function ProposalDetailPage() {
           </SectionCard>
 
           <SectionCard
-            title="提案动作"
-            description="保留每个动作的核心摘要，原始参数按需展开查看。"
+            title={GOVERNANCE_DETAIL_COPY.actionsTitle}
+            description={GOVERNANCE_DETAIL_COPY.actionsDescription}
           >
             {loadingDetail ? (
               <div className="text-sm text-slate-500 dark:text-slate-400">
-                正在加载动作详情...
+                {GOVERNANCE_DETAIL_COPY.loading.detail}
               </div>
             ) : !proposalDetail ? (
               <div className="text-sm text-slate-500 dark:text-slate-400">
-                暂无动作数据。
+                {GOVERNANCE_DETAIL_COPY.noActionData}
               </div>
             ) : proposalDetail.targets.length === 0 ? (
               <div className="text-sm italic text-slate-500 dark:text-slate-400">
-                该提案不包含任何链上执行动作。
+                {GOVERNANCE_DETAIL_COPY.noOnchainActions}
               </div>
             ) : (
               <div className="space-y-4">
@@ -448,31 +454,31 @@ export default function ProposalDetailPage() {
                       <div className="mb-3 flex items-start justify-between gap-3">
                         <div>
                           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            动作 #{index + 1}
+                            {GOVERNANCE_DETAIL_COPY.status.actionPrefix(index)}
                           </div>
                           <div className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
-                            {summary?.title ?? "未识别动作"}
+                            {summary?.title ?? GOVERNANCE_DETAIL_COPY.unknownAction}
                           </div>
                         </div>
                         <div className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-                          {summary?.functionName ?? "unknown"}
+                          {summary?.functionName ?? GOVERNANCE_DETAIL_COPY.unknownFunction}
                         </div>
                       </div>
 
                       <div className="space-y-3 text-sm text-slate-700 dark:text-slate-200">
                         <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                           <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            摘要
+                            {GOVERNANCE_DETAIL_COPY.summaryLabel}
                           </div>
                           <div className="mt-1.5">
-                            {summary?.description ?? "暂无动作摘要"}
+                            {summary?.description ?? GOVERNANCE_DETAIL_COPY.noSummary}
                           </div>
                         </div>
 
                         <div className="grid gap-3 md:grid-cols-2">
                           <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                             <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                              目标合约
+                              {GOVERNANCE_DETAIL_COPY.targetContract}
                             </div>
                             <div className="mt-1.5 rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2 shadow-sm dark:border-slate-700/80 dark:bg-slate-800/60">
                               <span className="break-all font-mono text-xs text-slate-700 dark:text-slate-300">
@@ -483,7 +489,7 @@ export default function ProposalDetailPage() {
 
                           <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                             <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                              调用值
+                              {GOVERNANCE_DETAIL_COPY.callValue}
                             </div>
                             <div className="mt-1.5 rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2 shadow-sm dark:border-slate-700/80 dark:bg-slate-800/60">
                               <span className="font-mono text-xs text-slate-700 dark:text-slate-300">
@@ -495,7 +501,7 @@ export default function ProposalDetailPage() {
 
                         <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                           <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            原始 calldata
+                            {GOVERNANCE_DETAIL_COPY.rawCalldata}
                           </div>
                           <div className="mt-1.5 rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2 shadow-sm dark:border-slate-700/80 dark:bg-slate-800/60">
                             <span className="break-all font-mono text-xs text-slate-700 dark:text-slate-300">
@@ -514,19 +520,19 @@ export default function ProposalDetailPage() {
 
         <div className="space-y-6 xl:sticky xl:top-6">
           <SectionCard
-            title="操作面板"
-            description="根据提案当前状态完成投票、排队或执行。"
+            title={GOVERNANCE_DETAIL_COPY.panelTitle}
+            description={GOVERNANCE_DETAIL_COPY.panelDescription}
           >
             <div className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
                 <div className="rounded-lg bg-white/80 p-3 text-xs leading-relaxed text-slate-600 dark:bg-slate-900/70 dark:text-slate-300">
                   {canVote
-                    ? "当前提案处于投票中状态，可以参与赞成、反对或弃权投票。"
+                    ? GOVERNANCE_DETAIL_COPY.actionPanelVote
                     : canQueue
-                      ? "当前提案已通过投票，可以加入 Timelock 执行队列。"
+                      ? GOVERNANCE_DETAIL_COPY.actionPanelQueue
                       : canExecute
-                        ? "当前提案已排队且等待期结束，可以正式执行。"
-                        : "当前提案暂时没有可执行的治理操作，请关注状态变化。"}
+                        ? GOVERNANCE_DETAIL_COPY.actionPanelExecute
+                        : GOVERNANCE_DETAIL_COPY.actionPanelIdle}
                 </div>
               </div>
 
@@ -536,7 +542,7 @@ export default function ProposalDetailPage() {
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
               >
                 <VoteIcon className="h-4 w-4" />
-                投赞成票
+                {GOVERNANCE_DETAIL_COPY.voteFor}
               </button>
 
               <button
@@ -544,7 +550,7 @@ export default function ProposalDetailPage() {
                 disabled={!canVote}
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                投反对票
+                {GOVERNANCE_DETAIL_COPY.voteAgainst}
               </button>
 
               <button
@@ -552,7 +558,7 @@ export default function ProposalDetailPage() {
                 disabled={!canVote}
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                弃权
+                {GOVERNANCE_DETAIL_COPY.voteAbstain}
               </button>
 
               <div className="my-2 border-t border-slate-200 pt-2 dark:border-slate-700" />
@@ -562,7 +568,7 @@ export default function ProposalDetailPage() {
                 disabled={!canQueue || !proposalDetail}
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                加入队列
+                {GOVERNANCE_DETAIL_COPY.queueProposal}
               </button>
 
               <button
@@ -571,37 +577,37 @@ export default function ProposalDetailPage() {
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 px-4 py-3 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
               >
                 <CheckCircle2 className="h-4 w-4" />
-                执行提案
+                {GOVERNANCE_DETAIL_COPY.executeProposal}
               </button>
             </div>
           </SectionCard>
 
           <SectionCard
-            title="提案信息"
-            description="保留当前提案最常查看的关键信息。"
+            title={GOVERNANCE_DETAIL_COPY.infoTitle}
+            description={GOVERNANCE_DETAIL_COPY.infoDescription}
           >
             {loadingDetail ? (
               <div className="animate-pulse text-sm text-slate-500 dark:text-slate-400">
-                正在加载提案详情...
+                {GOVERNANCE_DETAIL_COPY.loading.detail}
               </div>
             ) : !proposalDetail ? (
               <div className="text-sm text-slate-500 dark:text-slate-400">
-                未找到该提案的 ProposalCreated 事件记录。
+                {GOVERNANCE_DETAIL_COPY.proposalEventMissing}
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  <InfoCard compact label="提案 ID" value={proposalId.toString()} />
-                  <InfoCard compact label="创建区块" value={proposalDetail.blockNumber.toString()} />
-                  <InfoCard compact label="投票开始" value={proposalDetail.voteStart.toString()} />
-                  <InfoCard compact label="投票结束" value={proposalDetail.voteEnd.toString()} />
+                  <InfoCard compact label={GOVERNANCE_DETAIL_COPY.info.proposalId} value={proposalId.toString()} />
+                  <InfoCard compact label={GOVERNANCE_DETAIL_COPY.info.createdBlock} value={proposalDetail.blockNumber.toString()} />
+                  <InfoCard compact label={GOVERNANCE_DETAIL_COPY.info.voteStart} value={proposalDetail.voteStart.toString()} />
+                  <InfoCard compact label={GOVERNANCE_DETAIL_COPY.info.voteEnd} value={proposalDetail.voteEnd.toString()} />
                   <InfoCard compact label={countdown.label} value={countdown.value} />
-                  <InfoCard compact label="动作数量" value={proposalDetail.targets.length.toString()} />
+                  <InfoCard compact label={GOVERNANCE_DETAIL_COPY.info.actionCount} value={proposalDetail.targets.length.toString()} />
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    提案人
+                    {GOVERNANCE_DETAIL_COPY.info.proposer}
                   </div>
                   <div className="text-sm text-slate-900 dark:text-slate-100">
                     <AddressBadge address={proposalDetail.proposer} />
@@ -612,8 +618,8 @@ export default function ProposalDetailPage() {
           </SectionCard>
 
           <SectionCard
-            title="浏览器"
-            description="在区块浏览器中查看该提案交易。"
+            title={GOVERNANCE_DETAIL_COPY.explorerTitle}
+            description={GOVERNANCE_DETAIL_COPY.explorerDescription}
           >
             <a
               href={proposalDetail?.transactionHash ? explorerProposalUrl(proposalDetail.transactionHash) : "#"}
@@ -627,11 +633,11 @@ export default function ProposalDetailPage() {
               onClick={(event) => {
                 if (!proposalDetail?.transactionHash) {
                   event.preventDefault();
-                  toast.error("尚未加载到创建提案的交易哈希");
+                  toast.error(GOVERNANCE_DETAIL_COPY.errors.missingTxHash);
                 }
               }}
             >
-              在 {BRANDING.explorerName} 中查看
+              {GOVERNANCE_DETAIL_COPY.browserOpen}
               <ExternalLink className="h-4 w-4" />
             </a>
           </SectionCard>

@@ -60,6 +60,71 @@ export const GOVERNANCE_PAGE_COPY = {
   paramsTitle: "治理参数",
   paramsDescription:
     "展示当前治理所需的关键参数，便于在配置提案时随时参考。",
+  viewGovernorContract: "查看 Governor 合约",
+  currentStep: "当前步骤",
+  currentStage: "当前阶段",
+  proposalDescriptionLabel: "提案描述",
+  proposalDescriptionPlaceholder: "描述这份治理提案的目标、影响范围与预期结果",
+  draftActionsLabel: "提案动作",
+  draftActionsCount: "当前 {current} / {max} 个动作",
+  addAction: "新增动作",
+  noActions: "当前还没有提案动作，请先添加至少一个治理动作。",
+  highRiskConfirmation:
+    "这份提案包含高风险治理动作，可能影响核心治理参数或执行延迟。我已核对目标合约、输入参数和预期影响。",
+  proposalFeeLabel: "提案费用",
+  proposalFeeLoading: "正在读取费用...",
+  proposalFeeFree: "当前免费",
+  proposalFeeHelp:
+    "发起提案时会将这笔费用转入协议金库，用于抑制低成本垃圾提案。",
+  submitProposal: "发起提案",
+  previewDescriptionEmpty: "请输入提案描述，预览区会更完整地反映最终提交内容。",
+  previewDescriptionLabel: "Proposal Description",
+  metrics: {
+    currentProposals: "当前提案",
+    configuredActions: "已配置动作",
+    highRiskActions: "高风险动作",
+    actionCount: "动作数量",
+    validActions: "有效动作",
+  },
+  params: {
+    proposalThreshold: "提案门槛",
+    proposalFee: "提案费用",
+    votingDelay: "投票延迟",
+    votingPeriod: "投票周期",
+    governorAddress: "Governor 合约地址",
+    openInExplorer: "在浏览器中查看",
+    proposalThresholdHelp: "创建提案所需的最低投票权。",
+    proposalFeeHelp: "提交提案时需要附带的协议费用，会直接转入 Revenue Vault。",
+    votingDelayHelp: "提案创建后到投票开始前需要等待的区块数。",
+    votingPeriodHelp: "提案保持可投票状态的持续区块数。",
+  },
+  errors: {
+    encodeActionFailed: "提案动作编码失败",
+    addActionLimit: `单个提案最多支持 ${MAX_GOVERNANCE_DRAFT_ACTIONS} 个动作`,
+    connectWallet: "请先连接钱包",
+    missingDescription: "请输入提案描述",
+    missingActions: "请至少添加一个提案动作",
+    confirmHighRisk: "请先确认高风险治理动作",
+    feeLoading: "提案费用尚未加载完成",
+    loadProposalList: "加载提案列表失败",
+  },
+  loading: {
+    submitProposal: "正在提交提案...",
+  },
+  success: {
+    submitProposal: "提案交易已提交",
+  },
+  fail: {
+    submitProposal: "提案提交失败",
+  },
+  formatters: {
+    stepLabel(step: number) {
+      return `Step ${step}`;
+    },
+    actionCount(current: number, max: number) {
+      return `当前 ${current} / ${max} 个动作`;
+    },
+  },
 } as const;
 
 export function moveGovernanceItem<T>(

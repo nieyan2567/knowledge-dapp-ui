@@ -209,7 +209,9 @@ export default function GovernancePage() {
           validation: {
             ok: false,
             error:
-              error instanceof Error ? error.message : "提案动作编码失败",
+              error instanceof Error
+                ? error.message
+                : GOVERNANCE_PAGE_COPY.errors.encodeActionFailed,
           },
           encodedAction: null,
         };
@@ -261,6 +263,7 @@ export default function GovernancePage() {
     trimmedDescription.length,
   ]);
   const canSubmitProposal =
+    !!address &&
     trimmedDescription.length > 0 &&
     draftActions.length > 0 &&
     allActionsValid &&
@@ -295,7 +298,7 @@ export default function GovernancePage() {
       setProposals(parsed);
     } catch (error) {
       reportGovernancePageError("Failed to load governance proposals", error);
-      toast.error("加载提案列表失败");
+      toast.error(GOVERNANCE_PAGE_COPY.errors.loadProposalList);
     } finally {
       setLoadingProposals(false);
     }
@@ -366,7 +369,7 @@ export default function GovernancePage() {
 
   function handleAddAction() {
     if (draftActions.length >= MAX_GOVERNANCE_DRAFT_ACTIONS) {
-      toast.error(`单个提案最多支持 ${MAX_GOVERNANCE_DRAFT_ACTIONS} 个动作`);
+      toast.error(GOVERNANCE_PAGE_COPY.errors.addActionLimit);
       return;
     }
 
@@ -404,12 +407,12 @@ export default function GovernancePage() {
 
   async function handlePropose() {
     if (!address) {
-      toast.error("请先连接钱包");
+      toast.error(GOVERNANCE_PAGE_COPY.errors.connectWallet);
       return;
     }
 
     if (!trimmedDescription) {
-      toast.error("请输入提案描述");
+      toast.error(GOVERNANCE_PAGE_COPY.errors.missingDescription);
       return;
     }
 
@@ -425,12 +428,12 @@ export default function GovernancePage() {
     }
 
     if (hasHighRiskAction && !highRiskConfirmed) {
-      toast.error("请先确认高风险治理动作");
+      toast.error(GOVERNANCE_PAGE_COPY.errors.confirmHighRisk);
       return;
     }
 
     if (proposalFee === undefined) {
-      toast.error("提案费用尚未加载完成");
+      toast.error(GOVERNANCE_PAGE_COPY.errors.feeLoading);
       return;
     }
 
@@ -450,9 +453,9 @@ export default function GovernancePage() {
           value: typeof proposalFee === "bigint" ? proposalFee : 0n,
           account: address,
         },
-      loading: "正在提交提案...",
-      success: "提案交易已提交",
-      fail: "提案提交失败",
+      loading: GOVERNANCE_PAGE_COPY.loading.submitProposal,
+      success: GOVERNANCE_PAGE_COPY.success.submitProposal,
+      fail: GOVERNANCE_PAGE_COPY.fail.submitProposal,
     });
 
     if (!hash) return;
@@ -474,7 +477,7 @@ export default function GovernancePage() {
             rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
-            查看 Governor 合约
+            {GOVERNANCE_PAGE_COPY.viewGovernorContract}
             <ExternalLink className="h-4 w-4" />
           </a>
         }
@@ -493,7 +496,7 @@ export default function GovernancePage() {
                 <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-semibold text-white">
                   {activeGovernanceStep}
                 </span>
-                <span>当前步骤</span>
+                <span>{GOVERNANCE_PAGE_COPY.currentStep}</span>
                 <span className="hidden h-1 w-1 rounded-full bg-amber-400 md:block dark:bg-amber-500" />
                 <span className="hidden md:block">{currentGovernanceStageText}</span>
               </div>
@@ -517,7 +520,7 @@ export default function GovernancePage() {
                         </div>
                         <div className="min-w-0">
                           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                            Step {step.step}
+                            {GOVERNANCE_PAGE_COPY.formatters.stepLabel(step.step)}
                           </div>
                           <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
                             {step.title}
@@ -533,7 +536,7 @@ export default function GovernancePage() {
                     </div>
                     {isActive ? (
                       <div className="mt-2 inline-flex rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                        当前阶段
+                        {GOVERNANCE_PAGE_COPY.currentStage}
                       </div>
                     ) : null}
                   </div>
@@ -547,9 +550,18 @@ export default function GovernancePage() {
             description={GOVERNANCE_PAGE_COPY.listDescription}
           >
             <div className="mb-4 grid gap-3 sm:grid-cols-3">
-              <PreviewStat label="当前提案" value={String(proposals.length)} />
-              <PreviewStat label="已配置动作" value={String(draftActions.length)} />
-              <PreviewStat label="高风险动作" value={String(highRiskActionCount)} />
+              <PreviewStat
+                label={GOVERNANCE_PAGE_COPY.metrics.currentProposals}
+                value={String(proposals.length)}
+              />
+              <PreviewStat
+                label={GOVERNANCE_PAGE_COPY.metrics.configuredActions}
+                value={String(draftActions.length)}
+              />
+              <PreviewStat
+                label={GOVERNANCE_PAGE_COPY.metrics.highRiskActions}
+                value={String(highRiskActionCount)}
+              />
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-950/40">
@@ -574,24 +586,27 @@ export default function GovernancePage() {
               <div className="flex min-h-0 flex-1 flex-col gap-5">
                 <div className="space-y-3">
                   <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    提案描述
+                    {GOVERNANCE_PAGE_COPY.proposalDescriptionLabel}
                   </div>
                   <textarea
                     className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
                     rows={2}
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
-                    placeholder="描述这份治理提案的目标、影响范围与预期结果"
+                    placeholder={GOVERNANCE_PAGE_COPY.proposalDescriptionPlaceholder}
                   />
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                      提案动作
+                      {GOVERNANCE_PAGE_COPY.draftActionsLabel}
                     </div>
                     <div className="text-xs text-slate-500 dark:text-slate-400">
-                      当前 {draftActions.length} / {MAX_GOVERNANCE_DRAFT_ACTIONS} 个动作
+                      {GOVERNANCE_PAGE_COPY.formatters.actionCount(
+                        draftActions.length,
+                        MAX_GOVERNANCE_DRAFT_ACTIONS
+                      )}
                     </div>
                   </div>
 
@@ -601,14 +616,14 @@ export default function GovernancePage() {
                     className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     <Plus className="h-4 w-4" />
-                    新增动作
+                    {GOVERNANCE_PAGE_COPY.addAction}
                   </button>
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-hidden">
                   {draftStates.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
-                      当前还没有提案动作，请先添加至少一个治理动作。
+                      {GOVERNANCE_PAGE_COPY.noActions}
                     </div>
                   ) : (
                     <div className="h-full space-y-4 overflow-y-auto pr-1">
@@ -640,24 +655,24 @@ export default function GovernancePage() {
                       onChange={(event) => setHighRiskConfirmed(event.target.checked)}
                     />
                     <span>
-                      这份提案包含高风险治理动作，可能影响核心治理参数或执行延迟。我已核对目标合约、输入参数和预期影响。
+                      {GOVERNANCE_PAGE_COPY.highRiskConfirmation}
                     </span>
                   </label>
                 ) : null}
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
                   <div className="font-medium text-slate-900 dark:text-slate-100">
-                    提案费用
+                    {GOVERNANCE_PAGE_COPY.proposalFeeLabel}
                   </div>
                   <div className="mt-1">
                     {typeof proposalFee === "bigint"
                       ? proposalFee > 0n
                         ? `${formatEther(proposalFee)} ${BRANDING.nativeTokenSymbol}`
-                        : "当前免费"
-                      : "正在读取费用..."}
+                        : GOVERNANCE_PAGE_COPY.proposalFeeFree
+                      : GOVERNANCE_PAGE_COPY.proposalFeeLoading}
                   </div>
                   <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    发起提案时会将这笔费用转入协议金库，用于抑制低成本垃圾提案。
+                    {GOVERNANCE_PAGE_COPY.proposalFeeHelp}
                   </div>
                 </div>
 
@@ -667,7 +682,7 @@ export default function GovernancePage() {
                   disabled={!canSubmitProposal}
                   className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
                 >
-                  发起提案
+                  {GOVERNANCE_PAGE_COPY.submitProposal}
                 </button>
               </div>
             </SectionCard>
@@ -680,19 +695,28 @@ export default function GovernancePage() {
             >
               <div className="flex min-h-0 flex-1 flex-col gap-4">
                 <div className="grid grid-cols-3 gap-3">
-                  <PreviewStat label="动作数量" value={String(draftActions.length)} />
-                  <PreviewStat label="有效动作" value={String(encodedActions.length)} />
-                  <PreviewStat label="高风险动作" value={String(highRiskActionCount)} />
+                  <PreviewStat
+                    label={GOVERNANCE_PAGE_COPY.metrics.actionCount}
+                    value={String(draftActions.length)}
+                  />
+                  <PreviewStat
+                    label={GOVERNANCE_PAGE_COPY.metrics.validActions}
+                    value={String(encodedActions.length)}
+                  />
+                  <PreviewStat
+                    label={GOVERNANCE_PAGE_COPY.metrics.highRiskActions}
+                    value={String(highRiskActionCount)}
+                  />
                 </div>
 
                 {!trimmedDescription ? (
                   <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
-                    请输入提案描述，预览区会更完整地反映最终提交内容。
+                    {GOVERNANCE_PAGE_COPY.previewDescriptionEmpty}
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-200">
                     <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      Proposal Description
+                      {GOVERNANCE_PAGE_COPY.previewDescriptionLabel}
                     </div>
                     <div className="mt-1">{trimmedDescription}</div>
                   </div>
@@ -723,45 +747,45 @@ export default function GovernancePage() {
             <div className="space-y-3">
               <GovernanceMetricCard
                 icon={<Gavel className="h-5 w-5 text-slate-500 dark:text-slate-400" />}
-                label="提案门槛"
+                label={GOVERNANCE_PAGE_COPY.params.proposalThreshold}
                 value={
                   proposalThreshold
                     ? `${formatEther(proposalThreshold as bigint)} ${BRANDING.nativeTokenSymbol}`
                     : "-"
                 }
-                description="创建提案所需的最低投票权。"
+                description={GOVERNANCE_PAGE_COPY.params.proposalThresholdHelp}
               />
 
               <GovernanceMetricCard
                 icon={<Coins className="h-5 w-5 text-slate-500 dark:text-slate-400" />}
-                label="提案费用"
+                label={GOVERNANCE_PAGE_COPY.params.proposalFee}
                 value={
                   typeof proposalFee === "bigint"
                     ? proposalFee > 0n
                       ? `${formatEther(proposalFee)} ${BRANDING.nativeTokenSymbol}`
-                      : "当前免费"
+                      : GOVERNANCE_PAGE_COPY.proposalFeeFree
                     : "-"
                 }
-                description="提交提案时需要附带的协议费用，会直接转入 Revenue Vault。"
+                description={GOVERNANCE_PAGE_COPY.params.proposalFeeHelp}
               />
 
               <GovernanceMetricCard
                 icon={<Clock3 className="h-5 w-5 text-slate-500 dark:text-slate-400" />}
-                label="投票延迟"
+                label={GOVERNANCE_PAGE_COPY.params.votingDelay}
                 value={votingDelay ? String(votingDelay) : "-"}
-                description="提案创建后到投票开始前需要等待的区块数。"
+                description={GOVERNANCE_PAGE_COPY.params.votingDelayHelp}
               />
 
               <GovernanceMetricCard
                 icon={<Vote className="h-5 w-5 text-slate-500 dark:text-slate-400" />}
-                label="投票周期"
+                label={GOVERNANCE_PAGE_COPY.params.votingPeriod}
                 value={votingPeriod ? String(votingPeriod) : "-"}
-                description="提案保持可投票状态的持续区块数。"
+                description={GOVERNANCE_PAGE_COPY.params.votingPeriodHelp}
               />
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
                 <div className="font-medium text-slate-900 dark:text-slate-100">
-                  Governor合约地址
+                  {GOVERNANCE_PAGE_COPY.params.governorAddress}
                 </div>
                 <div className="mt-2 break-all font-mono text-xs text-slate-500 dark:text-slate-400">
                   {CONTRACTS.KnowledgeGovernor}
@@ -772,7 +796,7 @@ export default function GovernancePage() {
                   rel="noreferrer"
                   className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-slate-900 transition hover:text-slate-600 dark:text-slate-100 dark:hover:text-slate-300"
                 >
-                  在浏览器中查看
+                  {GOVERNANCE_PAGE_COPY.params.openInExplorer}
                   <ExternalLink className="h-4 w-4" />
                 </a>
               </div>

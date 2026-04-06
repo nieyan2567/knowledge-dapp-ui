@@ -17,7 +17,6 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { BRANDING } from "@/lib/branding";
 import { FAUCET_COPY, getFaucetSuccessTitle } from "@/lib/faucet/copy";
-import { PAGE_TEST_IDS } from "@/lib/test-ids";
 
 export function ConnectAction() {
   return (
@@ -119,10 +118,7 @@ export function FaucetHeroSection({
         </div>
 
         <div className="space-y-4">
-          <h1
-            data-testid={PAGE_TEST_IDS.faucet}
-            className="max-w-3xl text-5xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-6xl"
-          >
+          <h1 className="max-w-3xl text-5xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-6xl">
             {FAUCET_COPY.page.heroTitle}
           </h1>
           <p className="max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-300">
