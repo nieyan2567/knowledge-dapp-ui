@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { formatEther } from "viem";
 import {
   useAccount,
   usePublicClient,
@@ -10,23 +9,19 @@ import {
 } from "wagmi";
 import { toast } from "sonner";
 
-import { ContentCard } from "@/components/content-card";
-import { CopyField } from "@/components/copy-field";
-import { FileDrop } from "@/components/file-drop";
+import {
+  ContentListSection,
+  ContentUploadSection,
+} from "@/components/content/content-page-sections";
 import { PageHeader } from "@/components/page-header";
-import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useUploadAuth } from "@/hooks/useUploadAuth";
-import { BRANDING } from "@/lib/branding";
 import {
   CONTENT_FETCH_CHUNK_SIZE,
   CONTENT_PAGE_COPY,
   CONTENTS_PER_PAGE,
   filterContentList,
-  formatContentCountSummary,
-  formatContentPaginationSummary,
-  formatUploadPolicyDescription,
   paginateContentList,
   parseContentResults,
   sortContentList,
@@ -369,170 +364,40 @@ export default function ContentPage() {
       />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-xl font-semibold text-slate-950 dark:text-slate-100">
-              {CONTENT_PAGE_COPY.listTitle}
-            </h2>
-            <div className="text-sm text-slate-500 dark:text-slate-400">
-              {formatContentCountSummary(sortedContents.length)}
-            </div>
-          </div>
+        <ContentListSection
+          search={search}
+          scope={scope}
+          sortBy={sortBy}
+          page={page}
+          totalPages={totalPages}
+          loadingList={loadingList}
+          sortedContentsLength={sortedContents.length}
+          pagedContents={pagedContents}
+          onSearchChange={setSearch}
+          onScopeChange={setScope}
+          onSortChange={setSortBy}
+          onPrevPage={() => setPage((current) => Math.max(1, current - 1))}
+          onNextPage={() => setPage((current) => Math.min(totalPages, current + 1))}
+          onActionComplete={refreshContentList}
+        />
 
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_180px_180px]">
-            <input
-              placeholder={CONTENT_PAGE_COPY.searchPlaceholder}
-              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-
-            <select
-              value={scope}
-              onChange={(event) => setScope(event.target.value as "all" | "mine")}
-              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-400"
-            >
-              <option value="all">{CONTENT_PAGE_COPY.scopeAll}</option>
-              <option value="mine">{CONTENT_PAGE_COPY.scopeMine}</option>
-            </select>
-
-            <select
-              value={sortBy}
-              onChange={(event) => setSortBy(event.target.value as ContentSortKey)}
-              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-400"
-            >
-              <option value="updated_desc">{CONTENT_PAGE_COPY.sortUpdated}</option>
-              <option value="created_desc">{CONTENT_PAGE_COPY.sortCreated}</option>
-              <option value="votes_desc">{CONTENT_PAGE_COPY.sortVotes}</option>
-              <option value="versions_desc">{CONTENT_PAGE_COPY.sortVersions}</option>
-            </select>
-          </div>
-
-          {loadingList ? (
-            <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-              {CONTENT_PAGE_COPY.loadingList}
-            </div>
-          ) : sortedContents.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-              {CONTENT_PAGE_COPY.emptyList}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                {pagedContents.map((item) => (
-                  <ContentCard
-                    key={item.id.toString()}
-                    content={item}
-                    onActionComplete={refreshContentList}
-                  />
-                ))}
-              </div>
-
-              <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  {formatContentPaginationSummary(
-                    page,
-                    totalPages,
-                    CONTENTS_PER_PAGE
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPage((current) => Math.max(1, current - 1))}
-                    disabled={page <= 1}
-                    className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    {CONTENT_PAGE_COPY.prevPage}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                    disabled={page >= totalPages}
-                    className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    {CONTENT_PAGE_COPY.nextPage}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <SectionCard
-            title={CONTENT_PAGE_COPY.uploadTitle}
-            description={CONTENT_PAGE_COPY.uploadDescription}
-          >
-            <div className="space-y-4">
-              <input
-                placeholder={CONTENT_PAGE_COPY.titlePlaceholder}
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
-              />
-
-              <textarea
-                placeholder={CONTENT_PAGE_COPY.descriptionPlaceholder}
-                value={desc}
-                onChange={(event) => setDesc(event.target.value)}
-                rows={4}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
-              />
-
-              <FileDrop file={file} onChange={handleFileChange} />
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
-                {formatUploadPolicyDescription(uploadMaxFileSizeText)}
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
-                <div className="font-medium text-slate-900 dark:text-slate-100">
-                  {CONTENT_PAGE_COPY.registerFeeTitle}
-                </div>
-                <div className="mt-1">
-                  {typeof registerFee === "bigint"
-                    ? registerFee > 0n
-                      ? `${formatEther(registerFee)} ${BRANDING.nativeTokenSymbol}`
-                      : CONTENT_PAGE_COPY.freeNow
-                    : CONTENT_PAGE_COPY.loadingFee}
-                </div>
-                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {CONTENT_PAGE_COPY.registerFeeDescription}
-                </div>
-              </div>
-
-              <button
-                onClick={handleUploadToIpfs}
-                disabled={!file || uploading || isAuthenticating}
-                className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-              >
-                {isAuthenticating
-                  ? CONTENT_PAGE_COPY.authenticating
-                  : uploading
-                    ? CONTENT_PAGE_COPY.uploading
-                    : CONTENT_PAGE_COPY.uploadToLocalIpfs}
-              </button>
-
-              {uploadedCid && (
-                <div className="space-y-3">
-                  <CopyField label="CID" value={uploadedCid} />
-                  <CopyField label={CONTENT_PAGE_COPY.localGatewayUrl} value={uploadedUrl} />
-                </div>
-              )}
-
-              <button
-                onClick={handleRegisterContent}
-                disabled={!uploadedCid || registering || registerFee === undefined}
-                className="w-full rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                {registering
-                  ? CONTENT_PAGE_COPY.registering
-                  : CONTENT_PAGE_COPY.registerOnchain}
-              </button>
-            </div>
-          </SectionCard>
-        </div>
+        <ContentUploadSection
+          title={title}
+          desc={desc}
+          file={file}
+          uploadedCid={uploadedCid}
+          uploadedUrl={uploadedUrl}
+          uploading={uploading}
+          registering={registering}
+          isAuthenticating={isAuthenticating}
+          registerFee={typeof registerFee === "bigint" ? registerFee : undefined}
+          uploadMaxFileSizeText={uploadMaxFileSizeText}
+          onTitleChange={setTitle}
+          onDescriptionChange={setDesc}
+          onFileChange={handleFileChange}
+          onUpload={handleUploadToIpfs}
+          onRegister={handleRegisterContent}
+        />
       </div>
     </main>
   );
