@@ -14,6 +14,7 @@ import {
   createFaucetClaimAuthorization,
   createRequestContextHashes,
   enforceFaucetRateLimit,
+  FaucetInfraError,
   formatFaucetAmount,
   getCooldownRemainingSeconds,
   getRequestIp,
@@ -22,6 +23,7 @@ import {
   markFaucetClaimed,
   rebalanceRevenueVault,
   releaseFaucetClaimLock,
+  runFaucetMaintenance,
   submitFaucetClaim,
 } from "@/lib/faucet/utils";
 import { captureServerException } from "@/lib/observability/server";
@@ -102,7 +104,28 @@ export async function POST(req: NextRequest) {
     }
 
     await enforceFaucetRateLimit("claim", address, ip);
-    await rebalanceRevenueVault();
+
+    const maintenance = await runFaucetMaintenance();
+    if (
+      BigInt(maintenance.relayer.balance) < BigInt(maintenance.relayer.alertMinBalance)
+    ) {
+      throw new FaucetInfraError("Faucet relayer 余额不足，请稍后重试。");
+    }
+
+    try {
+      await rebalanceRevenueVault();
+    } catch (error) {
+      await captureServerException("RevenueVault rebalance failed before faucet claim", {
+        source: "api.faucet.claim.rebalance",
+        severity: "warn",
+        request: req,
+        error,
+        alert: false,
+        context: {
+          address,
+        },
+      });
+    }
 
     const eligibility = await checkFaucetClaimEligibility(address, ip);
     if (!eligibility.ok) {

@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 
 import type { UploadAuthChallenge } from "@/lib/auth/message";
 import { getServerEnv } from "@/lib/env";
-import { getRedis } from "@/lib/redis";
+import { atomicGetDel, getRedis } from "@/lib/redis";
 
 type StoredUploadAuthChallenge = UploadAuthChallenge & {
   expiresAt: number;
@@ -105,7 +105,7 @@ async function takeUploadAuthChallengeInternal(
   const redis = await getRedis();
 
   if (redis) {
-    const raw = await redis.getDel(getNonceKey(nonce));
+    const raw = await atomicGetDel(getNonceKey(nonce));
 
     if (!raw) {
       return null;

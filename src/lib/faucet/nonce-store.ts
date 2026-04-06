@@ -3,7 +3,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 
 import { getServerEnv } from "@/lib/env";
-import { getRedis } from "@/lib/redis";
+import { atomicGetDel, getRedis } from "@/lib/redis";
 import type { FaucetAuthChallenge } from "@/lib/faucet/message";
 
 type StoredFaucetChallenge = FaucetAuthChallenge & {
@@ -98,7 +98,7 @@ export async function takeFaucetAuthChallenge(
   const redis = await getRedis();
 
   if (redis) {
-    const raw = await redis.getDel(getNonceKey(nonce));
+    const raw = await atomicGetDel(getNonceKey(nonce));
 
     if (!raw) {
       return null;

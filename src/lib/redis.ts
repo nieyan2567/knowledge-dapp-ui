@@ -33,6 +33,14 @@ function createRedisClient(): KnowledgeRedisClient | null {
   return client;
 }
 
+const ATOMIC_GET_DEL_SCRIPT = `
+local value = redis.call("GET", KEYS[1])
+if value then
+  redis.call("DEL", KEYS[1])
+end
+return value
+`;
+
 export async function getRedis(): Promise<KnowledgeRedisClient | null> {
   if (!getServerEnv().REDIS_URL) {
     return null;
@@ -64,4 +72,21 @@ export async function getRedis(): Promise<KnowledgeRedisClient | null> {
   }
 
   return globalThis.__knowledgeRedisConnectPromise;
+}
+
+export async function atomicGetDel(key: string): Promise<string | null> {
+  const client = await getRedis();
+
+  if (!client) {
+    return null;
+  }
+
+  const value = await client.sendCommand<string | null>([
+    "EVAL",
+    ATOMIC_GET_DEL_SCRIPT,
+    "1",
+    key,
+  ]);
+
+  return value ?? null;
 }

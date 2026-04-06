@@ -10,12 +10,15 @@ import {
   createFaucetClaimAuthorization,
   createRequestContextHashes,
   enforceFaucetRateLimit,
+  FaucetInfraError,
   formatFaucetAmount,
   getCooldownRemainingSeconds,
   getRequestIp,
   getRequestUserAgent,
+  isFaucetError,
   markFaucetClaimed,
   rebalanceRevenueVault,
+  runFaucetMaintenance,
   submitFaucetClaim,
 } from "@/lib/faucet/utils";
 import { verifyMessage } from "viem";
@@ -34,6 +37,9 @@ vi.mock("@/lib/faucet/utils", () => ({
   createFaucetClaimAuthorization: vi.fn(),
   createRequestContextHashes: vi.fn(),
   enforceFaucetRateLimit: vi.fn(),
+  FaucetInfraError: class FaucetInfraError extends Error {
+    status = 503;
+  },
   formatFaucetAmount: vi.fn(),
   getCooldownRemainingSeconds: vi.fn(),
   getRequestIp: vi.fn(),
@@ -42,6 +48,7 @@ vi.mock("@/lib/faucet/utils", () => ({
   markFaucetClaimed: vi.fn(),
   rebalanceRevenueVault: vi.fn(),
   releaseFaucetClaimLock: vi.fn(),
+  runFaucetMaintenance: vi.fn(),
   submitFaucetClaim: vi.fn(),
 }));
 
@@ -84,6 +91,23 @@ describe("POST /api/faucet/claim", () => {
     });
     vi.mocked(verifyMessage).mockResolvedValue(true);
     vi.mocked(enforceFaucetRateLimit).mockResolvedValue(undefined);
+    vi.mocked(runFaucetMaintenance).mockResolvedValue({
+      status: "ok",
+      relayer: {
+        address: "0x6c7a4f6C81B0d9dc937fC04e5090b168F050dbCF",
+        balance: "100000000000000000",
+        alertMinBalance: "50000000000000000",
+      },
+      topUp: { attempted: false },
+      faucetVault: {
+        address: "0xd0de0912991896691E3671157A2adada5B102aFB",
+        balance: "100000000000000000000",
+        claimAmount: "2000000000000000000",
+        availableBudget: "20000000000000000000",
+        paused: false,
+      },
+      issues: [],
+    });
     vi.mocked(checkFaucetClaimEligibility).mockResolvedValue({
       ok: true,
       amount: 2n,
@@ -177,6 +201,7 @@ describe("POST /api/faucet/claim", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(runFaucetMaintenance).toHaveBeenCalledTimes(1);
     expect(rebalanceRevenueVault).toHaveBeenCalledTimes(1);
     expect(createFaucetClaimAuthorization).toHaveBeenCalledTimes(1);
     expect(
@@ -208,5 +233,63 @@ describe("POST /api/faucet/claim", () => {
       displayAmount: "2 KC",
     });
     expect(String(body.address).toLowerCase()).toBe(address.toLowerCase());
+  });
+
+  it("continues the claim flow when revenue vault rebalance fails", async () => {
+    vi.mocked(rebalanceRevenueVault).mockRejectedValueOnce(new Error("rebalance failed"));
+
+    const { POST } = await import("@/app/api/faucet/claim/route");
+    const response = await POST(
+      createJsonRequest("http://localhost/api/faucet/claim", "POST", {
+        address,
+        nonce: "nonce-1",
+        signature: "0x1234",
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(runFaucetMaintenance).toHaveBeenCalledTimes(1);
+    expect(rebalanceRevenueVault).toHaveBeenCalledTimes(1);
+    expect(submitFaucetClaim).toHaveBeenCalledTimes(1);
+    expect(markFaucetClaimed).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 503 when relayer balance is still below threshold after maintenance", async () => {
+    vi.mocked(runFaucetMaintenance).mockResolvedValueOnce({
+      status: "degraded",
+      relayer: {
+        address: "0x6c7a4f6C81B0d9dc937fC04e5090b168F050dbCF",
+        balance: "0",
+        alertMinBalance: "50000000000000000",
+      },
+      topUp: {
+        attempted: true,
+        error: "Top-up failed",
+      },
+      faucetVault: {
+        address: "0xd0de0912991896691E3671157A2adada5B102aFB",
+        balance: "100000000000000000000",
+        claimAmount: "2000000000000000000",
+        availableBudget: "20000000000000000000",
+        paused: false,
+      },
+      issues: ["Top-up failed"],
+    });
+
+    vi.mocked(isFaucetError).mockImplementation(
+      (error) => error instanceof FaucetInfraError
+    );
+
+    const { POST } = await import("@/app/api/faucet/claim/route");
+    const response = await POST(
+      createJsonRequest("http://localhost/api/faucet/claim", "POST", {
+        address,
+        nonce: "nonce-1",
+        signature: "0x1234",
+      })
+    );
+
+    expect(response.status).toBe(503);
+    expect(submitFaucetClaim).not.toHaveBeenCalled();
   });
 });
