@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useAccount,
   usePublicClient,
-  useReadContract,
   useWriteContract,
 } from "wagmi";
 import { toast } from "sonner";
@@ -18,15 +17,19 @@ import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useUploadAuth } from "@/hooks/useUploadAuth";
 import {
-  CONTENT_FETCH_CHUNK_SIZE,
   CONTENT_PAGE_COPY,
   CONTENTS_PER_PAGE,
   filterContentList,
   paginateContentList,
-  parseContentResults,
   sortContentList,
 } from "@/lib/content-page-helpers";
+import {
+  readContentCountFromChain,
+  readContentsFromChain,
+} from "@/lib/content-chain";
+import { fetchAllIndexedContents, fetchIndexedSystemSnapshot } from "@/lib/indexer-api";
 import { reportClientError } from "@/lib/observability/client";
+import { readContentRegisterFeeFromChain } from "@/lib/system-chain";
 import { PAGE_TEST_IDS } from "@/lib/test-ids";
 import { txToast, writeTxToast } from "@/lib/tx-toast";
 import {
@@ -34,7 +37,6 @@ import {
   getUploadMaxFileSizeBytes,
   validateUploadFile,
 } from "@/lib/upload-policy";
-import { asContentData } from "@/lib/web3-types";
 import type { ContentCardData } from "@/types/content";
 
 type ContentSortKey =
@@ -78,79 +80,57 @@ export default function ContentPage() {
   const [page, setPage] = useState(1);
   const [contentList, setContentList] = useState<ContentCardData[]>([]);
   const [loadingList, setLoadingList] = useState(false);
+  const [registerFee, setRegisterFee] = useState<bigint | undefined>(undefined);
 
   const uploadMaxFileSizeText = useMemo(
     () => formatUploadFileSize(getUploadMaxFileSizeBytes()),
     []
   );
 
-  const { data: contentCount, refetch: refetchContentCount } = useReadContract({
-    address: CONTRACTS.KnowledgeContent as `0x${string}`,
-    abi: ABIS.KnowledgeContent,
-    functionName: "contentCount",
-  });
-
-  const { data: registerFee } = useReadContract({
-    address: CONTRACTS.KnowledgeContent as `0x${string}`,
-    abi: ABIS.KnowledgeContent,
-    functionName: "registerFee",
-  });
-
   const readContents = useCallback(
     async (total: number) => {
       if (!publicClient || total <= 0) {
-        return [];
+        return [] satisfies ContentCardData[];
       }
 
-      const ids = Array.from({ length: total }, (_, index) => BigInt(index + 1));
-      const parsedContents: ContentCardData[] = [];
-
-      for (let start = 0; start < ids.length; start += CONTENT_FETCH_CHUNK_SIZE) {
-        const chunk = ids.slice(start, start + CONTENT_FETCH_CHUNK_SIZE);
-        const chunkResults = await Promise.all(
-          chunk.map((id) =>
-            publicClient.readContract({
-              address: CONTRACTS.KnowledgeContent as `0x${string}`,
-              abi: ABIS.KnowledgeContent,
-              functionName: "contents",
-              args: [id],
-            })
-          )
-        );
-        const rewardAccrualCounts = (await Promise.all(
-          chunk.map((id) =>
-            publicClient.readContract({
-              address: CONTRACTS.KnowledgeContent as `0x${string}`,
-              abi: ABIS.KnowledgeContent,
-              functionName: "rewardAccrualCount",
-              args: [id],
-            })
-          )
-        )) as bigint[];
-
-        const parsedChunk = parseContentResults(
-          chunkResults,
-          rewardAccrualCounts,
-          asContentData
-        );
-        parsedContents.push(...parsedChunk);
-      }
-
-      return parsedContents;
+      return readContentsFromChain(publicClient, total);
     },
     [publicClient]
   );
 
-  const refreshContentList = useCallback(async () => {
-    if (!publicClient) {
-      setContentList([]);
+  const loadRegisterFee = useCallback(async () => {
+    const indexedSystemSnapshot = await fetchIndexedSystemSnapshot();
+
+    if (indexedSystemSnapshot) {
+      setRegisterFee(BigInt(indexedSystemSnapshot.content_register_fee_amount));
       return;
     }
 
+    if (!publicClient) {
+      setRegisterFee(undefined);
+      return;
+    }
+
+    setRegisterFee(await readContentRegisterFeeFromChain(publicClient));
+  }, [publicClient]);
+
+  const refreshContentList = useCallback(async () => {
     setLoadingList(true);
 
     try {
-      const latestCount = Number((await refetchContentCount()).data ?? 0n);
+      const indexedContents = await fetchAllIndexedContents();
+
+      if (indexedContents) {
+        setContentList(indexedContents);
+        return;
+      }
+
+      if (!publicClient) {
+        setContentList([]);
+        return;
+      }
+
+      const latestCount = Number(await readContentCountFromChain(publicClient));
       const parsed = await readContents(latestCount);
       setContentList(parsed);
     } catch (error) {
@@ -159,21 +139,33 @@ export default function ContentPage() {
     } finally {
       setLoadingList(false);
     }
-  }, [publicClient, readContents, refetchContentCount]);
+  }, [publicClient, readContents]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadContents() {
-      if (!publicClient || contentCount === undefined) {
-        setContentList([]);
-        return;
-      }
-
       setLoadingList(true);
 
       try {
-        const parsed = await readContents(Number(contentCount));
+        const indexedContents = await fetchAllIndexedContents();
+
+        if (indexedContents) {
+          if (!cancelled) {
+            setContentList(indexedContents);
+          }
+          return;
+        }
+
+        if (!publicClient) {
+          if (!cancelled) {
+            setContentList([]);
+          }
+          return;
+        }
+
+        const chainContentCount = await readContentCountFromChain(publicClient);
+        const parsed = await readContents(Number(chainContentCount));
 
         if (!cancelled) {
           setContentList(parsed);
@@ -195,7 +187,11 @@ export default function ContentPage() {
     return () => {
       cancelled = true;
     };
-  }, [contentCount, publicClient, readContents]);
+  }, [publicClient, readContents]);
+
+  useEffect(() => {
+    void loadRegisterFee();
+  }, [loadRegisterFee]);
 
   const filteredContents = useMemo(() => {
     return filterContentList(contentList, scope, address, search);
@@ -390,7 +386,7 @@ export default function ContentPage() {
           uploading={uploading}
           registering={registering}
           isAuthenticating={isAuthenticating}
-          registerFee={typeof registerFee === "bigint" ? registerFee : undefined}
+          registerFee={registerFee}
           uploadMaxFileSizeText={uploadMaxFileSizeText}
           onTitleChange={setTitle}
           onDescriptionChange={setDesc}

@@ -4,13 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatEther } from "viem";
-import {
-  useAccount,
-  useBlockNumber,
-  usePublicClient,
-  useReadContract,
-  useWriteContract,
-} from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -24,20 +18,21 @@ import { AddressBadge } from "@/components/address-badge";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
+import { useLiveChainClock } from "@/hooks/useLiveChainClock";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 import { BRANDING } from "@/lib/branding";
 import { GOVERNANCE_DETAIL_COPY } from "@/lib/governance-detail-helpers";
+import { readProposalDetailFromChain } from "@/lib/governance-chain";
 import {
   getProposalStageCountdown,
   governanceStateBadgeClass as stateBadgeClass,
   governanceStateLabel as stateLabel,
   summarizeProposalActions,
 } from "@/lib/governance";
+import { fetchIndexedProposalDetail } from "@/lib/indexer-api";
 import { reportClientError } from "@/lib/observability/client";
-import { fetchProposalDetail } from "@/lib/proposal-events";
 import { writeTxToast } from "@/lib/tx-toast";
-import { asBigInt, asProposalVotes } from "@/lib/web3-types";
 import type { ProposalItem, ProposalVotes } from "@/types/governance";
 
 function explorerProposalUrl(txHash: string) {
@@ -59,16 +54,21 @@ export default function ProposalDetailPage() {
   const params = useParams();
   const publicClient = usePublicClient();
   const { address } = useAccount();
-  const { data: blockNumber } = useBlockNumber({ watch: true });
   const { writeContractAsync } = useWriteContract();
   const refreshAfterTx = useRefreshOnTxConfirmed();
+  const { nowTs, liveBlockNumber } = useLiveChainClock();
 
   const [proposalDetail, setProposalDetail] = useState<ProposalItem | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [nowTs, setNowTs] = useState(() => Math.floor(Date.now() / 1000));
-  const [liveBlockNumber, setLiveBlockNumber] = useState<bigint | undefined>(
-    typeof blockNumber === "bigint" ? blockNumber : undefined
+  const [liveProposalState, setLiveProposalState] = useState<bigint | undefined>(
+    undefined
   );
+  const [liveProposalEta, setLiveProposalEta] = useState<bigint | undefined>(undefined);
+  const [liveVotes, setLiveVotes] = useState<ProposalVotes>({
+    againstVotes: 0n,
+    forVotes: 0n,
+    abstainVotes: 0n,
+  });
 
   const proposalId = useMemo(() => {
     const raw = typeof params?.id === "string" ? params.id : null;
@@ -78,79 +78,9 @@ export default function ProposalDetailPage() {
     return BigInt(raw);
   }, [params]);
 
-  const { data: state, refetch: refetchState } = useReadContract({
-    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-    abi: ABIS.KnowledgeGovernor,
-    functionName: "state",
-    args: proposalId ? [proposalId] : undefined,
-    query: { enabled: !!proposalId },
-  });
-
-  const { data: votes, refetch: refetchVotes } = useReadContract({
-    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-    abi: ABIS.KnowledgeGovernor,
-    functionName: "proposalVotes",
-    args: proposalId ? [proposalId] : undefined,
-    query: { enabled: !!proposalId },
-  });
-
-  const { data: proposalEta, refetch: refetchProposalEta } = useReadContract({
-    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-    abi: ABIS.KnowledgeGovernor,
-    functionName: "proposalEta",
-    args: proposalId ? [proposalId] : undefined,
-    query: { enabled: !!proposalId },
-  });
-
-  const proposalState = asBigInt(state);
-  const proposalEtaValue = asBigInt(proposalEta);
-  const voteData: ProposalVotes =
-    asProposalVotes(votes) ?? {
-      againstVotes: 0n,
-      forVotes: 0n,
-      abstainVotes: 0n,
-    };
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNowTs(Math.floor(Date.now() / 1000));
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (typeof blockNumber === "bigint") {
-      setLiveBlockNumber(blockNumber);
-    }
-  }, [blockNumber]);
-
-  useEffect(() => {
-    if (!publicClient) return;
-
-    let cancelled = false;
-
-    const updateBlockNumber = async () => {
-      try {
-        const latestBlock = await publicClient.getBlockNumber();
-        if (!cancelled) {
-          setLiveBlockNumber(latestBlock);
-        }
-      } catch {
-        // Keep the latest known block when polling fails transiently.
-      }
-    };
-
-    void updateBlockNumber();
-    const timer = window.setInterval(() => {
-      void updateBlockNumber();
-    }, 8000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [publicClient]);
+  const proposalState = liveProposalState;
+  const proposalEtaValue = liveProposalEta;
+  const voteData: ProposalVotes = liveVotes;
 
   const totalVotes =
     voteData.forVotes + voteData.againstVotes + voteData.abstainVotes;
@@ -203,8 +133,27 @@ export default function ProposalDetailPage() {
 
     setLoadingDetail(true);
     try {
-      const detail = await fetchProposalDetail(publicClient, proposalId);
-      setProposalDetail(detail);
+      const indexedDetail = await fetchIndexedProposalDetail(proposalId);
+
+      if (indexedDetail) {
+        setProposalDetail(indexedDetail);
+        setLiveProposalState(indexedDetail.stateValue);
+        setLiveProposalEta(indexedDetail.etaSecond);
+        setLiveVotes(
+          indexedDetail.votes ?? {
+            againstVotes: 0n,
+            forVotes: 0n,
+            abstainVotes: 0n,
+          }
+        );
+        return;
+      }
+
+      const fallbackDetail = await readProposalDetailFromChain(publicClient, proposalId);
+      setProposalDetail(fallbackDetail.detail);
+      setLiveProposalState(fallbackDetail.state);
+      setLiveProposalEta(fallbackDetail.eta);
+      setLiveVotes(fallbackDetail.votes);
     } catch (error) {
       reportProposalDetailError("Failed to load proposal detail", error);
     } finally {
@@ -217,13 +166,8 @@ export default function ProposalDetailPage() {
   }, [loadProposalDetail]);
 
   const refreshProposalDetail = useCallback(async () => {
-    await Promise.all([
-      refetchProposalEta(),
-      refetchState(),
-      refetchVotes(),
-      loadProposalDetail(),
-    ]);
-  }, [loadProposalDetail, refetchProposalEta, refetchState, refetchVotes]);
+    await loadProposalDetail();
+  }, [loadProposalDetail]);
 
   const governanceRefreshDomains = useMemo(
     () => ["governance", "system"] as const,
@@ -241,8 +185,8 @@ export default function ProposalDetailPage() {
       return;
     }
 
-    void Promise.all([refetchProposalEta(), refetchState(), refetchVotes()]);
-  }, [liveBlockNumber, proposalId, refetchProposalEta, refetchState, refetchVotes]);
+    void loadProposalDetail();
+  }, [liveBlockNumber, proposalId, loadProposalDetail]);
 
   async function vote(support: 0 | 1 | 2) {
     if (!address || !proposalId) {

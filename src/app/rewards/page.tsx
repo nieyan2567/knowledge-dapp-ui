@@ -5,14 +5,19 @@ import { Coins, ExternalLink, ShieldCheck, Wallet } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { formatEther } from "viem";
-import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
+import { usePollingEffect } from "@/hooks/usePollingEffect";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 import { BRANDING } from "@/lib/branding";
+import {
+  fetchIndexedProfileSummary,
+  fetchIndexedSystemSnapshot,
+} from "@/lib/indexer-api";
 import { reportClientError } from "@/lib/observability/client";
 import {
   formatRewardBlockSummary,
@@ -24,13 +29,16 @@ import {
   REWARDS_PAGE_COPY,
 } from "@/lib/rewards-page-helpers";
 import {
-  fetchRewardActivity,
   type RewardHistoryItem,
   type RewardSourceItem,
 } from "@/lib/reward-events";
+import { readRewardActivityWithFallback } from "@/lib/reward-chain";
+import {
+  readPendingRewardsFromChain,
+  readRewardBudgetFromChain,
+} from "@/lib/system-chain";
 import { PAGE_TEST_IDS } from "@/lib/test-ids";
 import { writeTxToast } from "@/lib/tx-toast";
-import { asBigInt } from "@/lib/web3-types";
 
 type HistoryFilter = (typeof REWARD_HISTORY_FILTERS)[number];
 
@@ -59,6 +67,9 @@ export default function RewardsPage() {
   const [loadingRewardActivity, setLoadingRewardActivity] = useState(false);
   const [rewardHistory, setRewardHistory] = useState<RewardHistoryItem[]>([]);
   const [rewardSources, setRewardSources] = useState<RewardSourceItem[]>([]);
+  const [pendingValue, setPendingValue] = useState<bigint>(0n);
+  const [budgetValue, setBudgetValue] = useState<bigint>(0n);
+  const [spentValue, setSpentValue] = useState<bigint>(0n);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPageSize, setHistoryPageSize] = useState<
     (typeof REWARD_PAGE_SIZE_OPTIONS)[number]
@@ -69,34 +80,41 @@ export default function RewardsPage() {
     (typeof REWARD_PAGE_SIZE_OPTIONS)[number]
   >(3);
 
-  const { data: pendingRewards, refetch: refetchPendingRewards } = useReadContract({
-    address: CONTRACTS.TreasuryNative as `0x${string}`,
-    abi: ABIS.TreasuryNative,
-    functionName: "pendingRewards",
-    args: address ? [address] : undefined,
-    query: { enabled: !!address },
-  });
-
-  const { data: epochBudget, refetch: refetchEpochBudget } = useReadContract({
-    address: CONTRACTS.TreasuryNative as `0x${string}`,
-    abi: ABIS.TreasuryNative,
-    functionName: "epochBudget",
-  });
-
-  const { data: epochSpent, refetch: refetchEpochSpent } = useReadContract({
-    address: CONTRACTS.TreasuryNative as `0x${string}`,
-    abi: ABIS.TreasuryNative,
-    functionName: "epochSpent",
-  });
-
-  const pendingValue = asBigInt(pendingRewards);
-  const budgetValue = asBigInt(epochBudget);
-  const spentValue = asBigInt(epochSpent);
-
   const pending = pendingValue ? Number(formatEther(pendingValue)) : 0;
   const budget = budgetValue ? Number(formatEther(budgetValue)) : 0;
   const spent = spentValue ? Number(formatEther(spentValue)) : 0;
   const progress = budget ? Math.min((spent / budget) * 100, 100) : 0;
+
+  const loadRewardSummary = useCallback(async () => {
+    const [indexedSummary, indexedSystemSnapshot] = await Promise.all([
+      address ? fetchIndexedProfileSummary(address) : Promise.resolve(null),
+      fetchIndexedSystemSnapshot(),
+    ]);
+
+    if (indexedSummary) {
+      setPendingValue(BigInt(indexedSummary.pending_reward_amount));
+    } else if (publicClient && address) {
+      setPendingValue(await readPendingRewardsFromChain(publicClient, address));
+    } else {
+      setPendingValue(0n);
+    }
+
+    if (indexedSystemSnapshot) {
+      setBudgetValue(BigInt(indexedSystemSnapshot.epoch_budget_amount));
+      setSpentValue(BigInt(indexedSystemSnapshot.epoch_spent_amount));
+      return;
+    }
+
+    if (!publicClient) {
+      setBudgetValue(0n);
+      setSpentValue(0n);
+      return;
+    }
+
+    const budgetSnapshot = await readRewardBudgetFromChain(publicClient);
+    setBudgetValue(budgetSnapshot.epochBudget);
+    setSpentValue(budgetSnapshot.epochSpent);
+  }, [address, publicClient]);
 
   const loadRewardActivity = useCallback(async () => {
     if (!publicClient || !address) {
@@ -108,10 +126,10 @@ export default function RewardsPage() {
     setLoadingRewardActivity(true);
 
     try {
-      const { historyItems, rewardSources } = await fetchRewardActivity(publicClient, {
-        author: address,
-        beneficiary: address,
-      });
+      const { historyItems, rewardSources } = await readRewardActivityWithFallback(
+        publicClient,
+        address
+      );
 
       setRewardHistory(historyItems);
       setRewardSources(rewardSources);
@@ -125,12 +143,10 @@ export default function RewardsPage() {
 
   const refreshRewardsData = useCallback(async () => {
     await Promise.all([
-      refetchPendingRewards(),
-      refetchEpochBudget(),
-      refetchEpochSpent(),
+      loadRewardSummary(),
       loadRewardActivity(),
     ]);
-  }, [loadRewardActivity, refetchEpochBudget, refetchEpochSpent, refetchPendingRewards]);
+  }, [loadRewardActivity, loadRewardSummary]);
 
   const rewardRefreshDomains = useMemo(
     () => ["rewards", "content", "dashboard", "system"] as const,
@@ -141,18 +157,10 @@ export default function RewardsPage() {
   useTxEventRefetch(rewardRefreshDomains, rewardRefetchers);
 
   useEffect(() => {
-    void loadRewardActivity();
-  }, [loadRewardActivity]);
+    void Promise.all([loadRewardActivity(), loadRewardSummary()]);
+  }, [loadRewardActivity, loadRewardSummary]);
 
-  useEffect(() => {
-    if (!address) return;
-
-    const timer = window.setInterval(() => {
-      void refreshRewardsData();
-    }, 30000);
-
-    return () => window.clearInterval(timer);
-  }, [address, refreshRewardsData]);
+  usePollingEffect(() => refreshRewardsData(), 30000, !!address);
 
   const filteredRewardHistory = useMemo(
     () =>

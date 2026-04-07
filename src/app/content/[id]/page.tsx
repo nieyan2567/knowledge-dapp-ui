@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 
 import {
@@ -26,8 +26,14 @@ import {
   buildContentStatusSummary,
   CONTENT_DETAIL_COPY,
 } from "@/lib/content-detail-helpers";
+import { readContentDetailFromChain } from "@/lib/content-chain";
+import {
+  fetchIndexedContentDetail,
+  fetchIndexedSystemSnapshot,
+} from "@/lib/indexer-api";
 import { getIpfsFileUrl } from "@/lib/ipfs";
 import { reportClientError } from "@/lib/observability/client";
+import { readContentUpdateConfigFromChain } from "@/lib/system-chain";
 import { PAGE_TEST_IDS } from "@/lib/test-ids";
 import { txToast, writeTxToast } from "@/lib/tx-toast";
 import {
@@ -35,8 +41,7 @@ import {
   getUploadMaxFileSizeBytes,
   validateUploadFile,
 } from "@/lib/upload-policy";
-import { asContentData, asContentVersion } from "@/lib/web3-types";
-import type { ContentVersionData } from "@/types/content";
+import type { ContentData, ContentVersionData } from "@/types/content";
 
 function reportContentDetailError(
   message: string,
@@ -72,6 +77,14 @@ export default function ContentDetailPage() {
   const [restoring, setRestoring] = useState(false);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [versions, setVersions] = useState<ContentVersionData[]>([]);
+  const [content, setContent] = useState<ContentData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [versionCount, setVersionCount] = useState<bigint>(0n);
+  const [rewardAccrualCount, setRewardAccrualCount] = useState<bigint>(0n);
+  const [maxVersionsPerContent, setMaxVersionsPerContent] = useState<bigint | undefined>(
+    undefined
+  );
+  const [updateFee, setUpdateFee] = useState<bigint | undefined>(undefined);
 
   const rawId = params?.id;
   const contentId = useMemo(() => {
@@ -85,116 +98,72 @@ export default function ContentDetailPage() {
     []
   );
 
-  const {
-    data: contentData,
-    isLoading,
-    refetch: refetchContent,
-  } = useReadContract({
-    address: CONTRACTS.KnowledgeContent as `0x${string}`,
-    abi: ABIS.KnowledgeContent,
-    functionName: "contents",
-    args: contentId ? [contentId] : undefined,
-    query: {
-      enabled: !!contentId,
-    },
-  });
+  const loadDetail = useCallback(async () => {
+    if (!contentId) {
+      setContent(null);
+      setVersions([]);
+      setIsLoading(false);
+      return;
+    }
 
-  const {
-    data: versionCountData,
-    refetch: refetchVersionCount,
-  } = useReadContract({
-    address: CONTRACTS.KnowledgeContent as `0x${string}`,
-    abi: ABIS.KnowledgeContent,
-    functionName: "contentVersionCount",
-    args: contentId ? [contentId] : undefined,
-    query: {
-      enabled: !!contentId,
-    },
-  });
+    setIsLoading(true);
+    setLoadingVersions(true);
 
-  const { data: rewardAccrualCountData } = useReadContract({
-    address: CONTRACTS.KnowledgeContent as `0x${string}`,
-    abi: ABIS.KnowledgeContent,
-    functionName: "rewardAccrualCount",
-    args: contentId ? [contentId] : undefined,
-    query: {
-      enabled: !!contentId,
-    },
-  });
+    try {
+      const [indexedDetail, indexedSystemSnapshot] = await Promise.all([
+        fetchIndexedContentDetail(contentId),
+        fetchIndexedSystemSnapshot(),
+      ]);
 
-  const { data: maxVersionsPerContentData } = useReadContract({
-    address: CONTRACTS.KnowledgeContent as `0x${string}`,
-    abi: ABIS.KnowledgeContent,
-    functionName: "maxVersionsPerContent",
-  });
+      if (indexedDetail) {
+        setContent(indexedDetail.content);
+        setVersions(indexedDetail.versions);
+        setVersionCount(BigInt(indexedDetail.versions.length));
+        setRewardAccrualCount(indexedDetail.content.rewardAccrualCount);
+        if (indexedSystemSnapshot) {
+          setMaxVersionsPerContent(
+            BigInt(indexedSystemSnapshot.max_versions_per_content)
+          );
+          setUpdateFee(BigInt(indexedSystemSnapshot.content_update_fee_amount));
+        } else if (publicClient) {
+          const updateConfig = await readContentUpdateConfigFromChain(publicClient);
+          setMaxVersionsPerContent(updateConfig.maxVersionsPerContent);
+          setUpdateFee(updateConfig.updateFee);
+        }
+        return;
+      }
 
-  const { data: updateFeeData } = useReadContract({
-    address: CONTRACTS.KnowledgeContent as `0x${string}`,
-    abi: ABIS.KnowledgeContent,
-    functionName: "updateFee",
-  });
-
-  const content = asContentData(contentData);
-  const versionCount = typeof versionCountData === "bigint" ? versionCountData : 0n;
-  const rewardAccrualCount =
-    typeof rewardAccrualCountData === "bigint" ? rewardAccrualCountData : 0n;
-  const maxVersionsPerContent =
-    typeof maxVersionsPerContentData === "bigint" ? maxVersionsPerContentData : undefined;
-  const updateFee = typeof updateFeeData === "bigint" ? updateFeeData : undefined;
-
-  const loadVersions = useCallback(
-    async (countOverride?: bigint) => {
-      if (!publicClient || !contentId) {
+      if (!publicClient) {
+        setContent(null);
         setVersions([]);
         return;
       }
 
-      const total = Number(countOverride ?? versionCount);
+      const [fallbackDetail, updateConfig] = await Promise.all([
+        readContentDetailFromChain(publicClient, contentId),
+        readContentUpdateConfigFromChain(publicClient),
+      ]);
 
-      if (total <= 0) {
-        setVersions([]);
-        return;
-      }
-
-      setLoadingVersions(true);
-
-      try {
-        const versionIds = Array.from({ length: total }, (_, index) => BigInt(index + 1));
-        const results = await Promise.all(
-          versionIds.map((version) =>
-            publicClient.readContract({
-              address: CONTRACTS.KnowledgeContent as `0x${string}`,
-              abi: ABIS.KnowledgeContent,
-              functionName: "getContentVersion",
-              args: [contentId, version],
-            })
-          )
-        );
-
-        const parsed = results
-          .map((item, index) => asContentVersion(item, versionIds[index]))
-          .filter((item): item is ContentVersionData => !!item)
-          .sort((left, right) => Number(right.version - left.version));
-
-        setVersions(parsed);
-      } catch (error) {
-        reportContentDetailError("Failed to load content version history", error, {
-          contentId: contentId.toString(),
-        });
-        toast.error(CONTENT_DETAIL_COPY.loadVersionsFailed);
-      } finally {
-        setLoadingVersions(false);
-      }
-    },
-    [contentId, publicClient, versionCount]
-  );
+      setContent(fallbackDetail.content);
+      setVersionCount(fallbackDetail.versionCount);
+      setRewardAccrualCount(fallbackDetail.rewardAccrualCount);
+      setVersions(fallbackDetail.versions);
+      setMaxVersionsPerContent(updateConfig.maxVersionsPerContent);
+      setUpdateFee(updateConfig.updateFee);
+    } catch (error) {
+      reportContentDetailError("Failed to load content detail", error, {
+        contentId: contentId.toString(),
+      });
+      toast.error(CONTENT_DETAIL_COPY.loadVersionsFailed);
+    } finally {
+      setIsLoading(false);
+      setLoadingVersions(false);
+    }
+  }, [contentId, publicClient]);
 
   const refreshDetail = useCallback(async () => {
-    const [, versionResult] = await Promise.all([refetchContent(), refetchVersionCount()]);
-    await loadVersions(
-      typeof versionResult.data === "bigint" ? versionResult.data : undefined
-    );
-  }, [loadVersions, refetchContent, refetchVersionCount]);
+    await loadDetail();
+  }, [loadDetail]);
 
   const currentContentId = content?.id;
   const currentContentTitle = content?.title;
@@ -223,8 +192,8 @@ export default function ContentDetailPage() {
   ]);
 
   useEffect(() => {
-    void loadVersions();
-  }, [loadVersions]);
+    void loadDetail();
+  }, [loadDetail]);
 
   const handleCopyToClipboard = useCallback(
     async (value: string, label: string) => {

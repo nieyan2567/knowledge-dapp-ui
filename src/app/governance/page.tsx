@@ -3,15 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useAccount,
-  useBlockNumber,
   usePublicClient,
-  useReadContract,
   useWriteContract,
 } from "wagmi";
 import { toast } from "sonner";
 
 import { GovernancePageLayout } from "@/components/governance/governance-page-layout";
 import { ABIS, CONTRACTS } from "@/contracts";
+import { useLiveChainClock } from "@/hooks/useLiveChainClock";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 import {
@@ -29,10 +28,13 @@ import {
   MAX_GOVERNANCE_DRAFT_ACTIONS,
   moveGovernanceItem,
 } from "@/lib/governance-page-helpers";
+import { fetchIndexedSystemSnapshot } from "@/lib/indexer-api";
+import {
+  readProposalListWithFallback,
+} from "@/lib/governance-chain";
 import { reportClientError } from "@/lib/observability/client";
-import { fetchParsedProposals } from "@/lib/proposal-events";
+import { readGovernanceConfigFromChain } from "@/lib/system-chain";
 import { writeTxToast } from "@/lib/tx-toast";
-import { asBigInt } from "@/lib/web3-types";
 import type {
   GovernanceDraftAction,
   GovernanceTemplateDefinition,
@@ -62,10 +64,10 @@ function reportGovernancePageError(message: string, error: unknown) {
 
 export default function GovernancePage() {
   const { address } = useAccount();
-  const { data: blockNumber } = useBlockNumber({ watch: true });
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const refreshAfterTx = useRefreshOnTxConfirmed();
+  const { nowTs, liveBlockNumber } = useLiveChainClock();
 
   const [description, setDescription] = useState("提案：更新治理参数");
   const [draftActions, setDraftActions] = useState<GovernanceDraftAction[]>(() => [
@@ -74,95 +76,21 @@ export default function GovernancePage() {
   const [highRiskConfirmed, setHighRiskConfirmed] = useState(false);
   const [loadingProposals, setLoadingProposals] = useState(false);
   const [proposals, setProposals] = useState<ProposalItem[]>([]);
-  const [nowTs, setNowTs] = useState(() => Math.floor(Date.now() / 1000));
-  const [liveBlockNumber, setLiveBlockNumber] = useState<bigint | undefined>(
-    typeof blockNumber === "bigint" ? blockNumber : undefined
-  );
+  const [governanceConfig, setGovernanceConfig] = useState<{
+    proposalThreshold: bigint;
+    votingDelay: bigint;
+    votingPeriod: bigint;
+    proposalFee: bigint;
+  }>({
+    proposalThreshold: 0n,
+    votingDelay: 0n,
+    votingPeriod: 0n,
+    proposalFee: 0n,
+  });
   const latestProposal = proposals[0];
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNowTs(Math.floor(Date.now() / 1000));
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (typeof blockNumber === "bigint") {
-      setLiveBlockNumber(blockNumber);
-    }
-  }, [blockNumber]);
-
-  useEffect(() => {
-    if (!publicClient) return;
-
-    let cancelled = false;
-
-    const updateBlockNumber = async () => {
-      try {
-        const latestBlock = await publicClient.getBlockNumber();
-        if (!cancelled) {
-          setLiveBlockNumber(latestBlock);
-        }
-      } catch {
-        // Keep the latest known block when polling fails transiently.
-      }
-    };
-
-    void updateBlockNumber();
-    const timer = window.setInterval(() => {
-      void updateBlockNumber();
-    }, 8000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [publicClient]);
 
   const templates = useMemo(() => getGovernanceTemplates(), []);
   const groupedTemplates = useMemo(() => groupGovernanceTemplates(templates), [templates]);
-
-  const { data: proposalThreshold, refetch: refetchProposalThreshold } = useReadContract({
-    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-    abi: ABIS.KnowledgeGovernor,
-    functionName: "proposalThreshold",
-  });
-
-  const { data: votingDelay, refetch: refetchVotingDelay } = useReadContract({
-    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-    abi: ABIS.KnowledgeGovernor,
-    functionName: "votingDelay",
-  });
-
-  const { data: votingPeriod, refetch: refetchVotingPeriod } = useReadContract({
-    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-    abi: ABIS.KnowledgeGovernor,
-    functionName: "votingPeriod",
-  });
-
-  const { data: proposalFee, refetch: refetchProposalFee } = useReadContract({
-    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-    abi: ABIS.KnowledgeGovernor,
-    functionName: "proposalFee",
-  });
-
-  const { data: latestProposalState, refetch: refetchLatestProposalState } = useReadContract({
-    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-    abi: ABIS.KnowledgeGovernor,
-    functionName: "state",
-    args: latestProposal ? [latestProposal.proposalId] : undefined,
-    query: { enabled: !!latestProposal },
-  });
-
-  const { data: latestProposalEta, refetch: refetchLatestProposalEta } = useReadContract({
-    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
-    abi: ABIS.KnowledgeGovernor,
-    functionName: "proposalEta",
-    args: latestProposal ? [latestProposal.proposalId] : undefined,
-    query: { enabled: !!latestProposal },
-  });
 
   const draftStates = useMemo<DraftActionState[]>(() => {
     return draftActions.map((action) => {
@@ -211,8 +139,8 @@ export default function GovernancePage() {
   ).length;
   const hasHighRiskAction = highRiskActionCount > 0;
   const trimmedDescription = description.trim();
-  const latestProposalStateValue = asBigInt(latestProposalState);
-  const latestProposalEtaValue = asBigInt(latestProposalEta);
+  const latestProposalStateValue = latestProposal?.stateValue;
+  const latestProposalEtaValue = latestProposal?.etaSecond;
   const activeGovernanceStep = useMemo(() => {
     return getActiveGovernanceStep({
       latestProposal,
@@ -250,21 +178,8 @@ export default function GovernancePage() {
     trimmedDescription.length > 0 &&
     draftActions.length > 0 &&
     allActionsValid &&
-    proposalFee !== undefined &&
+    governanceConfig.proposalFee !== undefined &&
     (!hasHighRiskAction || highRiskConfirmed);
-
-  useEffect(() => {
-    if (!latestProposal || liveBlockNumber === undefined) {
-      return;
-    }
-
-    void Promise.all([refetchLatestProposalState(), refetchLatestProposalEta()]);
-  }, [
-    latestProposal,
-    liveBlockNumber,
-    refetchLatestProposalEta,
-    refetchLatestProposalState,
-  ]);
 
   useEffect(() => {
     if (!hasHighRiskAction && highRiskConfirmed) {
@@ -277,8 +192,7 @@ export default function GovernancePage() {
 
     setLoadingProposals(true);
     try {
-      const parsed = (await fetchParsedProposals(publicClient)).reverse();
-      setProposals(parsed);
+      setProposals(await readProposalListWithFallback(publicClient));
     } catch (error) {
       reportGovernancePageError("Failed to load governance proposals", error);
       toast.error(GOVERNANCE_PAGE_COPY.errors.loadProposalList);
@@ -287,9 +201,39 @@ export default function GovernancePage() {
     }
   }, [publicClient]);
 
+  const loadGovernanceConfig = useCallback(async () => {
+    const indexedSnapshot = await fetchIndexedSystemSnapshot();
+
+    if (indexedSnapshot) {
+      setGovernanceConfig({
+        proposalThreshold: BigInt(indexedSnapshot.proposal_threshold_amount),
+        votingDelay: BigInt(indexedSnapshot.voting_delay_block),
+        votingPeriod: BigInt(indexedSnapshot.voting_period_block),
+        proposalFee: BigInt(indexedSnapshot.proposal_fee_amount),
+      });
+      return;
+    }
+
+    if (!publicClient) {
+      setGovernanceConfig({
+        proposalThreshold: 0n,
+        votingDelay: 0n,
+        votingPeriod: 0n,
+        proposalFee: 0n,
+      });
+      return;
+    }
+
+    setGovernanceConfig(await readGovernanceConfigFromChain(publicClient));
+  }, [publicClient]);
+
   useEffect(() => {
     void loadProposals();
   }, [loadProposals]);
+
+  useEffect(() => {
+    void loadGovernanceConfig();
+  }, [loadGovernanceConfig]);
 
   const governanceRefreshDomains = useMemo(
     () => ["governance", "system"] as const,
@@ -299,17 +243,11 @@ export default function GovernancePage() {
   const governanceRefetchers = useMemo(
     () => [
       loadProposals,
-      refetchProposalThreshold,
-      refetchProposalFee,
-      refetchVotingDelay,
-      refetchVotingPeriod,
+      loadGovernanceConfig,
     ],
     [
       loadProposals,
-      refetchProposalFee,
-      refetchProposalThreshold,
-      refetchVotingDelay,
-      refetchVotingPeriod,
+      loadGovernanceConfig,
     ]
   );
 
@@ -415,7 +353,7 @@ export default function GovernancePage() {
       return;
     }
 
-    if (proposalFee === undefined) {
+    if (governanceConfig.proposalFee === undefined) {
       toast.error(GOVERNANCE_PAGE_COPY.errors.feeLoading);
       return;
     }
@@ -433,7 +371,7 @@ export default function GovernancePage() {
             encodedActions.map((item) => item.calldata),
             trimmedDescription,
           ],
-          value: typeof proposalFee === "bigint" ? proposalFee : 0n,
+          value: governanceConfig.proposalFee,
           account: address,
         },
       loading: GOVERNANCE_PAGE_COPY.loading.submitProposal,
@@ -449,10 +387,10 @@ export default function GovernancePage() {
   return (
     <GovernancePageLayout
       description={description}
-      proposalFee={typeof proposalFee === "bigint" ? proposalFee : undefined}
-      proposalThreshold={typeof proposalThreshold === "bigint" ? proposalThreshold : undefined}
-      votingDelay={typeof votingDelay === "bigint" ? votingDelay : undefined}
-      votingPeriod={typeof votingPeriod === "bigint" ? votingPeriod : undefined}
+      proposalFee={governanceConfig.proposalFee}
+      proposalThreshold={governanceConfig.proposalThreshold}
+      votingDelay={governanceConfig.votingDelay}
+      votingPeriod={governanceConfig.votingPeriod}
       activeGovernanceStep={activeGovernanceStep}
       currentGovernanceStageText={currentGovernanceStageText}
       loadingProposals={loadingProposals}

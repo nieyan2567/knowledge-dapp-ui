@@ -8,17 +8,22 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { formatEther } from "viem";
-import { usePublicClient, useReadContract } from "wagmi";
+import { usePublicClient } from "wagmi";
 
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
-import { ABIS, CONTRACTS } from "@/contracts";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 import { BRANDING } from "@/lib/branding";
-import { fetchLatestProposal } from "@/lib/proposal-events";
-import { fetchRewardActivity } from "@/lib/reward-events";
+import {
+  readContentCountFromChain,
+  readContentsFromChain,
+} from "@/lib/content-chain";
+import {
+  fetchAllIndexedContents,
+} from "@/lib/indexer-api";
+import { readLatestProposalWithFallback } from "@/lib/governance-chain";
+import { readRewardActivityWithFallback } from "@/lib/reward-chain";
 import { PAGE_TEST_IDS } from "@/lib/test-ids";
-import { asBigInt, asContentData } from "@/lib/web3-types";
 import type { ContentCardData } from "@/types/content";
 import type { ProposalItem } from "@/types/governance";
 
@@ -115,68 +120,35 @@ export default function HomePage() {
   const [recentRewardsLoading, setRecentRewardsLoading] = useState(false);
   const [recentRewardsError, setRecentRewardsError] = useState<string | null>(null);
 
-  const { data: contentCount, refetch: refetchContentCount } = useReadContract({
-    address: CONTRACTS.KnowledgeContent as `0x${string}`,
-    abi: ABIS.KnowledgeContent,
-    functionName: "contentCount",
-  });
-
   const loadRecentContents = useCallback(
     async (countOverride?: bigint) => {
-      if (!publicClient) {
-        setRecentContents([]);
-        setRecentContentsError(null);
-        return;
-      }
-
-      const total = Number(countOverride ?? contentCount ?? 0n);
-      if (total <= 0) {
-        setRecentContents([]);
-        setRecentContentsError(null);
-        return;
-      }
-
       setRecentContentsLoading(true);
       setRecentContentsError(null);
 
       try {
+        const indexedContents = await fetchAllIndexedContents();
+
+        if (indexedContents) {
+          const parsed = [...indexedContents]
+            .sort((left, right) => Number(right.id - left.id))
+            .slice(0, RECENT_CONTENT_LIMIT);
+          setRecentContents(parsed);
+          return;
+        }
+
+        if (!publicClient) {
+          setRecentContents([]);
+          return;
+        }
+
+        const total = Number(countOverride ?? 0n);
+        if (total <= 0) {
+          setRecentContents([]);
+          return;
+        }
+
         const scanCount = Math.min(total, RECENT_CONTENT_SCAN);
-        const ids = Array.from({ length: scanCount }, (_, index) => BigInt(total - index));
-
-        const [contentResults, accrualCountResults] = await Promise.all([
-          Promise.all(
-            ids.map((id) =>
-              publicClient.readContract({
-                address: CONTRACTS.KnowledgeContent as `0x${string}`,
-                abi: ABIS.KnowledgeContent,
-                functionName: "contents",
-                args: [id],
-              })
-            )
-          ),
-          Promise.all(
-            ids.map((id) =>
-              publicClient.readContract({
-                address: CONTRACTS.KnowledgeContent as `0x${string}`,
-                abi: ABIS.KnowledgeContent,
-                functionName: "rewardAccrualCount",
-                args: [id],
-              })
-            )
-          ),
-        ]);
-
-        const parsed = contentResults
-          .map((result, index) => {
-            const content = asContentData(result);
-            if (!content) return null;
-
-            return {
-              ...content,
-              rewardAccrualCount: asBigInt(accrualCountResults[index]) ?? 0n,
-            } satisfies ContentCardData;
-          })
-          .filter((item): item is ContentCardData => !!item)
+        const parsed = (await readContentsFromChain(publicClient, scanCount))
           .sort((left, right) => Number(right.id - left.id))
           .slice(0, RECENT_CONTENT_LIMIT);
 
@@ -191,7 +163,7 @@ export default function HomePage() {
         setRecentContentsLoading(false);
       }
     },
-    [contentCount, publicClient]
+    [publicClient]
   );
 
   const loadLatestProposal = useCallback(async () => {
@@ -206,7 +178,7 @@ export default function HomePage() {
     setLatestProposalError(null);
 
     try {
-      const newest = await fetchLatestProposal(publicClient);
+      const newest = await readLatestProposalWithFallback(publicClient);
 
       setLatestProposal(newest ?? null);
       if (newest) {
@@ -237,7 +209,7 @@ export default function HomePage() {
     setRecentRewardsError(null);
 
     try {
-      const { historyItems } = await fetchRewardActivity(publicClient);
+      const { historyItems } = await readRewardActivityWithFallback(publicClient);
 
       const items: DashboardRewardItem[] = historyItems
         .map((item) => ({
@@ -268,13 +240,11 @@ export default function HomePage() {
   }, [publicClient]);
 
   const refreshDashboardData = useCallback(async () => {
-    const results = await Promise.all([
-      refetchContentCount(),
-    ]);
+    let resolvedCount: bigint | undefined;
 
-    const countResult = results[0];
-    const resolvedCount =
-      typeof countResult.data === "bigint" ? countResult.data : undefined;
+    if (publicClient) {
+      resolvedCount = await readContentCountFromChain(publicClient);
+    }
 
     await Promise.all([
       loadRecentContents(resolvedCount),
@@ -285,7 +255,7 @@ export default function HomePage() {
     loadLatestProposal,
     loadRecentContents,
     loadRecentRewards,
-    refetchContentCount,
+    publicClient,
   ]);
 
   useEffect(() => {

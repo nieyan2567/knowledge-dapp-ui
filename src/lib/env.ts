@@ -54,6 +54,11 @@ const optionalUrl = z.preprocess(
   z.string().url().optional()
 );
 
+const optionalDatabaseUrl = z.preprocess(
+  emptyStringToUndefined,
+  z.string().trim().min(1).optional()
+);
+
 const productionRequiredPublicUrls = [
   "NEXT_PUBLIC_BESU_RPC_URL",
   "NEXT_PUBLIC_BLOCKSCOUT_URL",
@@ -88,6 +93,19 @@ const serverEnvSchema = publicEnvSchema
     UPLOAD_AUTH_NONCE_TTL_SECONDS: positiveIntWithDefault(300),
     UPLOAD_AUTH_SESSION_TTL_SECONDS: positiveIntWithDefault(2 * 60 * 60),
     UPLOAD_MAX_FILE_SIZE_BYTES: positiveIntWithDefault(512 * 1024 * 1024),
+    INDEXER_ENABLED: z.preprocess(
+      emptyStringToUndefined,
+      z.coerce.boolean().optional()
+    ).transform((value) => value ?? false),
+    INDEXER_RPC_URL: optionalUrl,
+    DATABASE_URL: optionalDatabaseUrl,
+    INDEXER_CONFIRMATIONS: positiveIntWithDefault(3),
+    INDEXER_POLL_INTERVAL_MS: positiveIntWithDefault(5000),
+    INDEXER_BATCH_SIZE: positiveIntWithDefault(500),
+    INDEXER_START_BLOCK: z.preprocess(
+      emptyStringToUndefined,
+      z.coerce.number().int().min(0).optional()
+    ).transform((value) => value ?? 0),
     REDIS_URL: optionalUrl,
     API_RATE_LIMIT_WINDOW_SECONDS: positiveIntWithDefault(60),
     API_RATE_LIMIT_MAX: positiveIntWithDefault(120),
@@ -171,6 +189,14 @@ const serverEnvSchema = publicEnvSchema
         code: "custom",
         path: ["OBS_ALERT_WEBHOOK_URL"],
         message: "Required when NODE_ENV=production",
+      });
+    }
+
+    if (env.INDEXER_ENABLED && !env.DATABASE_URL) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["DATABASE_URL"],
+        message: "Required when INDEXER_ENABLED=true",
       });
     }
   });
@@ -274,6 +300,13 @@ function getServerEnvSource() {
     UPLOAD_AUTH_SESSION_TTL_SECONDS:
       process.env.UPLOAD_AUTH_SESSION_TTL_SECONDS,
     UPLOAD_MAX_FILE_SIZE_BYTES: process.env.UPLOAD_MAX_FILE_SIZE_BYTES,
+    INDEXER_ENABLED: process.env.INDEXER_ENABLED,
+    INDEXER_RPC_URL: process.env.INDEXER_RPC_URL,
+    DATABASE_URL: process.env.DATABASE_URL,
+    INDEXER_CONFIRMATIONS: process.env.INDEXER_CONFIRMATIONS,
+    INDEXER_POLL_INTERVAL_MS: process.env.INDEXER_POLL_INTERVAL_MS,
+    INDEXER_BATCH_SIZE: process.env.INDEXER_BATCH_SIZE,
+    INDEXER_START_BLOCK: process.env.INDEXER_START_BLOCK,
     REDIS_URL: process.env.REDIS_URL,
     API_RATE_LIMIT_WINDOW_SECONDS: process.env.API_RATE_LIMIT_WINDOW_SECONDS,
     API_RATE_LIMIT_MAX: process.env.API_RATE_LIMIT_MAX,

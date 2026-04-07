@@ -11,7 +11,7 @@ import {
   Vote,
   Wallet,
 } from "lucide-react";
-import { useAccount, usePublicClient, useReadContract } from "wagmi";
+import { useAccount, usePublicClient } from "wagmi";
 
 import {
   formatAddressSummaryValue,
@@ -21,9 +21,7 @@ import {
   ProfileSummaryCard,
 } from "@/components/profile/profile-page-sections";
 import { PageHeader } from "@/components/page-header";
-import { ABIS, CONTRACTS } from "@/contracts";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
-import { fetchProposalsByProposer } from "@/lib/proposal-events";
 import {
   formatMyContentsHelp,
   formatTokenValue,
@@ -33,9 +31,26 @@ import {
   type ContentFilter,
   type ContentSort,
 } from "@/lib/profile-page-helpers";
-import { asBigInt, asContentData } from "@/lib/web3-types";
+import {
+  fetchAllIndexedContents,
+  fetchIndexedProfileSummary,
+} from "@/lib/indexer-api";
+import { readContentCountFromChain, readContentsFromChain } from "@/lib/content-chain";
+import { readProposalListWithFallback } from "@/lib/governance-chain";
+import { readStakeSummaryFromChain } from "@/lib/stake-summary";
+import { readPendingRewardsFromChain } from "@/lib/system-chain";
 import type { ContentData } from "@/types/content";
 import type { ProposalItem } from "@/types/governance";
+
+type ProfileSummaryState = {
+  content_count: number;
+  proposal_count: number;
+  vote_amount: bigint;
+  pending_reward_amount: bigint;
+  staked_amount: bigint;
+  pending_stake_amount: bigint;
+  pending_withdraw_amount: bigint;
+};
 
 export default function ProfilePage() {
   const { address, isConnected } = useAccount();
@@ -43,63 +58,13 @@ export default function ProfilePage() {
   const [loadingContents, setLoadingContents] = useState(false);
   const [contentError, setContentError] = useState<string | null>(null);
   const [myContents, setMyContents] = useState<ContentData[]>([]);
+  const [indexedContentCount, setIndexedContentCount] = useState<number | null>(null);
   const [loadingProposals, setLoadingProposals] = useState(false);
   const [proposalError, setProposalError] = useState<string | null>(null);
   const [myProposals, setMyProposals] = useState<ProposalItem[]>([]);
+  const [profileSummary, setProfileSummary] = useState<ProfileSummaryState | null>(null);
   const [contentFilter, setContentFilter] = useState<ContentFilter>("all");
   const [contentSort, setContentSort] = useState<ContentSort>("updated_desc");
-
-  const { data: contentCount, refetch: refetchContentCount } = useReadContract({
-    address: CONTRACTS.KnowledgeContent as `0x${string}`,
-    abi: ABIS.KnowledgeContent,
-    functionName: "contentCount",
-  });
-
-  const { data: myVotes, refetch: refetchMyVotes } = useReadContract({
-    address: CONTRACTS.NativeVotes as `0x${string}`,
-    abi: ABIS.NativeVotes,
-    functionName: "getVotes",
-    args: address ? [address] : undefined,
-    query: { enabled: !!address },
-  });
-
-  const { data: myStaked, refetch: refetchMyStaked } = useReadContract({
-    address: CONTRACTS.NativeVotes as `0x${string}`,
-    abi: ABIS.NativeVotes,
-    functionName: "staked",
-    args: address ? [address] : undefined,
-    query: { enabled: !!address },
-  });
-
-  const { data: myPendingStake, refetch: refetchMyPendingStake } = useReadContract({
-    address: CONTRACTS.NativeVotes as `0x${string}`,
-    abi: ABIS.NativeVotes,
-    functionName: "pendingStake",
-    args: address ? [address] : undefined,
-    query: { enabled: !!address },
-  });
-
-  const { data: myPendingWithdraw, refetch: refetchMyPendingWithdraw } = useReadContract({
-    address: CONTRACTS.NativeVotes as `0x${string}`,
-    abi: ABIS.NativeVotes,
-    functionName: "pendingWithdraw",
-    args: address ? [address] : undefined,
-    query: { enabled: !!address },
-  });
-
-  const { data: myPendingRewards, refetch: refetchMyPendingRewards } = useReadContract({
-    address: CONTRACTS.TreasuryNative as `0x${string}`,
-    abi: ABIS.TreasuryNative,
-    functionName: "pendingRewards",
-    args: address ? [address] : undefined,
-    query: { enabled: !!address },
-  });
-
-  const myVotesValue = asBigInt(myVotes) ?? 0n;
-  const myStakedValue = asBigInt(myStaked) ?? 0n;
-  const myPendingStakeValue = asBigInt(myPendingStake) ?? 0n;
-  const myPendingWithdrawValue = asBigInt(myPendingWithdraw) ?? 0n;
-  const myPendingRewardsValue = asBigInt(myPendingRewards) ?? 0n;
 
   const deletedContents = useMemo(
     () => myContents.filter((item) => item.deleted).length,
@@ -115,16 +80,10 @@ export default function ProfilePage() {
   );
 
   const loadMyContents = useCallback(
-    async (countOverride?: bigint) => {
+    async () => {
       if (!publicClient || !address) {
         setMyContents([]);
-        setContentError(null);
-        return;
-      }
-
-      const total = Number(countOverride ?? contentCount ?? 0n);
-      if (total <= 0) {
-        setMyContents([]);
+        setIndexedContentCount(null);
         setContentError(null);
         return;
       }
@@ -133,26 +92,34 @@ export default function ProfilePage() {
       setContentError(null);
 
       try {
-        const ids = Array.from({ length: total }, (_, index) => BigInt(index + 1));
-        const results = await Promise.all(
-          ids.map((id) =>
-            publicClient.readContract({
-              address: CONTRACTS.KnowledgeContent as `0x${string}`,
-              abi: ABIS.KnowledgeContent,
-              functionName: "contents",
-              args: [id],
-            })
-          )
+        const [indexedContents, indexedSummary] = await Promise.all([
+          fetchAllIndexedContents({
+            author_address: address,
+            include_deleted: true,
+          }),
+          fetchIndexedProfileSummary(address),
+        ]);
+
+        if (indexedContents) {
+          setMyContents(indexedContents);
+          setIndexedContentCount(indexedSummary?.content_count ?? indexedContents.length);
+          return;
+        }
+
+        const chainContentCount = await readContentCountFromChain(publicClient);
+        const total = Number(chainContentCount);
+        if (total <= 0) {
+          setMyContents([]);
+          setIndexedContentCount(0);
+          return;
+        }
+
+        const authoredContents = (await readContentsFromChain(publicClient, total)).filter(
+          (item) => item.author.toLowerCase() === address.toLowerCase()
         );
 
-        const authoredContents = results
-          .map((item) => asContentData(item))
-          .filter(
-            (item): item is ContentData =>
-              !!item && item.author.toLowerCase() === address.toLowerCase()
-          );
-
         setMyContents(authoredContents);
+        setIndexedContentCount(authoredContents.length);
       } catch (error) {
         setContentError(
           getErrorMessage(error, PROFILE_PAGE_COPY.loadMyContentsFailed)
@@ -161,44 +128,62 @@ export default function ProfilePage() {
         setLoadingContents(false);
       }
     },
-    [address, contentCount, publicClient]
+    [address, publicClient]
   );
+
+  const loadProfileSummary = useCallback(async () => {
+    if (!publicClient || !address) {
+      setProfileSummary(null);
+      return;
+    }
+
+    const indexedSummary = await fetchIndexedProfileSummary(address);
+
+    if (indexedSummary) {
+      setProfileSummary({
+        content_count: indexedSummary.content_count,
+        proposal_count: indexedSummary.proposal_count,
+        vote_amount: BigInt(indexedSummary.vote_amount),
+        pending_reward_amount: BigInt(indexedSummary.pending_reward_amount),
+        staked_amount: BigInt(indexedSummary.staked_amount),
+        pending_stake_amount: BigInt(indexedSummary.pending_stake_amount),
+        pending_withdraw_amount: BigInt(indexedSummary.pending_withdraw_amount),
+      });
+      return;
+    }
+
+    const [stakeSummary, pendingRewardAmount] = await Promise.all([
+      readStakeSummaryFromChain(publicClient, address),
+      readPendingRewardsFromChain(publicClient, address),
+    ]);
+
+    setProfileSummary({
+      content_count: 0,
+      proposal_count: 0,
+      vote_amount: stakeSummary.vote_amount,
+      pending_reward_amount: pendingRewardAmount,
+      staked_amount: stakeSummary.staked_amount,
+      pending_stake_amount: stakeSummary.pending_stake_amount,
+      pending_withdraw_amount: stakeSummary.pending_withdraw_amount,
+    });
+  }, [address, publicClient]);
 
   const refreshProfile = useCallback(async () => {
     if (!address) {
       setMyContents([]);
       setMyProposals([]);
+      setProfileSummary(null);
       setContentError(null);
       setProposalError(null);
       return;
     }
 
     try {
-      const [countResult] = await Promise.all([
-        refetchContentCount(),
-        refetchMyVotes(),
-        refetchMyStaked(),
-        refetchMyPendingStake(),
-        refetchMyPendingWithdraw(),
-        refetchMyPendingRewards(),
-      ]);
-
-      await loadMyContents(
-        typeof countResult.data === "bigint" ? countResult.data : undefined
-      );
+      await Promise.all([loadProfileSummary(), loadMyContents()]);
     } catch (error) {
       setContentError(getErrorMessage(error, PROFILE_PAGE_COPY.refreshProfileFailed));
     }
-  }, [
-    address,
-    loadMyContents,
-    refetchContentCount,
-    refetchMyPendingRewards,
-    refetchMyPendingStake,
-    refetchMyPendingWithdraw,
-    refetchMyStaked,
-    refetchMyVotes,
-  ]);
+  }, [address, loadMyContents, loadProfileSummary]);
 
   const loadMyProposals = useCallback(async () => {
     if (!publicClient || !address) {
@@ -207,14 +192,16 @@ export default function ProfilePage() {
       return;
     }
 
-    setLoadingProposals(true);
-    setProposalError(null);
+      setLoadingProposals(true);
+      setProposalError(null);
 
-    try {
-      const proposals = await fetchProposalsByProposer(publicClient, address);
-      setMyProposals(proposals);
-    } catch (error) {
-      setProposalError(
+      try {
+        const proposals = await readProposalListWithFallback(publicClient, {
+          proposerAddress: address,
+        });
+        setMyProposals(proposals);
+      } catch (error) {
+        setProposalError(
         getErrorMessage(error, PROFILE_PAGE_COPY.loadMyProposalsFailed)
       );
     } finally {
@@ -225,6 +212,15 @@ export default function ProfilePage() {
   const refreshProfilePage = useCallback(async () => {
     await Promise.all([refreshProfile(), loadMyProposals()]);
   }, [loadMyProposals, refreshProfile]);
+
+  const myVotesValue = profileSummary?.vote_amount ?? 0n;
+  const myStakedValue = profileSummary?.staked_amount ?? 0n;
+  const myPendingStakeValue = profileSummary?.pending_stake_amount ?? 0n;
+  const myPendingWithdrawValue = profileSummary?.pending_withdraw_amount ?? 0n;
+  const myPendingRewardsValue = profileSummary?.pending_reward_amount ?? 0n;
+  const summaryContentCount =
+    profileSummary?.content_count ?? indexedContentCount ?? myContents.length;
+  const summaryProposalCount = profileSummary?.proposal_count ?? myProposals.length;
 
   useEffect(() => {
     void refreshProfilePage();
@@ -301,13 +297,13 @@ export default function ProfilePage() {
               <ProfileSummaryCard
                 icon={<BookOpen className="h-4 w-4" />}
                 label={PROFILE_PAGE_COPY.summaryMyContents}
-                value={String(myContents.length)}
+                value={String(summaryContentCount)}
                 description={formatMyContentsHelp(activeContents, deletedContents)}
               />
               <ProfileSummaryCard
                 icon={<Gavel className="h-4 w-4" />}
                 label={PROFILE_PAGE_COPY.summaryMyProposals}
-                value={String(myProposals.length)}
+                value={String(summaryProposalCount)}
                 description={PROFILE_PAGE_COPY.summaryMyProposalsHelp}
               />
             </div>
