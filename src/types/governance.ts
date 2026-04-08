@@ -27,10 +27,7 @@ export interface ProposalItem {
   targets: readonly Address[]
   values: readonly bigint[]
   calldatas: readonly HexString[]
-  transactionHash?: HexString
-  stateValue?: bigint
-  etaSecond?: bigint
-  votes?: ProposalVotes
+	transactionHash?: HexString
 }
 
 export interface ProposalActionSummary {

@@ -32,15 +32,10 @@ type RewardActivityOptions = {
   beneficiary?: `0x${string}`;
 };
 
-export type RewardActivityResult = {
-  historyItems: RewardHistoryItem[];
-  rewardSources: RewardSourceItem[];
-};
-
 export async function fetchRewardActivity(
   publicClient: PublicClient,
   options: RewardActivityOptions = {}
-): Promise<RewardActivityResult> {
+) {
   const latestBlock = await publicClient.getBlockNumber();
   const [accrualLogs, claimLogs] = await Promise.all([
     collectByBlockRange({

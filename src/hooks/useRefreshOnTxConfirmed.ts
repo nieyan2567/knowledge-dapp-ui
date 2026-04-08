@@ -4,7 +4,6 @@ import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePublicClient } from "wagmi";
-import { triggerIndexedRefresh } from "@/lib/indexer-trigger";
 import { emitTxConfirmed, type TxDomain } from "@/lib/tx-events";
 
 type RefreshCallback = () => unknown | Promise<unknown>;
@@ -22,12 +21,6 @@ export function useRefreshOnTxConfirmed() {
     ) => {
       if (publicClient) {
         await publicClient.waitForTransactionReceipt({ hash });
-      }
-
-      try {
-        await triggerIndexedRefresh(domains, hash);
-      } catch {
-        // Trigger sync is best-effort. The polling indexer remains the source of eventual consistency.
       }
 
       emitTxConfirmed({ hash, domains });

@@ -7,19 +7,17 @@ import { toast } from "sonner";
 import {
 	useAccount,
 	useBalance,
+	useBlockNumber,
 	usePublicClient,
+	useReadContract,
 	useWriteContract,
 } from "wagmi";
 
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
-import { useLiveChainClock } from "@/hooks/useLiveChainClock";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { BRANDING } from "@/lib/branding";
-import { fetchIndexedStakeSummary, fetchIndexedSystemSnapshot } from "@/lib/indexer-api";
-import { readStakeSummaryFromChain, type StakeSummaryData } from "@/lib/stake-summary";
-import { readStakeConfigFromChain } from "@/lib/system-chain";
 import { PAGE_TEST_IDS } from "@/lib/test-ids";
 import {
 	formatStakeDuration,
@@ -36,13 +34,14 @@ import {
 	getWithdrawHelperText,
 } from "@/lib/stake-page-helpers";
 import { writeTxToast } from "@/lib/tx-toast";
+import { asBigInt } from "@/lib/web3-types";
 
 export default function StakePage() {
 	const { address } = useAccount();
 	const publicClient = usePublicClient();
 	const { writeContractAsync } = useWriteContract();
 	const refreshAfterTx = useRefreshOnTxConfirmed();
-	const { nowTs, liveBlockNumber } = useLiveChainClock();
+	const { data: blockNumber } = useBlockNumber({ watch: true });
 	const { data: nativeBalance, refetch: refetchNativeBalance } = useBalance({
 		address,
 		query: { enabled: !!address },
@@ -50,69 +49,50 @@ export default function StakePage() {
 
 	const [depositAmount, setDepositAmount] = useState("1");
 	const [withdrawAmount, setWithdrawAmount] = useState("1");
-	const [stakeSummary, setStakeSummary] = useState<StakeSummaryData>({
-		vote_amount: 0n,
-		staked_amount: 0n,
-		pending_stake_amount: 0n,
-		pending_withdraw_amount: 0n,
-		activate_after_block: 0n,
-		withdraw_after_time: 0n,
-	});
-	const [systemConfig, setSystemConfig] = useState({
-		activationBlocks: 0n,
-		cooldownSeconds: 0n,
-	});
+	const [nowTs, setNowTs] = useState(() => Math.floor(Date.now() / 1000));
+	const [liveBlockNumber, setLiveBlockNumber] = useState<bigint | undefined>(
+		typeof blockNumber === "bigint" ? blockNumber : undefined
+	);
 
-	const loadStakeSummary = useCallback(async () => {
-		if (!publicClient || !address) {
-			setStakeSummary({
-				vote_amount: 0n,
-				staked_amount: 0n,
-				pending_stake_amount: 0n,
-				pending_withdraw_amount: 0n,
-				activate_after_block: 0n,
-				withdraw_after_time: 0n,
-			});
-			return;
+	useEffect(() => {
+		const timer = window.setInterval(() => {
+			setNowTs(Math.floor(Date.now() / 1000));
+		}, 1000);
+
+		return () => window.clearInterval(timer);
+	}, []);
+
+	useEffect(() => {
+		if (typeof blockNumber === "bigint") {
+			setLiveBlockNumber(blockNumber);
 		}
+	}, [blockNumber]);
 
-		const indexedSummary = await fetchIndexedStakeSummary(address);
+	useEffect(() => {
+		if (!publicClient) return;
 
-		if (indexedSummary) {
-			setStakeSummary({
-				vote_amount: BigInt(indexedSummary.vote_amount),
-				staked_amount: BigInt(indexedSummary.staked_amount),
-				pending_stake_amount: BigInt(indexedSummary.pending_stake_amount),
-				pending_withdraw_amount: BigInt(indexedSummary.pending_withdraw_amount),
-				activate_after_block: BigInt(indexedSummary.activate_after_block),
-				withdraw_after_time: BigInt(indexedSummary.withdraw_after_time),
-			});
-			return;
-		}
+		let cancelled = false;
 
-		setStakeSummary(await readStakeSummaryFromChain(publicClient, address));
-	}, [address, publicClient]);
+		const updateBlockNumber = async () => {
+			try {
+				const latestBlock = await publicClient.getBlockNumber();
+				if (!cancelled) {
+					setLiveBlockNumber(latestBlock);
+				}
+			} catch {
+				// Ignore transient polling failures and keep the last known block number.
+			}
+		};
 
-	const loadStakeConfig = useCallback(async () => {
-		const indexedSnapshot = await fetchIndexedSystemSnapshot();
+		void updateBlockNumber();
+		const timer = window.setInterval(() => {
+			void updateBlockNumber();
+		}, 8000);
 
-		if (indexedSnapshot) {
-			setSystemConfig({
-				activationBlocks: BigInt(indexedSnapshot.activation_blocks),
-				cooldownSeconds: BigInt(indexedSnapshot.cooldown_seconds),
-			});
-			return;
-		}
-
-		if (!publicClient) {
-			setSystemConfig({
-				activationBlocks: 0n,
-				cooldownSeconds: 0n,
-			});
-			return;
-		}
-
-		setSystemConfig(await readStakeConfigFromChain(publicClient));
+		return () => {
+			cancelled = true;
+			window.clearInterval(timer);
+		};
 	}, [publicClient]);
 
 	function parseAmount(value: string, field: string) {
@@ -134,14 +114,74 @@ export default function StakePage() {
 		}
 	}
 
-	const votesValue = stakeSummary.vote_amount;
-	const stakedValue = stakeSummary.staked_amount;
-	const pendingStakeValue = stakeSummary.pending_stake_amount;
-	const pendingWithdrawValue = stakeSummary.pending_withdraw_amount;
-	const activationBlocksValue = systemConfig.activationBlocks;
-	const cooldownSecondsValue = systemConfig.cooldownSeconds;
-	const activateAfterBlockValue = stakeSummary.activate_after_block;
-	const withdrawAfterTimeValue = stakeSummary.withdraw_after_time;
+	const { data: votes, refetch: refetchVotes } = useReadContract({
+		address: CONTRACTS.NativeVotes as `0x${string}`,
+		abi: ABIS.NativeVotes,
+		functionName: "getVotes",
+		args: address ? [address] : undefined,
+		query: { enabled: !!address },
+	});
+
+	const { data: staked, refetch: refetchStaked } = useReadContract({
+		address: CONTRACTS.NativeVotes as `0x${string}`,
+		abi: ABIS.NativeVotes,
+		functionName: "staked",
+		args: address ? [address] : undefined,
+		query: { enabled: !!address },
+	});
+
+	const { data: pendingStake, refetch: refetchPendingStake } = useReadContract({
+		address: CONTRACTS.NativeVotes as `0x${string}`,
+		abi: ABIS.NativeVotes,
+		functionName: "pendingStake",
+		args: address ? [address] : undefined,
+		query: { enabled: !!address },
+	});
+
+	const { data: pendingWithdraw, refetch: refetchPendingWithdraw } = useReadContract({
+		address: CONTRACTS.NativeVotes as `0x${string}`,
+		abi: ABIS.NativeVotes,
+		functionName: "pendingWithdraw",
+		args: address ? [address] : undefined,
+		query: { enabled: !!address },
+	});
+
+	const { data: activationBlocksData } = useReadContract({
+		address: CONTRACTS.NativeVotes as `0x${string}`,
+		abi: ABIS.NativeVotes,
+		functionName: "activationBlocks",
+	});
+
+	const { data: cooldownSecondsData } = useReadContract({
+		address: CONTRACTS.NativeVotes as `0x${string}`,
+		abi: ABIS.NativeVotes,
+		functionName: "cooldownSeconds",
+	});
+
+	const { data: activateAfterBlock, refetch: refetchActivateAfterBlock } = useReadContract({
+		address: CONTRACTS.NativeVotes as `0x${string}`,
+		abi: ABIS.NativeVotes,
+		functionName: "activateAfterBlock",
+		args: address ? [address] : undefined,
+		query: { enabled: !!address },
+	});
+
+	const { data: withdrawAfterTime, refetch: refetchWithdrawAfterTime } = useReadContract({
+		address: CONTRACTS.NativeVotes as `0x${string}`,
+		abi: ABIS.NativeVotes,
+		functionName: "withdrawAfterTime",
+		args: address ? [address] : undefined,
+		query: { enabled: !!address },
+	});
+
+	const votesValue = asBigInt(votes) ?? 0n;
+	const stakedValue = asBigInt(staked) ?? 0n;
+	const pendingStakeValue = asBigInt(pendingStake) ?? 0n;
+	const pendingWithdrawValue = asBigInt(pendingWithdraw) ?? 0n;
+	const activationBlocksValue = asBigInt(activationBlocksData) ?? 0n;
+	const cooldownSecondsValue = asBigInt(cooldownSecondsData) ?? 0n;
+	const activateAfterBlockValue = asBigInt(activateAfterBlock) ?? 0n;
+	const withdrawAfterTimeValue = asBigInt(withdrawAfterTime) ?? 0n;
 	const currentBlock = liveBlockNumber;
 	const walletBalanceValue = nativeBalance?.value ?? 0n;
 	const depositAmountWei = useMemo(() => tryParseStakeAmount(depositAmount), [depositAmount]);
@@ -216,15 +256,23 @@ export default function StakePage() {
 
 	const refreshStakeData = useCallback(async () => {
 		await Promise.all([
-			loadStakeSummary(),
-			loadStakeConfig(),
+			refetchVotes(),
+			refetchStaked(),
+			refetchPendingStake(),
+			refetchPendingWithdraw(),
+			refetchActivateAfterBlock(),
+			refetchWithdrawAfterTime(),
 			refetchNativeBalance(),
 		]);
-	}, [loadStakeConfig, loadStakeSummary, refetchNativeBalance]);
-
-	useEffect(() => {
-		void Promise.all([loadStakeSummary(), loadStakeConfig()]);
-	}, [loadStakeConfig, loadStakeSummary]);
+	}, [
+		refetchActivateAfterBlock,
+		refetchNativeBalance,
+		refetchPendingStake,
+		refetchPendingWithdraw,
+		refetchStaked,
+		refetchVotes,
+		refetchWithdrawAfterTime,
+	]);
 
 	function applyQuickAmount(
 		base: bigint,

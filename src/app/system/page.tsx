@@ -1,122 +1,144 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { formatEther } from "viem";
-import { usePublicClient } from "wagmi";
+import { useReadContract } from "wagmi";
 
 import { AddressBadge } from "@/components/address-badge";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
-import { CONTRACTS } from "@/contracts";
+import { ABIS, CONTRACTS } from "@/contracts";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 import { BRANDING } from "@/lib/branding";
-import { fetchIndexedSystemSnapshot } from "@/lib/indexer-api";
-import { readSystemSnapshotFromChain } from "@/lib/system-chain";
 import { PAGE_TEST_IDS } from "@/lib/test-ids";
 import { formatSystemBoolean, SYSTEM_PAGE_COPY } from "@/lib/system-page-helpers";
-
-type SystemSnapshotState = {
-  contentOwner: string;
-  votesContract: string;
-  treasuryContract: string;
-  editLockVotes: bigint;
-  allowDeleteAfterVote: boolean;
-  maxVersionsPerContent: bigint;
-  treasuryOwner: string;
-  epochBudget: bigint;
-  epochSpent: bigint;
-  minDelay: bigint;
-  governorToken: string;
-  lateQuorumVoteExtension: bigint;
-};
+import { asBigInt } from "@/lib/web3-types";
 
 function explorerAddressUrl(address: string) {
   return `${BRANDING.explorerUrl}/address/${address}`;
 }
 
-function emptySystemSnapshot(): SystemSnapshotState {
-  return {
-    contentOwner: "",
-    votesContract: "",
-    treasuryContract: "",
-    editLockVotes: 0n,
-    allowDeleteAfterVote: false,
-    maxVersionsPerContent: 0n,
-    treasuryOwner: "",
-    epochBudget: 0n,
-    epochSpent: 0n,
-    minDelay: 0n,
-    governorToken: "",
-    lateQuorumVoteExtension: 0n,
-  };
-}
-
 export default function SystemPage() {
-  const publicClient = usePublicClient();
-  const [snapshot, setSnapshot] = useState<SystemSnapshotState>(emptySystemSnapshot);
+  const { data: contentOwner, refetch: refetchContentOwner } = useReadContract({
+    address: CONTRACTS.KnowledgeContent as `0x${string}`,
+    abi: ABIS.KnowledgeContent,
+    functionName: "owner",
+  });
 
-  const loadSystemSnapshot = useCallback(async () => {
-    const indexedSnapshot = await fetchIndexedSystemSnapshot();
+  const { data: votesContract, refetch: refetchVotesContract } = useReadContract({
+    address: CONTRACTS.KnowledgeContent as `0x${string}`,
+    abi: ABIS.KnowledgeContent,
+    functionName: "votesContract",
+  });
 
-    if (indexedSnapshot) {
-      setSnapshot({
-        contentOwner: indexedSnapshot.content_owner_address ?? "",
-        votesContract: indexedSnapshot.votes_contract_address ?? "",
-        treasuryContract: indexedSnapshot.treasury_contract_address ?? "",
-        editLockVotes: BigInt(indexedSnapshot.edit_lock_votes),
-        allowDeleteAfterVote: indexedSnapshot.is_allow_delete_after_vote === 1,
-        maxVersionsPerContent: BigInt(indexedSnapshot.max_versions_per_content),
-        treasuryOwner: indexedSnapshot.treasury_owner_address ?? "",
-        epochBudget: BigInt(indexedSnapshot.epoch_budget_amount),
-        epochSpent: BigInt(indexedSnapshot.epoch_spent_amount),
-        minDelay: BigInt(indexedSnapshot.timelock_min_delay_second),
-        governorToken: indexedSnapshot.governor_token_address ?? "",
-        lateQuorumVoteExtension: BigInt(
-          indexedSnapshot.late_quorum_vote_extension_block
-        ),
-      });
-      return;
-    }
+  const { data: treasury, refetch: refetchTreasury } = useReadContract({
+    address: CONTRACTS.KnowledgeContent as `0x${string}`,
+    abi: ABIS.KnowledgeContent,
+    functionName: "treasury",
+  });
 
-    if (!publicClient) {
-      setSnapshot(emptySystemSnapshot());
-      return;
-    }
+  const { data: editLockVotes, refetch: refetchEditLockVotes } = useReadContract({
+    address: CONTRACTS.KnowledgeContent as `0x${string}`,
+    abi: ABIS.KnowledgeContent,
+    functionName: "editLockVotes",
+  });
 
-    const fallbackSnapshot = await readSystemSnapshotFromChain(publicClient);
+  const {
+    data: allowDeleteAfterVote,
+    refetch: refetchAllowDeleteAfterVote,
+  } = useReadContract({
+    address: CONTRACTS.KnowledgeContent as `0x${string}`,
+    abi: ABIS.KnowledgeContent,
+    functionName: "allowDeleteAfterVote",
+  });
 
-    setSnapshot({
-      contentOwner: fallbackSnapshot.contentOwner,
-      votesContract: fallbackSnapshot.votesContract,
-      treasuryContract: fallbackSnapshot.treasuryContract,
-      editLockVotes: fallbackSnapshot.editLockVotes,
-      allowDeleteAfterVote: fallbackSnapshot.allowDeleteAfterVote,
-      maxVersionsPerContent: fallbackSnapshot.maxVersionsPerContent,
-      treasuryOwner: fallbackSnapshot.treasuryOwner,
-      epochBudget: fallbackSnapshot.epochBudget,
-      epochSpent: fallbackSnapshot.epochSpent,
-      minDelay: fallbackSnapshot.minDelay,
-      governorToken: fallbackSnapshot.governorToken,
-      lateQuorumVoteExtension: fallbackSnapshot.lateQuorumVoteExtension,
-    });
-  }, [publicClient]);
+  const {
+    data: maxVersionsPerContent,
+    refetch: refetchMaxVersionsPerContent,
+  } = useReadContract({
+    address: CONTRACTS.KnowledgeContent as `0x${string}`,
+    abi: ABIS.KnowledgeContent,
+    functionName: "maxVersionsPerContent",
+  });
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      void loadSystemSnapshot();
-    }, 0);
+  const { data: treasuryOwner, refetch: refetchTreasuryOwner } = useReadContract({
+    address: CONTRACTS.TreasuryNative as `0x${string}`,
+    abi: ABIS.TreasuryNative,
+    functionName: "owner",
+  });
 
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [loadSystemSnapshot]);
+  const { data: epochBudget, refetch: refetchEpochBudget } = useReadContract({
+    address: CONTRACTS.TreasuryNative as `0x${string}`,
+    abi: ABIS.TreasuryNative,
+    functionName: "epochBudget",
+  });
+
+  const { data: epochSpent, refetch: refetchEpochSpent } = useReadContract({
+    address: CONTRACTS.TreasuryNative as `0x${string}`,
+    abi: ABIS.TreasuryNative,
+    functionName: "epochSpent",
+  });
+
+  const { data: minDelay, refetch: refetchMinDelay } = useReadContract({
+    address: CONTRACTS.TimelockController as `0x${string}`,
+    abi: ABIS.TimelockController,
+    functionName: "getMinDelay",
+  });
+
+  const { data: governorToken, refetch: refetchGovernorToken } = useReadContract({
+    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
+    abi: ABIS.KnowledgeGovernor,
+    functionName: "token",
+  });
+
+  const {
+    data: lateQuorumVoteExtension,
+    refetch: refetchLateQuorumVoteExtension,
+  } = useReadContract({
+    address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
+    abi: ABIS.KnowledgeGovernor,
+    functionName: "lateQuorumVoteExtension",
+  });
+
+  const epochBudgetValue = asBigInt(epochBudget);
+  const epochSpentValue = asBigInt(epochSpent);
+  const minDelayValue = asBigInt(minDelay);
 
   const systemRefreshDomains = useMemo(
-    () => ["rewards", "content", "governance", "system", "stake"] as const,
+    () => ["rewards", "content", "governance", "system"] as const,
     []
   );
 
-  const systemRefetchers = useMemo(() => [loadSystemSnapshot], [loadSystemSnapshot]);
+  const systemRefetchers = useMemo(
+    () => [
+      refetchContentOwner,
+      refetchVotesContract,
+      refetchTreasury,
+      refetchEditLockVotes,
+      refetchAllowDeleteAfterVote,
+      refetchMaxVersionsPerContent,
+      refetchTreasuryOwner,
+      refetchEpochBudget,
+      refetchEpochSpent,
+      refetchGovernorToken,
+      refetchLateQuorumVoteExtension,
+      refetchMinDelay,
+    ],
+    [
+      refetchContentOwner,
+      refetchVotesContract,
+      refetchTreasury,
+      refetchEditLockVotes,
+      refetchAllowDeleteAfterVote,
+      refetchMaxVersionsPerContent,
+      refetchTreasuryOwner,
+      refetchEpochBudget,
+      refetchEpochSpent,
+      refetchGovernorToken,
+      refetchLateQuorumVoteExtension,
+      refetchMinDelay,
+    ]
+  );
 
   useTxEventRefetch(systemRefreshDomains, systemRefetchers);
 
@@ -146,22 +168,22 @@ export default function SystemPage() {
               <AddressBadge address={CONTRACTS.KnowledgeContent} />
             </SystemRow>
             <SystemRow label={SYSTEM_PAGE_COPY.owner}>
-              <AddressBadge address={snapshot.contentOwner} />
+              <AddressBadge address={String(contentOwner ?? "")} />
             </SystemRow>
             <SystemRow label={SYSTEM_PAGE_COPY.votesContract}>
-              <AddressBadge address={snapshot.votesContract} />
+              <AddressBadge address={String(votesContract ?? "")} />
             </SystemRow>
             <SystemRow label={SYSTEM_PAGE_COPY.treasuryContract}>
-              <AddressBadge address={snapshot.treasuryContract} />
+              <AddressBadge address={String(treasury ?? "")} />
             </SystemRow>
             <SystemRow label={SYSTEM_PAGE_COPY.editLockVotes}>
-              {snapshot.editLockVotes.toString()}
+              {editLockVotes ? String(editLockVotes) : "-"}
             </SystemRow>
             <SystemRow label={SYSTEM_PAGE_COPY.allowDeleteAfterVote}>
-              {formatSystemBoolean(snapshot.allowDeleteAfterVote)}
+              {formatSystemBoolean(allowDeleteAfterVote)}
             </SystemRow>
             <SystemRow label={SYSTEM_PAGE_COPY.maxVersionsPerContent}>
-              {snapshot.maxVersionsPerContent.toString()}
+              {maxVersionsPerContent ? String(maxVersionsPerContent) : "-"}
             </SystemRow>
 
             <SystemExplorerLink address={CONTRACTS.KnowledgeContent} />
@@ -174,13 +196,15 @@ export default function SystemPage() {
               <AddressBadge address={CONTRACTS.TreasuryNative} />
             </SystemRow>
             <SystemRow label={SYSTEM_PAGE_COPY.owner}>
-              <AddressBadge address={snapshot.treasuryOwner} />
+              <AddressBadge address={String(treasuryOwner ?? "")} />
             </SystemRow>
             <SystemRow label={SYSTEM_PAGE_COPY.cycleBudget}>
-              {formatEther(snapshot.epochBudget)} {BRANDING.nativeTokenSymbol}
+              {epochBudgetValue ? formatEther(epochBudgetValue) : "0"}{" "}
+              {BRANDING.nativeTokenSymbol}
             </SystemRow>
             <SystemRow label={SYSTEM_PAGE_COPY.cycleSpent}>
-              {formatEther(snapshot.epochSpent)} {BRANDING.nativeTokenSymbol}
+              {epochSpentValue ? formatEther(epochSpentValue) : "0"}{" "}
+              {BRANDING.nativeTokenSymbol}
             </SystemRow>
 
             <SystemExplorerLink address={CONTRACTS.TreasuryNative} />
@@ -193,10 +217,11 @@ export default function SystemPage() {
               <AddressBadge address={CONTRACTS.KnowledgeGovernor} />
             </SystemRow>
             <SystemRow label={SYSTEM_PAGE_COPY.governanceToken}>
-              <AddressBadge address={snapshot.governorToken} />
+              <AddressBadge address={String(governorToken ?? "")} />
             </SystemRow>
             <SystemRow label={SYSTEM_PAGE_COPY.lateQuorumExtension}>
-              {snapshot.lateQuorumVoteExtension.toString()} {SYSTEM_PAGE_COPY.blockUnit}
+              {lateQuorumVoteExtension ? String(lateQuorumVoteExtension) : "-"}{" "}
+              {SYSTEM_PAGE_COPY.blockUnit}
             </SystemRow>
 
             <SystemExplorerLink address={CONTRACTS.KnowledgeGovernor} />
@@ -209,7 +234,7 @@ export default function SystemPage() {
               <AddressBadge address={CONTRACTS.TimelockController} />
             </SystemRow>
             <SystemRow label={SYSTEM_PAGE_COPY.minDelay}>
-              {snapshot.minDelay.toString()} {SYSTEM_PAGE_COPY.secondsUnit}
+              {minDelayValue ? String(minDelayValue) : "-"} {SYSTEM_PAGE_COPY.secondsUnit}
             </SystemRow>
 
             <SystemExplorerLink address={CONTRACTS.TimelockController} />

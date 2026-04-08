@@ -15,13 +15,6 @@ const originalEnv = {
   UPLOAD_AUTH_SECRET: process.env["UPLOAD_AUTH_SECRET"],
   IPFS_API_URL: process.env["IPFS_API_URL"],
   IPFS_GATEWAY_URL: process.env["IPFS_GATEWAY_URL"],
-  INDEXER_ENABLED: process.env["INDEXER_ENABLED"],
-  INDEXER_RPC_URL: process.env["INDEXER_RPC_URL"],
-  DATABASE_URL: process.env["DATABASE_URL"],
-  INDEXER_CONFIRMATIONS: process.env["INDEXER_CONFIRMATIONS"],
-  INDEXER_POLL_INTERVAL_MS: process.env["INDEXER_POLL_INTERVAL_MS"],
-  INDEXER_BATCH_SIZE: process.env["INDEXER_BATCH_SIZE"],
-  INDEXER_START_BLOCK: process.env["INDEXER_START_BLOCK"],
   API_RATE_LIMIT_MAX: process.env["API_RATE_LIMIT_MAX"],
   REDIS_URL: process.env["REDIS_URL"],
   OBS_SERVICE_NAME: process.env["OBS_SERVICE_NAME"],
@@ -64,14 +57,6 @@ function applyValidServerEnv() {
   mutableEnv.UPLOAD_AUTH_SECRET = "test-upload-secret";
   mutableEnv.IPFS_API_URL = "http://127.0.0.1:5001";
   mutableEnv.IPFS_GATEWAY_URL = "http://127.0.0.1:8080/ipfs";
-  mutableEnv.INDEXER_ENABLED = "false";
-  mutableEnv.INDEXER_RPC_URL = "http://127.0.0.1:8545";
-  mutableEnv.DATABASE_URL =
-    "postgresql://knowledge:knowledge@127.0.0.1:5432/knowledge_dapp";
-  mutableEnv.INDEXER_CONFIRMATIONS = "3";
-  mutableEnv.INDEXER_POLL_INTERVAL_MS = "5000";
-  mutableEnv.INDEXER_BATCH_SIZE = "500";
-  mutableEnv.INDEXER_START_BLOCK = "0";
   mutableEnv.API_RATE_LIMIT_MAX = "120";
   mutableEnv.REDIS_URL = "redis://localhost:6379";
   mutableEnv.OBS_SERVICE_NAME = "knowledge-dapp-ui";
@@ -112,16 +97,6 @@ afterEach(() => {
   restoreEnvValue("UPLOAD_AUTH_SECRET", originalEnv.UPLOAD_AUTH_SECRET);
   restoreEnvValue("IPFS_API_URL", originalEnv.IPFS_API_URL);
   restoreEnvValue("IPFS_GATEWAY_URL", originalEnv.IPFS_GATEWAY_URL);
-  restoreEnvValue("INDEXER_ENABLED", originalEnv.INDEXER_ENABLED);
-  restoreEnvValue("INDEXER_RPC_URL", originalEnv.INDEXER_RPC_URL);
-  restoreEnvValue("DATABASE_URL", originalEnv.DATABASE_URL);
-  restoreEnvValue("INDEXER_CONFIRMATIONS", originalEnv.INDEXER_CONFIRMATIONS);
-  restoreEnvValue(
-    "INDEXER_POLL_INTERVAL_MS",
-    originalEnv.INDEXER_POLL_INTERVAL_MS
-  );
-  restoreEnvValue("INDEXER_BATCH_SIZE", originalEnv.INDEXER_BATCH_SIZE);
-  restoreEnvValue("INDEXER_START_BLOCK", originalEnv.INDEXER_START_BLOCK);
   restoreEnvValue("API_RATE_LIMIT_MAX", originalEnv.API_RATE_LIMIT_MAX);
   restoreEnvValue("REDIS_URL", originalEnv.REDIS_URL);
   restoreEnvValue("OBS_SERVICE_NAME", originalEnv.OBS_SERVICE_NAME);
@@ -203,14 +178,6 @@ describe("env", () => {
     delete process.env.UPLOAD_AUTH_SECRET;
 
     expect(() => getServerEnv()).toThrow(/UPLOAD_AUTH_SECRET/i);
-  });
-
-  it("requires database url when the indexer is enabled", () => {
-    applyValidServerEnv();
-    mutableEnv.INDEXER_ENABLED = "true";
-    delete process.env.DATABASE_URL;
-
-    expect(() => getServerEnv()).toThrow(/DATABASE_URL/i);
   });
 
   it("requires explicit public URLs in production", () => {
