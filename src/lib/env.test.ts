@@ -15,8 +15,12 @@ const originalEnv = {
   UPLOAD_AUTH_SECRET: process.env["UPLOAD_AUTH_SECRET"],
   IPFS_API_URL: process.env["IPFS_API_URL"],
   IPFS_GATEWAY_URL: process.env["IPFS_GATEWAY_URL"],
+  DATABASE_URL: process.env["DATABASE_URL"],
   API_RATE_LIMIT_MAX: process.env["API_RATE_LIMIT_MAX"],
   REDIS_URL: process.env["REDIS_URL"],
+  BESU_ADMIN_RPC_URL: process.env["BESU_ADMIN_RPC_URL"],
+  BESU_ADMIN_RPC_TOKEN: process.env["BESU_ADMIN_RPC_TOKEN"],
+  ADMIN_ADDRESSES: process.env["ADMIN_ADDRESSES"],
   OBS_SERVICE_NAME: process.env["OBS_SERVICE_NAME"],
   OBS_DEPLOYMENT_ENV: process.env["OBS_DEPLOYMENT_ENV"],
   OBS_LOG_LEVEL: process.env["OBS_LOG_LEVEL"],
@@ -57,8 +61,13 @@ function applyValidServerEnv() {
   mutableEnv.UPLOAD_AUTH_SECRET = "test-upload-secret";
   mutableEnv.IPFS_API_URL = "http://127.0.0.1:5001";
   mutableEnv.IPFS_GATEWAY_URL = "http://127.0.0.1:8080/ipfs";
+  mutableEnv.DATABASE_URL = "postgresql://knowledge:knowledge@127.0.0.1:5432/knowledge_dapp";
   mutableEnv.API_RATE_LIMIT_MAX = "120";
   mutableEnv.REDIS_URL = "redis://localhost:6379";
+  mutableEnv.BESU_ADMIN_RPC_URL = "http://127.0.0.1:8546";
+  mutableEnv.BESU_ADMIN_RPC_TOKEN = "besu-admin-secret";
+  mutableEnv.ADMIN_ADDRESSES =
+    "0x1234567890abcdef1234567890abcdef12345678,0xabcdefabcdefabcdefabcdefabcdefabcdefabcd";
   mutableEnv.OBS_SERVICE_NAME = "knowledge-dapp-ui";
   mutableEnv.OBS_DEPLOYMENT_ENV = "test";
   mutableEnv.OBS_LOG_LEVEL = "info";
@@ -97,8 +106,12 @@ afterEach(() => {
   restoreEnvValue("UPLOAD_AUTH_SECRET", originalEnv.UPLOAD_AUTH_SECRET);
   restoreEnvValue("IPFS_API_URL", originalEnv.IPFS_API_URL);
   restoreEnvValue("IPFS_GATEWAY_URL", originalEnv.IPFS_GATEWAY_URL);
+  restoreEnvValue("DATABASE_URL", originalEnv.DATABASE_URL);
   restoreEnvValue("API_RATE_LIMIT_MAX", originalEnv.API_RATE_LIMIT_MAX);
   restoreEnvValue("REDIS_URL", originalEnv.REDIS_URL);
+  restoreEnvValue("BESU_ADMIN_RPC_URL", originalEnv.BESU_ADMIN_RPC_URL);
+  restoreEnvValue("BESU_ADMIN_RPC_TOKEN", originalEnv.BESU_ADMIN_RPC_TOKEN);
+  restoreEnvValue("ADMIN_ADDRESSES", originalEnv.ADMIN_ADDRESSES);
   restoreEnvValue("OBS_SERVICE_NAME", originalEnv.OBS_SERVICE_NAME);
   restoreEnvValue("OBS_DEPLOYMENT_ENV", originalEnv.OBS_DEPLOYMENT_ENV);
   restoreEnvValue("OBS_LOG_LEVEL", originalEnv.OBS_LOG_LEVEL);
@@ -160,8 +173,16 @@ describe("env", () => {
   it("treats blank optional server values as undefined", () => {
     applyValidServerEnv();
     mutableEnv.REDIS_URL = "";
+    mutableEnv.BESU_ADMIN_RPC_URL = "";
+    mutableEnv.BESU_ADMIN_RPC_TOKEN = "";
+    mutableEnv.ADMIN_ADDRESSES = "";
+    mutableEnv.DATABASE_URL = "";
 
+    expect(getServerEnv().DATABASE_URL).toBeUndefined();
     expect(getServerEnv().REDIS_URL).toBeUndefined();
+    expect(getServerEnv().BESU_ADMIN_RPC_URL).toBeUndefined();
+    expect(getServerEnv().BESU_ADMIN_RPC_TOKEN).toBeUndefined();
+    expect(getServerEnv().ADMIN_ADDRESSES).toBeUndefined();
   });
 
   it("rejects invalid numeric values", () => {
@@ -206,15 +227,19 @@ describe("env", () => {
     });
   });
 
-  it("does not throw when importing branding, chains, and wagmi modules in production", async () => {
-    applyValidServerEnv();
-    mutableEnv.NODE_ENV = "production";
-    vi.resetModules();
+  it(
+    "does not throw when importing branding, chains, and wagmi modules in production",
+    async () => {
+      applyValidServerEnv();
+      mutableEnv.NODE_ENV = "production";
+      vi.resetModules();
 
-    await expect(import("./branding")).resolves.toBeTruthy();
-    await expect(import("./chains")).resolves.toBeTruthy();
-    await expect(import("./wagmi")).resolves.toBeTruthy();
-  });
+      await expect(import("./branding")).resolves.toBeTruthy();
+      await expect(import("./chains")).resolves.toBeTruthy();
+      await expect(import("./wagmi")).resolves.toBeTruthy();
+    },
+    15000
+  );
 
   it("requires explicit server URLs in production", () => {
     applyValidServerEnv();

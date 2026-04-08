@@ -9,6 +9,14 @@ export type ApiRateLimitPolicyName =
   | "auth:verify"
   | "auth:session"
   | "auth:logout"
+  | "admin:session"
+  | "admin:overview"
+  | "admin:network"
+  | "admin:node-requests:list"
+  | "admin:node-requests:create"
+  | "admin:node-requests:status"
+  | "admin:node-requests:approve"
+  | "admin:node-requests:reject"
   | "ipfs:upload"
   | "client:error"
   | "faucet:nonce"
@@ -54,6 +62,22 @@ function getDefaultPolicy(name: ApiRateLimitPolicyName): ApiRateLimitPolicy {
       return { max: 60, windowSeconds: 60 };
     case "auth:logout":
       return { max: 20, windowSeconds: 60 };
+    case "admin:session":
+      return { max: 60, windowSeconds: 60 };
+    case "admin:overview":
+      return { max: 30, windowSeconds: 60 };
+    case "admin:network":
+      return { max: 30, windowSeconds: 60 };
+    case "admin:node-requests:list":
+      return { max: 60, windowSeconds: 60 };
+    case "admin:node-requests:create":
+      return { max: 20, windowSeconds: 300 };
+    case "admin:node-requests:status":
+      return { max: 120, windowSeconds: 60 };
+    case "admin:node-requests:approve":
+      return { max: 20, windowSeconds: 300 };
+    case "admin:node-requests:reject":
+      return { max: 20, windowSeconds: 300 };
     case "ipfs:upload":
       return { max: 10, windowSeconds: 300 };
     case "client:error":

@@ -24,6 +24,7 @@ export const INTERNAL_NAV_ITEMS = [
     testId: NAV_LINK_TEST_IDS.governance,
   },
   { key: "system", href: "/system", label: "System", testId: NAV_LINK_TEST_IDS.system },
+  { key: "admin", href: "/admin", label: "Admin", testId: NAV_LINK_TEST_IDS.admin },
 ] as const;
 
 export const EXTERNAL_NAV_ITEMS = [
@@ -31,6 +32,12 @@ export const EXTERNAL_NAV_ITEMS = [
 ] as const;
 
 export function getPageTitle(pathname: string) {
-  const item = INTERNAL_NAV_ITEMS.find((entry) => entry.href === pathname);
+  const item = INTERNAL_NAV_ITEMS.find((entry) => {
+    if (entry.href === "/") {
+      return pathname === "/";
+    }
+
+    return pathname === entry.href || pathname.startsWith(`${entry.href}/`);
+  });
   return item?.label || APP_SHELL_COPY.defaultPageTitle;
 }

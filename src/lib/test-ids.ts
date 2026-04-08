@@ -7,6 +7,7 @@ export const PAGE_TEST_IDS = {
   rewards: "page-rewards",
   governance: "page-governance",
   system: "page-system",
+  admin: "page-admin",
 } as const;
 
 export const NAV_LINK_TEST_IDS = {
@@ -18,6 +19,7 @@ export const NAV_LINK_TEST_IDS = {
   rewards: "nav-rewards",
   governance: "nav-governance",
   system: "nav-system",
+  admin: "nav-admin",
   explorer: "nav-explorer",
 } as const;
 

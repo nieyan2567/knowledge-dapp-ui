@@ -54,6 +54,11 @@ const optionalUrl = z.preprocess(
   z.string().url().optional()
 );
 
+const optionalString = z.preprocess(
+  emptyStringToUndefined,
+  z.string().trim().min(1).optional()
+);
+
 const productionRequiredPublicUrls = [
   "NEXT_PUBLIC_BESU_RPC_URL",
   "NEXT_PUBLIC_BLOCKSCOUT_URL",
@@ -88,7 +93,11 @@ const serverEnvSchema = publicEnvSchema
     UPLOAD_AUTH_NONCE_TTL_SECONDS: positiveIntWithDefault(300),
     UPLOAD_AUTH_SESSION_TTL_SECONDS: positiveIntWithDefault(2 * 60 * 60),
     UPLOAD_MAX_FILE_SIZE_BYTES: positiveIntWithDefault(512 * 1024 * 1024),
+    DATABASE_URL: optionalUrl,
     REDIS_URL: optionalUrl,
+    BESU_ADMIN_RPC_URL: optionalUrl,
+    BESU_ADMIN_RPC_TOKEN: optionalString,
+    ADMIN_ADDRESSES: optionalString,
     API_RATE_LIMIT_WINDOW_SECONDS: positiveIntWithDefault(60),
     API_RATE_LIMIT_MAX: positiveIntWithDefault(120),
     OBS_SERVICE_NAME: z.preprocess(
@@ -274,7 +283,11 @@ function getServerEnvSource() {
     UPLOAD_AUTH_SESSION_TTL_SECONDS:
       process.env.UPLOAD_AUTH_SESSION_TTL_SECONDS,
     UPLOAD_MAX_FILE_SIZE_BYTES: process.env.UPLOAD_MAX_FILE_SIZE_BYTES,
+    DATABASE_URL: process.env.DATABASE_URL,
     REDIS_URL: process.env.REDIS_URL,
+    BESU_ADMIN_RPC_URL: process.env.BESU_ADMIN_RPC_URL,
+    BESU_ADMIN_RPC_TOKEN: process.env.BESU_ADMIN_RPC_TOKEN,
+    ADMIN_ADDRESSES: process.env.ADMIN_ADDRESSES,
     API_RATE_LIMIT_WINDOW_SECONDS: process.env.API_RATE_LIMIT_WINDOW_SECONDS,
     API_RATE_LIMIT_MAX: process.env.API_RATE_LIMIT_MAX,
     OBS_SERVICE_NAME: process.env.OBS_SERVICE_NAME,

@@ -12,6 +12,7 @@ import {
   Droplets,
   ExternalLink,
   LayoutDashboard,
+  LockKeyhole,
   Shield,
   UserRound,
   Vote,
@@ -47,6 +48,7 @@ const iconMap = {
   rewards: Coins,
   governance: Vote,
   system: Shield,
+  admin: LockKeyhole,
   explorer: ExternalLink,
 } as const;
 
