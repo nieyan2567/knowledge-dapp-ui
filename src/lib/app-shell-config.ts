@@ -24,7 +24,7 @@ export const INTERNAL_NAV_ITEMS = [
     testId: NAV_LINK_TEST_IDS.governance,
   },
   { key: "system", href: "/system", label: "System", testId: NAV_LINK_TEST_IDS.system },
-  { key: "admin", href: "/admin", label: "Admin", testId: NAV_LINK_TEST_IDS.admin },
+  // { key: "admin", href: "/admin", label: "Admin", testId: NAV_LINK_TEST_IDS.admin },
 ] as const;
 
 export const EXTERNAL_NAV_ITEMS = [
