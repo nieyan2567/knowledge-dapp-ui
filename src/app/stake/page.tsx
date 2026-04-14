@@ -16,6 +16,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { ABIS, CONTRACTS } from "@/contracts";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { BRANDING } from "@/lib/branding";
 import { PAGE_TEST_IDS } from "@/lib/test-ids";
@@ -54,12 +55,8 @@ export default function StakePage() {
 		typeof blockNumber === "bigint" ? blockNumber : undefined
 	);
 
-	useEffect(() => {
-		const timer = window.setInterval(() => {
-			setNowTs(Math.floor(Date.now() / 1000));
-		}, 1000);
-
-		return () => window.clearInterval(timer);
+	const refreshNowTs = useCallback(() => {
+		setNowTs(Math.floor(Date.now() / 1000));
 	}, []);
 
 	useEffect(() => {
@@ -68,32 +65,29 @@ export default function StakePage() {
 		}
 	}, [blockNumber]);
 
-	useEffect(() => {
+	const updateBlockNumber = useCallback(async () => {
 		if (!publicClient) return;
 
-		let cancelled = false;
-
-		const updateBlockNumber = async () => {
-			try {
-				const latestBlock = await publicClient.getBlockNumber();
-				if (!cancelled) {
-					setLiveBlockNumber(latestBlock);
-				}
-			} catch {
-				// Ignore transient polling failures and keep the last known block number.
-			}
-		};
-
-		void updateBlockNumber();
-		const timer = window.setInterval(() => {
-			void updateBlockNumber();
-		}, 8000);
-
-		return () => {
-			cancelled = true;
-			window.clearInterval(timer);
-		};
+		try {
+			const latestBlock = await publicClient.getBlockNumber();
+			setLiveBlockNumber(latestBlock);
+		} catch {
+			// Ignore transient polling failures and keep the last known block number.
+		}
 	}, [publicClient]);
+
+	useAutoRefresh({
+		enabled: true,
+		onRefresh: refreshNowTs,
+		intervalMs: 1000,
+	});
+
+	useAutoRefresh({
+		enabled: !!publicClient,
+		onRefresh: updateBlockNumber,
+		intervalMs: 8000,
+		runImmediately: true,
+	});
 
 	function parseAmount(value: string, field: string) {
 		if (!value.trim()) {
@@ -791,6 +785,5 @@ function QuickAmountButton({
 		</button>
 	);
 }
-
 
 

@@ -15,10 +15,15 @@ import {
 } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useEnsureKnowledgeChain } from "@/hooks/useEnsureKnowledgeChain";
 import { BRANDING } from "@/lib/branding";
 import { FAUCET_COPY, getFaucetSuccessTitle } from "@/lib/faucet/copy";
 
 export function ConnectAction() {
+  const { ensureChain, hasWalletRequest, isSwitching } = useEnsureKnowledgeChain({
+    errorMessage: `切换到 ${BRANDING.chainName} 失败，请重试`,
+  });
+
   return (
     <ConnectButton.Custom>
       {({
@@ -60,10 +65,19 @@ export function ConnectAction() {
           return (
             <button
               type="button"
-              onClick={openChainModal}
+              onClick={() => {
+                if (!hasWalletRequest) {
+                  openChainModal();
+                  return;
+                }
+
+                void ensureChain();
+              }}
               className="inline-flex h-11 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/50"
             >
-              {FAUCET_COPY.page.wrongNetwork}
+              {isSwitching
+                ? `切换到 ${BRANDING.chainName}...`
+                : FAUCET_COPY.page.wrongNetwork}
             </button>
           );
         }

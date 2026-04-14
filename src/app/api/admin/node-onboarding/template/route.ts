@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 import JSZip from "jszip";
@@ -8,17 +8,27 @@ export const runtime = "nodejs";
 
 const templateRoot = path.join(process.cwd(), "infra", "besu-join-node");
 
-const templateFiles = [
-  ".env.example",
-  "docker-compose.yml",
-  "README.md",
-  path.join("network", "README.md"),
-  path.join("scripts", "get-enode.sh"),
-  path.join("scripts", "get-enode.ps1"),
-];
+async function collectTemplateFiles(root: string, currentDir = ""): Promise<string[]> {
+  const absoluteDir = path.join(root, currentDir);
+  const entries = await readdir(absoluteDir, { withFileTypes: true });
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const relativePath = path.join(currentDir, entry.name);
+
+      if (entry.isDirectory()) {
+        return collectTemplateFiles(root, relativePath);
+      }
+
+      return relativePath;
+    })
+  );
+
+  return files.flat().sort();
+}
 
 export async function GET() {
   const zip = new JSZip();
+  const templateFiles = await collectTemplateFiles(templateRoot);
 
   await Promise.all(
     templateFiles.map(async (filePath) => {

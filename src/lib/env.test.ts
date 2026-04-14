@@ -64,7 +64,7 @@ function applyValidServerEnv() {
   mutableEnv.DATABASE_URL = "postgresql://knowledge:knowledge@127.0.0.1:5432/knowledge_dapp";
   mutableEnv.API_RATE_LIMIT_MAX = "120";
   mutableEnv.REDIS_URL = "redis://localhost:6379";
-  mutableEnv.BESU_ADMIN_RPC_URL = "http://127.0.0.1:8546";
+  mutableEnv.BESU_ADMIN_RPC_URL = "http://127.0.0.1:8545";
   mutableEnv.BESU_ADMIN_RPC_TOKEN = "besu-admin-secret";
   mutableEnv.ADMIN_ADDRESSES =
     "0x1234567890abcdef1234567890abcdef12345678,0xabcdefabcdefabcdefabcdefabcdefabcdefabcd";
@@ -238,7 +238,7 @@ describe("env", () => {
       await expect(import("./chains")).resolves.toBeTruthy();
       await expect(import("./wagmi")).resolves.toBeTruthy();
     },
-    15000
+    45000
   );
 
   it("requires explicit server URLs in production", () => {

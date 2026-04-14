@@ -10,6 +10,9 @@ export type ApiRateLimitPolicyName =
   | "auth:session"
   | "auth:logout"
   | "admin:session"
+  | "admin:admin-addresses:list"
+  | "admin:admin-addresses:create"
+  | "admin:admin-addresses:update"
   | "admin:overview"
   | "admin:network"
   | "admin:node-requests:list"
@@ -17,6 +20,12 @@ export type ApiRateLimitPolicyName =
   | "admin:node-requests:status"
   | "admin:node-requests:approve"
   | "admin:node-requests:reject"
+  | "admin:node-requests:revoke"
+  | "admin:validator-requests:list"
+  | "admin:validator-requests:create"
+  | "admin:validator-requests:approve"
+  | "admin:validator-requests:reject"
+  | "admin:validator-requests:remove"
   | "ipfs:upload"
   | "client:error"
   | "faucet:nonce"
@@ -64,6 +73,12 @@ function getDefaultPolicy(name: ApiRateLimitPolicyName): ApiRateLimitPolicy {
       return { max: 20, windowSeconds: 60 };
     case "admin:session":
       return { max: 60, windowSeconds: 60 };
+    case "admin:admin-addresses:list":
+      return { max: 60, windowSeconds: 60 };
+    case "admin:admin-addresses:create":
+      return { max: 20, windowSeconds: 300 };
+    case "admin:admin-addresses:update":
+      return { max: 20, windowSeconds: 300 };
     case "admin:overview":
       return { max: 30, windowSeconds: 60 };
     case "admin:network":
@@ -77,6 +92,18 @@ function getDefaultPolicy(name: ApiRateLimitPolicyName): ApiRateLimitPolicy {
     case "admin:node-requests:approve":
       return { max: 20, windowSeconds: 300 };
     case "admin:node-requests:reject":
+      return { max: 20, windowSeconds: 300 };
+    case "admin:node-requests:revoke":
+      return { max: 20, windowSeconds: 300 };
+    case "admin:validator-requests:list":
+      return { max: 60, windowSeconds: 60 };
+    case "admin:validator-requests:create":
+      return { max: 20, windowSeconds: 300 };
+    case "admin:validator-requests:approve":
+      return { max: 20, windowSeconds: 300 };
+    case "admin:validator-requests:reject":
+      return { max: 20, windowSeconds: 300 };
+    case "admin:validator-requests:remove":
       return { max: 20, windowSeconds: 300 };
     case "ipfs:upload":
       return { max: 10, windowSeconds: 300 };

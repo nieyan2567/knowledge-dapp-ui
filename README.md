@@ -1,54 +1,18 @@
 # Knowledge DApp UI
 
-基于 Next.js 16、React 19、Wagmi 和 RainbowKit 的知识内容协作 DApp 前端。项目面向本地 KnowChain 网络，提供内容上链、质押投票、治理提案、奖励领取、Faucet 和系统概览等功能。
+基于 Next.js 16、React 19、Wagmi 和 RainbowKit 的联盟链知识协作应用前端。
 
-## 项目概览
+当前版本面向本地或测试环境中的 Besu / EVM 网络，主要覆盖内容上链、质押投票、治理提案、奖励领取、Faucet 和系统概览等能力。
 
-当前前端覆盖的主要流程：
+## 功能范围
 
-- 连接钱包并切换到 KnowChain
-- 上传文件到本地 IPFS，并将内容登记到 `KnowledgeContent`
-- 通过 `NativeVotes` 质押原生币并激活投票权
-- 对内容投票、触发奖励记账、领取 `TreasuryNative` 奖励
-- 通过 `KnowledgeGovernor + TimelockController` 发起、投票、排队和执行治理提案
-- 通过 Faucet 为新钱包发放启动资金
-
-## 功能模块
-
-### Dashboard
-
-- 展示钱包连接状态和当前网络
-- 展示投票权、待领取奖励、内容数量和 Treasury 概览
-
-### Stake
-
-- 质押原生币到 `NativeVotes`
-- 激活待生效质押，获得投票权
-- 发起退出申请，并在冷却期后提取
-
-### Content
-
-- 通过钱包签名完成上传鉴权
-- 上传文件到本地 IPFS
-- 调用 `registerContent` 将内容登记上链
-- 浏览内容列表、查看详情、投票、发起奖励记账
-
-### Rewards
-
-- 查看当前账户待领取奖励
-- 查看奖励历史记录和奖励来源
-- 调用 `claim` 领取奖励
-
-### Governance
-
-- 查看提案门槛、投票延迟和投票周期
-- 发起针对治理参数和系统配置的治理提案
-- 浏览提案列表、查看详情、投票、排队和执行
-
-### System
-
-- 查看核心合约地址
-- 查看 owner、treasury、votesContract、timelock 等关键链上信息
+- Dashboard：展示钱包、投票权、奖励和 Treasury 摘要
+- Stake：质押原生代币、激活投票权、发起退出和提取
+- Content：上传内容到本地 IPFS，并登记到链上
+- Rewards：查看待领取奖励、奖励来源和领取历史
+- Governance：发起提案、投票、排队和执行
+- Faucet：为新钱包发放启动资金
+- System：查看核心合约和运行参数
 
 ## 技术栈
 
@@ -60,7 +24,6 @@
 - RainbowKit
 - Viem
 - TanStack Query
-- Sonner
 - Redis
 - Zod
 - Vitest
@@ -71,36 +34,33 @@
 ```text
 src/
   app/
-    page.tsx                  # Dashboard
-    faucet/page.tsx           # Faucet
-    stake/page.tsx            # 质押与投票权
-    content/page.tsx          # 内容上传与列表
-    content/[id]/page.tsx     # 内容详情
-    rewards/page.tsx          # 奖励中心
-    governance/page.tsx       # 治理中心
-    governance/[id]/page.tsx  # 提案详情
-    system/page.tsx           # 系统概览
-    api/
-      auth/                   # 上传鉴权
-      faucet/                 # Faucet nonce / claim
-      ipfs/upload/            # 本地 IPFS 上传
-      system/rebalance/       # RevenueVault 结算触发接口
-      system/faucet/maintenance/ # Faucet relayer 维护任务接口
-  components/                 # 通用 UI 组件
-  contracts/                  # ABI 与部署地址
-  hooks/                      # Wagmi / 刷新 / 上传鉴权 hooks
-  lib/                        # 链配置、鉴权、Faucet、治理和工具函数
+    api/                    # Next Route Handlers
+    content/                # 内容上传与详情
+    faucet/                 # Faucet
+    governance/             # 治理
+    profile/                # 账户资料
+    rewards/                # 奖励中心
+    stake/                  # 质押与投票权
+    system/                 # 系统概览
+  components/               # 页面组件与通用 UI
+  contracts/                # ABI 与部署地址
+  hooks/                    # 链交互、自动刷新、鉴权 hooks
+  lib/                      # 配置、鉴权、链交互、工具函数
+  server/                   # 服务端逻辑
+e2e/                        # Playwright 用例
+infra/                      # 辅助模板与基础设施示例
+scripts/                    # 辅助脚本
 ```
 
 ## 本地依赖
 
-建议先确保以下服务可用：
+建议先准备这些服务：
 
 - Besu / EVM RPC：`http://127.0.0.1:8545`
 - Blockscout：`http://127.0.0.1:8182`
 - IPFS Kubo API：`http://127.0.0.1:5001`
 - IPFS Gateway：`http://127.0.0.1:8080/ipfs`
-- Redis：用于上传鉴权 nonce 和 Faucet 限流
+- Redis：用于上传鉴权、限流和 Faucet
 
 ## 安装与启动
 
@@ -110,7 +70,7 @@ src/
 npm install
 ```
 
-复制环境变量模板并按需填写：
+复制环境变量模板：
 
 ```bash
 cp .env.example .env.local
@@ -122,7 +82,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-打开：
+默认访问：
 
 ```text
 http://localhost:3000
@@ -137,156 +97,121 @@ npm run start
 
 ## 环境变量
 
-项目提供 [.env.example](./.env.example) 作为模板。当前主要变量如下。
+项目提供 [.env.example](./.env.example) 作为模板。以下是当前最关键的配置项。
 
 ### 链与钱包
 
 - `NEXT_PUBLIC_BESU_RPC_URL`：前端读取链上数据的 RPC 地址
-- `NEXT_PUBLIC_BESU_CHAIN_ID`：当前链 ID，默认 `20260`
-- `NEXT_PUBLIC_BLOCKSCOUT_URL`：区块浏览器地址
+- `NEXT_PUBLIC_BESU_CHAIN_ID`：链 ID，默认 `20260`
+- `NEXT_PUBLIC_BLOCKSCOUT_URL`：浏览器地址
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`：WalletConnect 项目 ID
 
-### 上传服务
+### 上传与 IPFS
 
-- `UPLOAD_PROVIDER`：当前仅支持 `local`
-- `IPFS_API_URL`：服务端调用 Kubo 上传文件时使用的 API 地址
-- `IPFS_GATEWAY_URL`：服务端拼接返回的网关地址
-- `NEXT_PUBLIC_IPFS_GATEWAY_URL`：前端查看内容时使用的网关地址
-- `UPLOAD_AUTH_SECRET`：上传鉴权 session 的签名密钥
-- `UPLOAD_AUTH_NONCE_TTL_SECONDS`：上传鉴权 nonce 有效期
-- `UPLOAD_AUTH_SESSION_TTL_SECONDS`：上传鉴权 session 有效期
+- `UPLOAD_PROVIDER`
+- `IPFS_API_URL`
+- `IPFS_GATEWAY_URL`
+- `NEXT_PUBLIC_IPFS_GATEWAY_URL`
+- `UPLOAD_AUTH_SECRET`
+- `UPLOAD_MAX_FILE_SIZE_BYTES`
 
-### Redis
+### Redis 与限流
 
-- `REDIS_URL`：上传鉴权和 Faucet 限流依赖的 Redis 地址
+- `REDIS_URL`
+- `API_RATE_LIMIT_WINDOW_SECONDS`
+- `API_RATE_LIMIT_MAX`
 
-### Faucet
+### Faucet 与系统维护
 
-- `FAUCET_AUTH_SIGNER_PRIVATE_KEY`：用于签发 Faucet 领取授权的私钥
-- `FAUCET_RELAYER_PRIVATE_KEY`：用于提交 Faucet `claim` / `rebalance` 交易的私钥
-- `FAUCET_TOP_UP_FUNDER_PRIVATE_KEY`：用于在 relayer 余额低于阈值时自动补充 Gas 的运维钱包私钥
-- `SYSTEM_API_TOKEN`：服务端内部维护接口的 Bearer Token，供 `/api/system/faucet/maintenance` 等系统任务使用
-- `REBALANCE_API_TOKEN`：服务端 `POST /api/system/rebalance` 接口的 Bearer Token
-- `FAUCET_AMOUNT`：每次领取的启动资金数量
-- `FAUCET_MIN_BALANCE`：钱包余额达到该阈值后不再允许领取
-- `FAUCET_RELAYER_ALERT_MIN_BALANCE`：relayer 低余额告警阈值
-- `FAUCET_RELAYER_TOP_UP_AMOUNT`：每次自动为 relayer 补充的 Gas 数量
-- `FAUCET_VAULT_ALERT_MIN_BALANCE`：`FaucetVault` 低余额告警阈值
-- `FAUCET_COOLDOWN_HOURS`：领取冷却时间
-- `FAUCET_NONCE_TTL_SECONDS`：Faucet 签名 challenge 有效期
+- `FAUCET_AUTH_SIGNER_PRIVATE_KEY`
+- `FAUCET_RELAYER_PRIVATE_KEY`
+- `FAUCET_TOP_UP_FUNDER_PRIVATE_KEY`
+- `SYSTEM_API_TOKEN`
+- `REBALANCE_API_TOKEN`
+
+## 测试
+
+单元测试与路由测试：
+
+```bash
+npm run test:run
+```
+
+监听模式：
+
+```bash
+npm run test
+```
+
+端到端测试：
+
+```bash
+npm run test:e2e
+```
+
+显示浏览器运行 E2E：
+
+```bash
+npm run test:e2e:headed
+```
+
+完整检查：
+
+```bash
+npm run check
+```
+
+## E2E 说明
+
+- Playwright 会在本地启动一个独立的 Next.js 开发服务
+- 当前 E2E 主要覆盖导航和断开钱包场景
+- 测试中的链 RPC 请求通过本地 mock 处理，不依赖真实链节点
 
 ## Faucet Maintenance
 
-生产环境建议定时调用 `POST /api/system/faucet/maintenance`，而不是等用户点击 Faucet 时才发现 relayer 余额不足。该接口会：
+生产环境建议定时调用：
 
-- 检查 `FAUCET_RELAYER_PRIVATE_KEY` 对应钱包余额
-- 当 relayer 余额低于 `FAUCET_RELAYER_ALERT_MIN_BALANCE` 时，用 `FAUCET_TOP_UP_FUNDER_PRIVATE_KEY` 自动补充 `FAUCET_RELAYER_TOP_UP_AMOUNT`
-- 当 relayer 或 `FaucetVault` 余额低于阈值时，走现有 `OBS_ALERT_WEBHOOK_URL` 告警
+- `POST /api/system/faucet/maintenance`
 
-手动执行一次维护任务：
+它会检查 relayer 余额，并在需要时自动补充 gas。
+
+示例：
 
 ```bash
 curl --fail --show-error --silent \
   -X POST "https://your-domain.com/api/system/faucet/maintenance" \
-  -H "Authorization: Bearer YOUR_SYSTEM_API_TOKEN" \
-  -H "Content-Type: application/json"
+  -H "Authorization: Bearer YOUR_SYSTEM_API_TOKEN"
 ```
 
-PowerShell 示例：
+## 常见问题
 
-```powershell
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "https://your-domain.com/api/system/faucet/maintenance" `
-  -Headers @{ Authorization = "Bearer YOUR_SYSTEM_API_TOKEN" }
-```
+### 1. 钱包已连接，但页面仍然无法读取链上数据
 
-如果使用 GitHub Actions schedule：
+优先检查：
 
-- 在仓库 `Settings -> Secrets and variables -> Actions` 中创建 `FAUCET_MAINTENANCE_URL`
-- 在仓库 `Settings -> Secrets and variables -> Actions` 中创建 `SYSTEM_API_TOKEN`
-- 在 `.github/workflows/faucet-maintenance.yml` 中定时调用 maintenance API
+- `NEXT_PUBLIC_BESU_RPC_URL` 是否可访问
+- `NEXT_PUBLIC_BESU_CHAIN_ID` 是否与当前链一致
+- 浏览器钱包是否已切换到正确网络
 
-## 质量门禁
+### 2. 内容上传失败
 
-常用脚本：
+优先检查：
 
-```bash
-npm run lint
-npm run typecheck
-npm run test
-npm run test:run
-npm run test:e2e
-npm run check
-```
+- `IPFS_API_URL` 是否可访问
+- `UPLOAD_AUTH_SECRET` 是否已配置
+- 上传文件大小是否超过 `UPLOAD_MAX_FILE_SIZE_BYTES`
 
-其中：
+### 3. Faucet 领取失败
 
-- `lint`：运行 ESLint
-- `typecheck`：运行 TypeScript 类型检查
-- `test`：启动 Vitest 监听模式
-- `test:run`：执行一次性单元测试
-- `test:e2e`：执行 Playwright 端到端测试
-- `check`：依次执行 `lint`、`typecheck` 和 `test:run`
+优先检查：
 
-GitHub Actions 已接入 CI，会在 push 和 pull request 时自动执行质量门禁。
+- Faucet 私钥是否已配置
+- relayer 账户是否有足够 gas
+- Redis 是否可用
+- 当前地址是否命中了冷却时间限制
 
-## 当前合约配置
+## 当前已知待完善项
 
-当前仓库中的部署配置来自 `src/contracts/deployment.json`：
-
-- Network: `consortium`
-- Chain ID: `20260`
-- NativeVotes: `0xf913CC093f66D705936f3c8376eF4CDaAD970a42`
-- KnowledgeContent: `0xd68fbD1ce33ed4A71Dc48780D377Be0466735b04`
-- TreasuryNative: `0x1f95175342cf3d46031bbCE29a339AfD8335db99`
-- FaucetVault: `0xd0de0912991896691E3671157A2adada5B102aFB`
-- RevenueVault: `0x5f1F054903776a5025806Fc4FEeB0b0e55799A68`
-- TimelockController: `0xb1bb987e0d1eEE912aD4c68BC587Dd2DE0826157`
-- KnowledgeGovernor: `0x68913B494138FA4C2dD78AAA60D4933B0De753E5`
-
-## 上传鉴权流程
-
-`/api/ipfs/upload` 受签名鉴权保护，基本流程如下：
-
-1. 前端请求 `/api/auth/nonce`
-2. 用户使用钱包签名上传鉴权消息
-3. 服务端通过 `/api/auth/verify` 校验签名
-4. 校验通过后写入上传 session Cookie
-5. 前端再调用 `/api/ipfs/upload`
-
-## Faucet 限流说明
-
-Faucet 当前采用“钱包地址 + IP”双限流：
-
-- 同一个钱包不能重复领取
-- 同一个来源频繁切换新钱包也会被限制
-- 领取前会先做预检，避免先弹签名再失败
-
-## 常见排查
-
-### 页面一直连不上链
-
-- 检查 `NEXT_PUBLIC_BESU_RPC_URL`
-- 检查本地链是否启动
-- 检查钱包是否切换到正确的 Chain ID
-
-### IPFS 上传失败
-
-- 检查 `IPFS_API_URL` 对应的 Kubo API 是否正常
-- 检查 `UPLOAD_AUTH_SECRET` 是否已配置
-- 检查 Redis 是否可用
-
-### Faucet 无法领取
-
-- 检查钱包余额是否已经高于 `FAUCET_MIN_BALANCE`
-- 检查是否仍在冷却期内
-- 检查 `FaucetVault` 和 relayer 余额是否充足
-- 检查是否已执行过 `/api/system/faucet/maintenance`
-- 检查 relayer 地址是否已被 `FAUCET_TOP_UP_FUNDER_PRIVATE_KEY` 成功补充 Gas
-
-## 说明
-
-- 这个项目目前主要面向本地链开发环境
-- 前端已具备基础质量门禁、API schema 校验和 Faucet 双限流
-- 后续仍建议继续补全全局错误监控、事件索引优化和更多测试覆盖
+- E2E 还没有完全覆盖质押、治理、内容上传和奖励领取全链路
+- 生产部署说明仍可继续补充，例如反向代理、进程托管和备份策略
+- 真实链环境下的长期运行监控与告警能力仍可继续完善

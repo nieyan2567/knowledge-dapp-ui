@@ -6,6 +6,11 @@ import { getAddress } from "viem";
 import { errorResponse, type ValidationResult } from "@/lib/api-validation";
 import { readUploadSession } from "@/lib/auth/session";
 import { getServerEnv } from "@/lib/env";
+import {
+  AdminAddressStoreUnavailableError,
+  hasAnyAdminAddresses,
+  isAdminAddress,
+} from "@/server/admin/store";
 
 export type AdminRequestContext = {
   address: `0x${string}` | null;
@@ -26,8 +31,26 @@ function normalizeAddressList(value: string | undefined) {
   );
 }
 
-export function getAdminAddressSet() {
+export function getBootstrapAdminAddressSet() {
   return normalizeAddressList(getServerEnv().ADMIN_ADDRESSES);
+}
+
+async function resolveAdminStatus(address: `0x${string}`) {
+  const normalizedAddress = address.toLowerCase();
+
+  try {
+    const hasPersistedAdmins = await hasAnyAdminAddresses();
+
+    if (hasPersistedAdmins) {
+      return await isAdminAddress(address);
+    }
+  } catch (error) {
+    if (!(error instanceof AdminAddressStoreUnavailableError)) {
+      throw error;
+    }
+  }
+
+  return getBootstrapAdminAddressSet().has(normalizedAddress);
 }
 
 export async function readAdminRequestContext(
@@ -35,11 +58,10 @@ export async function readAdminRequestContext(
 ): Promise<AdminRequestContext> {
   const session = await readUploadSession(req);
   const address = session?.sub ?? null;
-  const adminAddresses = getAdminAddressSet();
 
   return {
     address,
-    isAdmin: !!address && adminAddresses.has(address.toLowerCase()),
+    isAdmin: address ? await resolveAdminStatus(address) : false,
   };
 }
 

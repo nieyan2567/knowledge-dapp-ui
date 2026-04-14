@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 
+import { CopyField } from "@/components/copy-field";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 
@@ -62,7 +63,7 @@ export function NodeOnboardingPage() {
         }
       />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.60fr)_minmax(0,0.40fr)]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.30fr)_minmax(0,0.70fr)]">
         <div className="min-w-0 space-y-6">
           <SectionCard
             title="你需要先准备什么"
@@ -273,15 +274,14 @@ function ChecklistItem({ children }: { children: ReactNode }) {
 }
 
 function PathCard({ path, desc }: { path: string; desc: string }) {
+  const label = path.split("/").at(-1) || "路径";
+
   return (
-    <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/30">
-      <div
-        title={path}
-        className="truncate font-mono text-sm text-slate-900 dark:text-slate-100"
-      >
-        {path}
+    <div className="min-w-0 space-y-2">
+      <CopyField label={label} value={path} />
+      <div className="px-1 text-sm text-slate-600 dark:text-slate-300">
+        {desc}
       </div>
-      <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">{desc}</div>
     </div>
   );
 }

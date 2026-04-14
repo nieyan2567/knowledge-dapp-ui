@@ -21,6 +21,7 @@ import {
 import clsx from "clsx";
 
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useEnsureKnowledgeChain } from "@/hooks/useEnsureKnowledgeChain";
 import {
   APP_SHELL_COPY,
   EXTERNAL_NAV_ITEMS,
@@ -55,6 +56,10 @@ const iconMap = {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isStandaloneRoute = pathname.startsWith("/faucet");
+  const { ensureChain, hasWalletRequest, isSwitching } = useEnsureKnowledgeChain({
+    auto: !isStandaloneRoute,
+    errorMessage: `切换到 ${BRANDING.chainName} 失败，请重试`,
+  });
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
     const saved = localStorage.getItem("knowledge-sidebar-collapsed");
@@ -281,12 +286,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 if (chain.unsupported) {
                   return (
                     <button
-                      onClick={openChainModal}
+                      onClick={() => {
+                        if (!hasWalletRequest) {
+                          openChainModal();
+                          return;
+                        }
+
+                        void ensureChain();
+                      }}
                       className={clsx(topbarButtonClass, dangerButtonClass)}
                       type="button"
                     >
                       <Shield className="h-4 w-4" />
-                      {APP_SHELL_COPY.wrongNetwork}
+                      {isSwitching ? `切换到 ${BRANDING.chainName}...` : APP_SHELL_COPY.wrongNetwork}
                     </button>
                   );
                 }

@@ -9,6 +9,7 @@ import { useAccount, usePublicClient, useReadContract, useWriteContract } from "
 
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { ABIS, CONTRACTS } from "@/contracts";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
@@ -33,6 +34,9 @@ import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt } from "@/lib/web3-types";
 
 type HistoryFilter = (typeof REWARD_HISTORY_FILTERS)[number];
+type LoadRewardActivityOptions = {
+  background?: boolean;
+};
 
 function reportRewardsPageError(message: string, error: unknown) {
   void reportClientError({
@@ -98,14 +102,17 @@ export default function RewardsPage() {
   const spent = spentValue ? Number(formatEther(spentValue)) : 0;
   const progress = budget ? Math.min((spent / budget) * 100, 100) : 0;
 
-  const loadRewardActivity = useCallback(async () => {
+  const loadRewardActivity = useCallback(
+    async ({ background = false }: LoadRewardActivityOptions = {}) => {
     if (!publicClient || !address) {
       setRewardHistory([]);
       setRewardSources([]);
       return;
     }
 
-    setLoadingRewardActivity(true);
+    if (!background) {
+      setLoadingRewardActivity(true);
+    }
 
     try {
       const { historyItems, rewardSources } = await fetchRewardActivity(publicClient, {
@@ -119,16 +126,20 @@ export default function RewardsPage() {
       reportRewardsPageError("Failed to load reward activity", error);
       toast.error(REWARDS_PAGE_COPY.loadActivityFailed);
     } finally {
-      setLoadingRewardActivity(false);
+      if (!background) {
+        setLoadingRewardActivity(false);
+      }
     }
-  }, [address, publicClient]);
+    },
+    [address, publicClient]
+  );
 
   const refreshRewardsData = useCallback(async () => {
     await Promise.all([
       refetchPendingRewards(),
       refetchEpochBudget(),
       refetchEpochSpent(),
-      loadRewardActivity(),
+      loadRewardActivity({ background: true }),
     ]);
   }, [loadRewardActivity, refetchEpochBudget, refetchEpochSpent, refetchPendingRewards]);
 
@@ -144,15 +155,10 @@ export default function RewardsPage() {
     void loadRewardActivity();
   }, [loadRewardActivity]);
 
-  useEffect(() => {
-    if (!address) return;
-
-    const timer = window.setInterval(() => {
-      void refreshRewardsData();
-    }, 30000);
-
-    return () => window.clearInterval(timer);
-  }, [address, refreshRewardsData]);
+  useAutoRefresh({
+    enabled: !!address,
+    onRefresh: refreshRewardsData,
+  });
 
   const filteredRewardHistory = useMemo(
     () =>

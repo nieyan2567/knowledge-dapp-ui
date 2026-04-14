@@ -12,6 +12,7 @@ import { toast } from "sonner";
 
 import { GovernancePageLayout } from "@/components/governance/governance-page-layout";
 import { ABIS, CONTRACTS } from "@/contracts";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { useRefreshOnTxConfirmed } from "@/hooks/useRefreshOnTxConfirmed";
 import { useTxEventRefetch } from "@/hooks/useTxEventRefetch";
 import {
@@ -80,12 +81,8 @@ export default function GovernancePage() {
   );
   const latestProposal = proposals[0];
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNowTs(Math.floor(Date.now() / 1000));
-    }, 1000);
-
-    return () => window.clearInterval(timer);
+  const refreshNowTs = useCallback(() => {
+    setNowTs(Math.floor(Date.now() / 1000));
   }, []);
 
   useEffect(() => {
@@ -94,32 +91,31 @@ export default function GovernancePage() {
     }
   }, [blockNumber]);
 
-  useEffect(() => {
-    if (!publicClient) return;
+  const updateBlockNumber = useCallback(async () => {
+    if (!publicClient) {
+      return;
+    }
 
-    let cancelled = false;
-
-    const updateBlockNumber = async () => {
-      try {
-        const latestBlock = await publicClient.getBlockNumber();
-        if (!cancelled) {
-          setLiveBlockNumber(latestBlock);
-        }
-      } catch {
-        // Keep the latest known block when polling fails transiently.
-      }
-    };
-
-    void updateBlockNumber();
-    const timer = window.setInterval(() => {
-      void updateBlockNumber();
-    }, 8000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
+    try {
+      const latestBlock = await publicClient.getBlockNumber();
+      setLiveBlockNumber(latestBlock);
+    } catch {
+      // Keep the latest known block when polling fails transiently.
+    }
   }, [publicClient]);
+
+  useAutoRefresh({
+    enabled: true,
+    onRefresh: refreshNowTs,
+    intervalMs: 1000,
+  });
+
+  useAutoRefresh({
+    enabled: !!publicClient,
+    onRefresh: updateBlockNumber,
+    intervalMs: 8000,
+    runImmediately: true,
+  });
 
   const templates = useMemo(() => getGovernanceTemplates(), []);
   const groupedTemplates = useMemo(() => groupGovernanceTemplates(templates), [templates]);
@@ -477,4 +473,3 @@ export default function GovernancePage() {
     />
   );
 }
-

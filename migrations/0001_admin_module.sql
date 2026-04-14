@@ -20,15 +20,15 @@ alter table node_request
   add constraint node_request_status_check
   check (status in ('pending', 'approved', 'rejected', 'revoked'));
 
+alter table node_request
+  add column if not exists node_rpc_url text;
+
 create unique index if not exists node_request_enode_active_idx
   on node_request (lower(enode))
   where status in ('pending', 'approved');
 
 create index if not exists node_request_status_idx
   on node_request (status, create_time desc);
-
-alter table node_request
-  add column if not exists node_rpc_url text;
 
 create table if not exists validator_request (
   id uuid primary key,
@@ -66,16 +66,3 @@ create table if not exists admin_action_log (
 
 create index if not exists admin_action_log_create_time_idx
   on admin_action_log (create_time desc);
-
-create table if not exists admin_address (
-  id uuid primary key,
-  wallet_address varchar(42) not null unique,
-  is_active boolean not null default true,
-  remark text,
-  created_by varchar(42),
-  create_time timestamptz not null default now(),
-  update_time timestamptz not null default now()
-);
-
-create index if not exists admin_address_active_idx
-  on admin_address (is_active, create_time desc);
