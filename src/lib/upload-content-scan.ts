@@ -1,11 +1,23 @@
+/**
+ * @notice 上传文本内容安全扫描工具。
+ * @dev 对文本文件样本执行规则匹配，拦截脚本、HTML 壳、危险命令等高风险内容。
+ */
 const MAX_TEXT_SCAN_BYTES = 256 * 1024;
 
+/**
+ * @notice 文本扫描规则定义。
+ * @dev 每条规则包含唯一 ID、匹配正则和命中后的提示文案。
+ */
 type TextScanRule = {
   id: string;
   pattern: RegExp;
   message: string;
 };
 
+/**
+ * @notice 文本内容扫描结果。
+ * @dev 成功时返回扫描文本，失败时返回命中的规则和错误提示。
+ */
 export type TextScanResult =
   | {
       ok: true;
@@ -99,10 +111,20 @@ function decodeTextSample(bytes: Uint8Array) {
   return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
 }
 
+/**
+ * @notice 截取用于扫描的文本样本。
+ * @param buffer 上传文件的完整缓冲区。
+ * @returns 不超过扫描上限的缓冲区切片。
+ */
 export function getTextScanSample(buffer: Buffer) {
   return buffer.subarray(0, Math.min(buffer.length, MAX_TEXT_SCAN_BYTES));
 }
 
+/**
+ * @notice 扫描文本内容中是否存在高风险模式。
+ * @param buffer 上传文件的完整缓冲区。
+ * @returns 成功时返回扫描文本，失败时返回命中的规则信息。
+ */
 export function scanTextContent(buffer: Buffer): TextScanResult {
   const scannedText = decodeTextSample(getTextScanSample(buffer));
 

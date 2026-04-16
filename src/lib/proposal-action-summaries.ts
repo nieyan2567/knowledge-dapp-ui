@@ -1,3 +1,7 @@
+/**
+ * @file 提案动作摘要模块。
+ * @description 负责把提案中的 targets、values、calldatas 解码成前端可展示的动作说明。
+ */
 import { decodeFunctionData, formatEther } from "viem";
 
 import { ABIS, CONTRACTS } from "@/contracts";
@@ -51,6 +55,7 @@ function summarizeDecodedAction(
   const targetLabel = getContractLabel(target);
 
   try {
+    // 先按已知治理目标合约逐个解码，优先输出更具体的业务文案和字段说明。
     if (isSameAddress(target, CONTRACTS.KnowledgeContent)) {
       const decoded = decodeFunctionData({ abi: ABIS.KnowledgeContent, data: calldata });
       const args = decoded.args ?? [];
@@ -475,6 +480,7 @@ function summarizeDecodedAction(
       const decoded = decodeFunctionData({ abi, data: calldata });
       const args = decoded.args ?? [];
 
+      // 若命中了已知 ABI 但没有更细粒度的业务摘要，则退化为通用函数调用展示。
       return createSummary({
         target,
         targetLabel,
@@ -493,7 +499,7 @@ function summarizeDecodedAction(
       });
     }
   } catch {
-    // Ignore decode failures and fall through.
+    // 解码失败时继续走兜底摘要，避免界面因为异常而完全失去动作说明。
   }
 
   return createSummary({
@@ -507,6 +513,11 @@ function summarizeDecodedAction(
   });
 }
 
+/**
+ * @notice 为提案中的每个链上动作生成可读摘要。
+ * @param proposal 只包含动作数组的提案对象。
+ * @returns 与提案动作一一对应的摘要数组。
+ */
 export function summarizeProposalActions(
   proposal: Pick<ProposalItem, "targets" | "values" | "calldatas">
 ): ProposalActionSummary[] {

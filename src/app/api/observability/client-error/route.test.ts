@@ -1,3 +1,6 @@
+/**
+ * 模块说明：覆盖前端错误上报接口的参数校验与接收行为。
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createJsonRequest } from "@/test/api-route";

@@ -1,3 +1,7 @@
+/**
+ * @notice `useEnsureKnowledgeChain` 相关辅助函数测试。
+ * @dev 当前测试聚焦于链注册参数构造和未知链错误识别逻辑，避免切链基础能力回归。
+ */
 import { describe, expect, it } from "vitest";
 
 import { buildAddEthereumChainParams, isUnknownChainError } from "@/hooks/useEnsureKnowledgeChain";

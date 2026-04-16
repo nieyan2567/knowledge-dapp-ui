@@ -1,3 +1,7 @@
+/**
+ * @notice `tx-toast` 模块测试。
+ * @dev 覆盖交易错误分类、提示展示和可观测性上报分支。
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { reportClientError } from "@/lib/observability/client";

@@ -1,5 +1,18 @@
+/**
+ * 模块说明：分区卡片容器组件，负责为页面中的独立功能区提供统一卡片样式和头部结构。
+ */
 import { ReactNode } from "react";
 
+/**
+ * 渲染带标题和内容区的通用分区卡片。
+ * @param title 卡片标题。
+ * @param description 卡片说明文本。
+ * @param headerRight 卡片头部右侧附加内容。
+ * @param children 卡片主体内容。
+ * @param className 卡片根节点附加样式。
+ * @param bodyClassName 卡片内容区附加样式。
+ * @returns 可复用的分区卡片容器。
+ */
 export function SectionCard({
   title,
   description,

@@ -1,10 +1,19 @@
 "use client";
 
+/**
+ * 模块说明：提供路由段级别的错误边界页面，在局部渲染失败时保留应用外壳并允许用户重试。
+ */
 import Link from "next/link";
 import { useEffect } from "react";
 
 import { reportClientError } from "@/lib/observability/client";
 
+/**
+ * 渲染当前路由段的错误边界回退界面。
+ * @param error 当前路由段抛出的错误对象。
+ * @param reset Next.js 提供的重试回调，用于重新加载当前路由段。
+ * @returns 当前页面可恢复的错误提示界面。
+ */
 export default function ErrorPage({
   error,
   reset,
@@ -13,6 +22,7 @@ export default function ErrorPage({
   reset: () => void;
 }) {
   useEffect(() => {
+    // 这里把路由段错误上报到前端观测链路，便于把页面崩溃和具体路由关联起来。
     void reportClientError({
       message: "Next.js segment error boundary triggered",
       source: "app.error",

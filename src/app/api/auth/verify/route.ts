@@ -1,3 +1,6 @@
+/**
+ * 模块说明：上传鉴权校验接口，负责验证钱包签名并建立短期上传会话。
+ */
 import { getAddress, verifyMessage } from "viem";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -13,8 +16,17 @@ import {
 } from "@/lib/auth/session";
 import { getKnowledgeChain } from "@/lib/chains";
 
+/**
+ * 声明当前接口运行在 Node.js 运行时。
+ * @returns Next.js 路由运行时标记。
+ */
 export const runtime = "nodejs";
 
+/**
+ * 校验上传签名挑战并建立上传会话。
+ * @param req 携带签名载荷的请求对象。
+ * @returns 描述当前上传会话的 JSON 响应。
+ */
 export async function POST(req: NextRequest) {
   const knowledgeChain = getKnowledgeChain();
   const rateLimit = await enforceApiRateLimits(req.headers, ["auth:verify"]);

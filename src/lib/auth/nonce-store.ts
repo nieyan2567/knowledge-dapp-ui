@@ -1,3 +1,7 @@
+/**
+ * @notice 上传鉴权 nonce 存储。
+ * @dev 支持 Redis 优先、内存回退的挑战生成与一次性消费逻辑。
+ */
 import "server-only";
 
 import { randomBytes } from "node:crypto";
@@ -6,6 +10,10 @@ import type { UploadAuthChallenge } from "@/lib/auth/message";
 import { getServerEnv } from "@/lib/env";
 import { atomicGetDel, getRedis } from "@/lib/redis";
 
+/**
+ * @notice 持久化存储中的上传鉴权挑战结构。
+ * @dev 在基础挑战信息上附加过期时间，便于内存回退模式清理。
+ */
 type StoredUploadAuthChallenge = UploadAuthChallenge & {
   expiresAt: number;
 };
@@ -37,6 +45,11 @@ function cleanupExpiredNonces(now: number) {
   }
 }
 
+/**
+ * @notice 创建一条新的上传鉴权挑战。
+ * @param input 除 nonce 与签发时间之外的挑战字段。
+ * @returns 新生成的上传鉴权挑战对象。
+ */
 export function createUploadAuthChallenge(
   input: Omit<UploadAuthChallenge, "nonce" | "issuedAt">
 ): Promise<UploadAuthChallenge> {
@@ -86,6 +99,11 @@ async function createUploadAuthChallengeInternal(
   };
 }
 
+/**
+ * @notice 原子读取并消费一条上传鉴权挑战。
+ * @param nonce 待消费的挑战 nonce。
+ * @returns 若存在且未过期则返回挑战对象，否则返回 `null`。
+ */
 export function takeUploadAuthChallenge(
   nonce: string
 ): Promise<UploadAuthChallenge | null> {

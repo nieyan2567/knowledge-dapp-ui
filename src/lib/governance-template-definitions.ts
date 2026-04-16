@@ -1,7 +1,15 @@
+/**
+ * @file 治理模板定义模块。
+ * @description 维护前端支持的全部治理模板元数据、字段定义和默认值。
+ */
 import { CONTRACTS } from "@/contracts";
 import type { Address } from "@/types/contracts";
 import type { GovernanceTemplateDefinition } from "@/types/governance";
 
+/**
+ * @notice 前端内置的治理模板定义列表。
+ * @dev 每个模板描述一个可视化治理动作，包含目标合约、函数、字段和风险等级。
+ */
 export const GOVERNANCE_TEMPLATES: GovernanceTemplateDefinition[] = [
   {
     id: "content.setRewardRules",

@@ -1,3 +1,7 @@
+/**
+ * @notice `upload-policy` 模块测试。
+ * @dev 覆盖基础上传策略、服务端二次校验和文件大小格式化逻辑。
+ */
 import { describe, expect, it } from "vitest";
 
 import {

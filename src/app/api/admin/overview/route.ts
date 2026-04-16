@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+/**
+ * 模块说明：管理后台总览接口，负责聚合节点申请、验证者申请和 Besu 网络状态等首页数据。
+ */
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { BesuAdminRpcError } from "@/lib/besu-admin/client";
 import { getNodesAllowlist } from "@/lib/besu-admin/permissioning";
@@ -6,8 +9,17 @@ import { getValidatorsByBlockNumber } from "@/lib/besu-admin/validators";
 import { requireAdminRequest } from "@/server/admin/auth";
 import { listNodeRequests, listRecentAdminActionLogs, listValidatorRequests } from "@/server/admin/store";
 
+/**
+ * 声明当前接口运行在 Node.js 运行时。
+ * @returns Next.js 路由运行时标记。
+ */
 export const runtime = "nodejs";
 
+/**
+ * 返回管理后台首页所需的总览数据。
+ * @param req 用于鉴权和限流的请求对象。
+ * @returns 包含审批统计、节点状态和近期日志的 JSON 响应。
+ */
 export async function GET(req: NextRequest) {
   const rateLimit = await enforceApiRateLimits(req.headers, ["admin:overview"]);
   if (!rateLimit.ok) return NextResponse.json({ error: rateLimit.error }, { status: rateLimit.status });

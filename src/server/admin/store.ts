@@ -1,3 +1,7 @@
+/**
+ * @file Admin 存储模块。
+ * @description 负责管理员后台对节点申请、验证者申请、操作日志和管理员地址的 PostgreSQL 读写。
+ */
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -134,10 +138,21 @@ const ACTIVE_NODE_REQUEST_CONSTRAINT = "node_request_enode_active_idx";
 const ACTIVE_VALIDATOR_NODE_CONSTRAINT = "validator_request_node_active_idx";
 const ACTIVE_VALIDATOR_ADDRESS_CONSTRAINT = "validator_request_address_active_idx";
 
+/**
+ * @notice 表示管理员存储中的冲突错误。
+ * @dev 常用于唯一索引冲突、重复审批或状态不允许的场景。
+ */
 export class AdminStoreConflictError extends Error {}
 
+/**
+ * @notice 表示管理员存储中目标记录不存在。
+ */
 export class AdminStoreNotFoundError extends Error {}
 
+/**
+ * @notice 表示管理员地址存储层当前不可用。
+ * @dev 常见于 `admin_address` 表尚未初始化的场景。
+ */
 export class AdminAddressStoreUnavailableError extends Error {}
 
 function toIsoString(value: Date | string) {
@@ -306,6 +321,10 @@ async function getValidatorRequestByIdForUpdate(client: PoolClient, id: string) 
   return result.rows[0] ?? null;
 }
 
+/**
+ * @notice 列出全部节点申请记录。
+ * @returns 节点申请记录数组。
+ */
 export async function listNodeRequests() {
   const result = await queryPostgres<NodeRequestRow>(
     `
@@ -330,6 +349,11 @@ export async function listNodeRequests() {
   return result.rows.map(mapNodeRequestRow);
 }
 
+/**
+ * @notice 按申请人地址列出节点申请记录。
+ * @param address 申请人钱包地址。
+ * @returns 节点申请记录数组。
+ */
 export async function listNodeRequestsByApplicant(address: `0x${string}`) {
   const result = await queryPostgres<NodeRequestRow>(
     `
@@ -356,6 +380,10 @@ export async function listNodeRequestsByApplicant(address: `0x${string}`) {
   return result.rows.map(mapNodeRequestRow);
 }
 
+/**
+ * @notice 列出已审批通过的节点申请记录。
+ * @returns 已通过的节点申请记录数组。
+ */
 export async function listApprovedNodeRequests() {
   const result = await queryPostgres<NodeRequestRow>(
     `
@@ -381,6 +409,11 @@ export async function listApprovedNodeRequests() {
   return result.rows.map(mapNodeRequestRow);
 }
 
+/**
+ * @notice 按申请人地址列出已通过的节点申请记录。
+ * @param address 申请人钱包地址。
+ * @returns 已通过的节点申请记录数组。
+ */
 export async function listApprovedNodeRequestsByApplicant(address: `0x${string}`) {
   const result = await queryPostgres<NodeRequestRow>(
     `
@@ -408,6 +441,11 @@ export async function listApprovedNodeRequestsByApplicant(address: `0x${string}`
   return result.rows.map(mapNodeRequestRow);
 }
 
+/**
+ * @notice 根据标识读取单条节点申请记录。
+ * @param id 节点申请标识。
+ * @returns 命中的节点申请记录；不存在时返回 `null`。
+ */
 export async function getNodeRequestById(id: string) {
   const result = await queryPostgres<NodeRequestRow>(
     `
@@ -435,6 +473,12 @@ export async function getNodeRequestById(id: string) {
   return row ? mapNodeRequestRow(row) : null;
 }
 
+/**
+ * @notice 创建新的节点申请记录。
+ * @param input 节点申请输入。
+ * @returns 新创建的节点申请记录。
+ * @throws 当 enode 已存在未完成申请时抛出冲突错误。
+ */
 export async function createNodeRequest(input: CreateNodeRequestInput) {
   try {
     const result = await queryPostgres<NodeRequestRow>(
@@ -487,6 +531,12 @@ export async function createNodeRequest(input: CreateNodeRequestInput) {
   }
 }
 
+/**
+ * @notice 审批节点申请。
+ * @param input 节点审批输入。
+ * @returns 更新后的节点申请记录。
+ * @throws 当申请不存在或状态不允许审批时抛出异常。
+ */
 export async function reviewNodeRequest(input: ReviewNodeRequestInput) {
   return withPostgresTransaction(async (client) => {
     const existing = await getNodeRequestByIdForUpdate(client, input.requestId);
@@ -499,6 +549,7 @@ export async function reviewNodeRequest(input: ReviewNodeRequestInput) {
       throw new AdminStoreConflictError("该申请已经完成审批");
     }
 
+    // 审批和操作日志写入放在同一事务内，确保状态变更与审计记录保持一致。
     const updatedResult = await client.query<NodeRequestRow>(
       `
         update node_request
@@ -547,6 +598,12 @@ export async function reviewNodeRequest(input: ReviewNodeRequestInput) {
   });
 }
 
+/**
+ * @notice 撤销已通过的节点申请。
+ * @param input 节点撤销输入。
+ * @returns 更新后的节点申请记录。
+ * @throws 当申请不存在或状态不是 `approved` 时抛出异常。
+ */
 export async function revokeNodeRequest(input: RevokeNodeRequestInput) {
   return withPostgresTransaction(async (client) => {
     const existing = await getNodeRequestByIdForUpdate(client, input.requestId);
@@ -599,6 +656,10 @@ export async function revokeNodeRequest(input: RevokeNodeRequestInput) {
   });
 }
 
+/**
+ * @notice 列出全部验证者申请记录。
+ * @returns 验证者申请记录数组。
+ */
 export async function listValidatorRequests() {
   const result = await queryPostgres<ValidatorRequestRow>(
     `
@@ -630,6 +691,11 @@ export async function listValidatorRequests() {
   return result.rows.map(mapValidatorRequestRow);
 }
 
+/**
+ * @notice 按申请人地址列出验证者申请记录。
+ * @param address 申请人钱包地址。
+ * @returns 验证者申请记录数组。
+ */
 export async function listValidatorRequestsByApplicant(address: `0x${string}`) {
   const result = await queryPostgres<ValidatorRequestRow>(
     `
@@ -663,6 +729,11 @@ export async function listValidatorRequestsByApplicant(address: `0x${string}`) {
   return result.rows.map(mapValidatorRequestRow);
 }
 
+/**
+ * @notice 根据标识读取单条验证者申请记录。
+ * @param id 验证者申请标识。
+ * @returns 命中的验证者申请记录；不存在时返回 `null`。
+ */
 export async function getValidatorRequestById(id: string) {
   const result = await queryPostgres<ValidatorRequestRow>(
     `
@@ -691,6 +762,12 @@ export async function getValidatorRequestById(id: string) {
   return row ? mapValidatorRequestRow(row) : null;
 }
 
+/**
+ * @notice 创建新的验证者申请记录。
+ * @param input 验证者申请输入。
+ * @returns 新创建的验证者申请记录。
+ * @throws 当节点或验证者地址已有未完成申请时抛出冲突错误。
+ */
 export async function createValidatorRequest(input: CreateValidatorRequestInput) {
   try {
     const result = await queryPostgres<ValidatorRequestRow>(
@@ -751,6 +828,12 @@ export async function createValidatorRequest(input: CreateValidatorRequestInput)
   }
 }
 
+/**
+ * @notice 审批验证者申请。
+ * @param input 验证者审批输入。
+ * @returns 更新后的验证者申请记录。
+ * @throws 当申请不存在或状态不允许审批时抛出异常。
+ */
 export async function reviewValidatorRequest(input: ReviewValidatorRequestInput) {
   return withPostgresTransaction(async (client) => {
     const existing = await getValidatorRequestByIdForUpdate(client, input.requestId);
@@ -763,6 +846,7 @@ export async function reviewValidatorRequest(input: ReviewValidatorRequestInput)
       throw new AdminStoreConflictError("该 validator 申请已经完成审批");
     }
 
+    // 验证者审批同样与操作日志绑定在同一事务里，避免出现已审批但无审计记录的状态。
     const updatedResult = await client.query<ValidatorRequestRow>(
       `
         update validator_request vr
@@ -825,12 +909,22 @@ export async function reviewValidatorRequest(input: ReviewValidatorRequestInput)
   });
 }
 
+/**
+ * @notice 写入一条管理员操作日志。
+ * @param input 管理员操作日志输入。
+ * @returns 事务执行结果。
+ */
 export async function logAdminAction(input: CreateAdminActionLogInput) {
   return withPostgresTransaction(async (client) => {
     await createAdminActionLog(client, input);
   });
 }
 
+/**
+ * @notice 列出最近的管理员操作日志。
+ * @param limit 返回条数上限。
+ * @returns 管理员操作日志数组。
+ */
 export async function listRecentAdminActionLogs(limit = 10) {
   const result = await queryPostgres<AdminActionLogRow>(
     `
@@ -852,6 +946,11 @@ export async function listRecentAdminActionLogs(limit = 10) {
   return result.rows.map(mapAdminActionLogRow);
 }
 
+/**
+ * @notice 列出全部管理员地址记录。
+ * @returns 管理员地址记录数组。
+ * @throws 当 `admin_address` 表不可用时抛出存储不可用错误。
+ */
 export async function listAdminAddresses() {
   try {
     const result = await queryPostgres<AdminAddressRow>(
@@ -881,6 +980,12 @@ export async function listAdminAddresses() {
   }
 }
 
+/**
+ * @notice 创建新的管理员地址记录。
+ * @param input 管理员地址输入。
+ * @returns 新创建的管理员地址记录。
+ * @throws 当管理员表不可用或地址重复时抛出异常。
+ */
 export async function createAdminAddress(input: CreateAdminAddressInput) {
   try {
     const result = await queryPostgres<AdminAddressRow>(
@@ -928,6 +1033,12 @@ export async function createAdminAddress(input: CreateAdminAddressInput) {
   }
 }
 
+/**
+ * @notice 更新管理员地址的启用状态或备注。
+ * @param input 管理员地址更新输入。
+ * @returns 更新后的管理员地址记录。
+ * @throws 当记录不存在、管理员表不可用或会导致没有启用管理员时抛出异常。
+ */
 export async function updateAdminAddress(input: UpdateAdminAddressInput) {
   try {
     return await withPostgresTransaction(async (client) => {
@@ -957,6 +1068,7 @@ export async function updateAdminAddress(input: UpdateAdminAddressInput) {
       const nextRemark =
         input.remark !== undefined ? input.remark.trim() || null : existing.remark;
 
+      // 至少保留一个启用中的管理员，避免后台失去任何可用管理入口。
       if (existing.is_active && !nextIsActive) {
         const activeCountResult = await client.query<{ count: string }>(
           `
@@ -1004,6 +1116,11 @@ export async function updateAdminAddress(input: UpdateAdminAddressInput) {
   }
 }
 
+/**
+ * @notice 判断当前是否至少存在一个启用中的管理员地址。
+ * @returns 若存在启用管理员则返回 `true`。
+ * @throws 当管理员表不可用时抛出存储不可用错误。
+ */
 export async function hasAnyAdminAddresses() {
   try {
     const result = await queryPostgres<{ count: string }>(
@@ -1026,6 +1143,12 @@ export async function hasAnyAdminAddresses() {
   }
 }
 
+/**
+ * @notice 判断指定钱包地址是否为启用中的管理员。
+ * @param walletAddress 待检查的钱包地址。
+ * @returns 若地址为启用中的管理员则返回 `true`。
+ * @throws 当管理员表不可用时抛出存储不可用错误。
+ */
 export async function isAdminAddress(walletAddress: `0x${string}`) {
   try {
     const result = await queryPostgres<AdminAddressRow>(

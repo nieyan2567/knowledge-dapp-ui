@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * 模块说明：内容广场分区组件集合，负责把内容列表区和内容上传区拆成可复用的展示单元。
+ */
 import { formatEther } from "viem";
 
 import { ContentCard } from "@/components/content-card";
@@ -15,6 +18,24 @@ import {
 } from "@/lib/content-page-helpers";
 import type { ContentCardData } from "@/types/content";
 
+/**
+ * 渲染内容列表分区。
+ * @param search 当前搜索关键词。
+ * @param scope 当前筛选范围。
+ * @param sortBy 当前排序方式。
+ * @param page 当前页码。
+ * @param totalPages 总页数。
+ * @param loadingList 是否正在加载列表。
+ * @param sortedContentsLength 当前筛选后列表总数。
+ * @param pagedContents 当前页内容数组。
+ * @param onSearchChange 搜索词变更回调。
+ * @param onScopeChange 范围切换回调。
+ * @param onSortChange 排序切换回调。
+ * @param onPrevPage 切换上一页回调。
+ * @param onNextPage 切换下一页回调。
+ * @param onActionComplete 卡片内链上操作完成后的刷新回调。
+ * @returns 内容列表与筛选分页区块。
+ */
 export function ContentListSection({
   search,
   scope,
@@ -135,6 +156,25 @@ export function ContentListSection({
   );
 }
 
+/**
+ * 渲染内容上传与链上注册分区。
+ * @param title 待发布内容标题。
+ * @param desc 待发布内容描述。
+ * @param file 当前选中的文件。
+ * @param uploadedCid 已上传文件的 CID。
+ * @param uploadedUrl 已上传文件的网关地址。
+ * @param uploading 是否正在上传。
+ * @param registering 是否正在注册上链。
+ * @param isAuthenticating 是否正在进行上传鉴权。
+ * @param registerFee 当前内容注册费用。
+ * @param uploadMaxFileSizeText 上传大小限制文本。
+ * @param onTitleChange 标题变更回调。
+ * @param onDescriptionChange 描述变更回调。
+ * @param onFileChange 文件变更回调。
+ * @param onUpload 上传触发回调。
+ * @param onRegister 注册触发回调。
+ * @returns 内容上传与注册区块。
+ */
 export function ContentUploadSection({
   title,
   desc,

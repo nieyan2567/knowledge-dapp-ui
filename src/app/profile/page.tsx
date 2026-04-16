@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * 模块说明：个人中心模块，负责汇总当前钱包的内容、提案、投票权和奖励等个人视图数据。
+ */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
@@ -37,6 +40,10 @@ import { asBigInt, asContentData } from "@/lib/web3-types";
 import type { ContentData } from "@/types/content";
 import type { ProposalItem } from "@/types/governance";
 
+/**
+ * 渲染个人中心页面。
+ * @returns 当前连接钱包的个人数据汇总页面。
+ */
 export default function ProfilePage() {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();

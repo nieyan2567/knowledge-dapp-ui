@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+/**
+ * 模块说明：节点申请通过接口，负责批准节点申请并同步把对应 enode 加入 Besu allowlist。
+ */
 import { reviewNodeRequestSchema } from "@/lib/admin/schemas";
 import { addNodesToAllowlist } from "@/lib/besu-admin/permissioning";
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
@@ -8,8 +11,18 @@ import { captureServerException } from "@/lib/observability/server";
 import { requireAdminRequest } from "@/server/admin/auth";
 import { AdminStoreConflictError, AdminStoreNotFoundError, getNodeRequestById, reviewNodeRequest } from "@/server/admin/store";
 
+/**
+ * 声明当前接口运行在 Node.js 运行时。
+ * @returns Next.js 路由运行时标记。
+ */
 export const runtime = "nodejs";
 
+/**
+ * 批准指定节点申请。
+ * @param req 携带审批参数的请求对象。
+ * @param context 包含节点申请 ID 的路由上下文。
+ * @returns 包含审批后节点申请记录的 JSON 响应。
+ */
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const rateLimit = await enforceApiRateLimits(req.headers, ["admin:node-requests:approve"]);
   if (!rateLimit.ok) return NextResponse.json({ error: rateLimit.error }, { status: rateLimit.status });

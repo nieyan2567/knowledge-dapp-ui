@@ -1,3 +1,6 @@
+/**
+ * 模块说明：覆盖管理员地址列表与创建接口行为。
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getAddress } from "viem";
 

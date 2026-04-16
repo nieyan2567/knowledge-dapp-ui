@@ -1,3 +1,7 @@
+/**
+ * @file Faucet 挑战随机数存储模块。
+ * @description 管理 Faucet 登录挑战的生成、暂存和一次性消费，支持 Redis 与内存双实现。
+ */
 import "server-only";
 
 import { randomBytes } from "node:crypto";
@@ -6,6 +10,9 @@ import { getServerEnv } from "@/lib/env";
 import { atomicGetDel, getRedis } from "@/lib/redis";
 import type { FaucetAuthChallenge } from "@/lib/faucet/message";
 
+/**
+ * @notice 带过期时间的 Faucet 挑战存储结构。
+ */
 type StoredFaucetChallenge = FaucetAuthChallenge & {
   expiresAt: number;
 };
@@ -40,6 +47,11 @@ function cleanupExpiredNonces(now: number) {
   }
 }
 
+/**
+ * @notice 创建新的 Faucet 鉴权挑战并写入一次性存储。
+ * @param input 除随机数和签发时间外的挑战字段。
+ * @returns 可发给客户端签名的钱包挑战对象。
+ */
 export async function createFaucetAuthChallenge(
   input: Omit<FaucetAuthChallenge, "nonce" | "issuedAt">
 ): Promise<FaucetAuthChallenge> {
@@ -57,6 +69,7 @@ export async function createFaucetAuthChallenge(
   const redis = await getRedis();
 
   if (redis) {
+    // Redis 可跨实例共享挑战状态；若不可用，则退回单机内存存储保证本地开发可运行。
     await redis.set(
       getNonceKey(challenge.nonce),
         JSON.stringify({
@@ -89,6 +102,11 @@ export async function createFaucetAuthChallenge(
   };
 }
 
+/**
+ * @notice 读取并消费指定的 Faucet 鉴权挑战。
+ * @param nonce 待消费的挑战随机数。
+ * @returns 挑战存在时返回原始挑战；不存在、过期或解析失败时返回 `null`。
+ */
 export async function takeFaucetAuthChallenge(
   nonce: string
 ): Promise<FaucetAuthChallenge | null> {

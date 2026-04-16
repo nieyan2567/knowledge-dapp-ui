@@ -1,3 +1,7 @@
+/**
+ * @notice `governance` 模块测试。
+ * @dev 覆盖治理动作摘要的编码结果与展示文本。
+ */
 import { describe, expect, it } from "vitest";
 import { encodeFunctionData } from "viem";
 

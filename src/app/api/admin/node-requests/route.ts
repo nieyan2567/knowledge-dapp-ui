@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+/**
+ * 模块说明：节点申请接口，负责列出当前可见节点申请并支持新建节点申请记录。
+ */
 import { createNodeRequestSchema } from "@/lib/admin/schemas";
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { parseJsonBody } from "@/lib/api-validation";
@@ -6,8 +9,17 @@ import { captureServerException } from "@/lib/observability/server";
 import { AdminStoreConflictError, createNodeRequest, listNodeRequests, listNodeRequestsByApplicant } from "@/server/admin/store";
 import { readAdminRequestContext, requireAuthenticatedRequest } from "@/server/admin/auth";
 
+/**
+ * 声明当前接口运行在 Node.js 运行时。
+ * @returns Next.js 路由运行时标记。
+ */
 export const runtime = "nodejs";
 
+/**
+ * 返回当前调用方可见的节点申请列表。
+ * @param req 用于鉴权和限流的请求对象。
+ * @returns 包含节点申请记录的 JSON 响应。
+ */
 export async function GET(req: NextRequest) {
   const rateLimit = await enforceApiRateLimits(req.headers, ["admin:node-requests:list"]);
   if (!rateLimit.ok) return NextResponse.json({ error: rateLimit.error }, { status: rateLimit.status });
@@ -18,6 +30,11 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ currentAddress: context.address, isAdmin: context.isAdmin, requests }, { headers: { "Cache-Control": "no-store" } });
 }
 
+/**
+ * 为当前认证用户创建新的节点申请记录。
+ * @param req 携带节点申请参数的请求对象。
+ * @returns 包含新建节点申请记录的 JSON 响应。
+ */
 export async function POST(req: NextRequest) {
   const rateLimit = await enforceApiRateLimits(req.headers, ["admin:node-requests:create"]);
   if (!rateLimit.ok) return NextResponse.json({ error: rateLimit.error }, { status: rateLimit.status });

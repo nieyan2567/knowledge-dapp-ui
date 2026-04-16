@@ -1,3 +1,6 @@
+/**
+ * 模块说明：覆盖上传鉴权 nonce 接口的限流与挑战签发行为。
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createNextRequest } from "@/test/api-route";

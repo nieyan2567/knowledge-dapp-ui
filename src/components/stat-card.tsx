@@ -1,6 +1,22 @@
+/**
+ * 模块说明：统计卡片组件，负责统一渲染数值类摘要信息和可选图标说明。
+ */
 import { ReactNode } from "react";
 import clsx from "clsx";
 
+/**
+ * 渲染统计信息卡片。
+ * @param title 指标标题。
+ * @param value 指标主值。
+ * @param description 指标补充说明。
+ * @param icon 右上角图标内容。
+ * @param className 根节点附加样式。
+ * @param headerClassName 头部容器附加样式。
+ * @param titleClassName 标题附加样式。
+ * @param valueClassName 数值附加样式。
+ * @param descriptionClassName 描述文本附加样式。
+ * @returns 可复用的统计展示卡片。
+ */
 export function StatCard({
   title,
   value,

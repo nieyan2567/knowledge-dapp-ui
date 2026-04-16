@@ -1,3 +1,6 @@
+/**
+ * 模块说明：节点接入向导组件，负责给首次接入联盟链的新节点操作者提供步骤化部署说明。
+ */
 "use client";
 
 import Link from "next/link";
@@ -38,6 +41,10 @@ const inspectNodeCommand = `./scripts/get-enode.sh
 curl -X POST http://127.0.0.1:8545 -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":1}'
 curl -X POST http://127.0.0.1:8545 -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_syncing","params":[],"id":1}'`;
 
+/**
+ * 渲染节点接入向导页面。
+ * @returns 节点接入步骤说明主组件。
+ */
 export function NodeOnboardingPage() {
   return (
     <main className="mx-auto max-w-7xl space-y-8 overflow-x-hidden px-6 py-10">
@@ -187,6 +194,14 @@ export function NodeOnboardingPage() {
   );
 }
 
+/**
+ * 渲染节点接入步骤卡片。
+ * @param step 步骤编号文案。
+ * @param title 步骤标题。
+ * @param description 步骤说明。
+ * @param command 该步骤对应的命令示例。
+ * @returns 单个步骤卡片。
+ */
 function StepCard({
   step,
   title,
@@ -214,6 +229,12 @@ function StepCard({
   );
 }
 
+/**
+ * 渲染命令展示与复制卡片。
+ * @param command 需要展示的命令文本。
+ * @param className 根节点附加样式。
+ * @returns 可复制的命令卡片。
+ */
 function CommandCard({
   command,
   className,

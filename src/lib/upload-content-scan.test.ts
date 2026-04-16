@@ -1,3 +1,7 @@
+/**
+ * @notice `upload-content-scan` 模块测试。
+ * @dev 覆盖安全文本放行与危险脚本、命令模式拦截。
+ */
 import { describe, expect, it } from "vitest";
 
 import { scanTextContent } from "./upload-content-scan";

@@ -1,3 +1,7 @@
+/**
+ * @file 节点运行时状态模块。
+ * @description 负责检查节点申请对应的 RPC 可达性、同步状态和 Besu allowlist 状态。
+ */
 import "server-only";
 
 import type {
@@ -97,6 +101,7 @@ async function readNodeHealth(
   }
 
   try {
+    // 并行拉取节点核心健康指标，尽量在一次检查里拿到 peer、同步和 enode 信息。
     const [peerCountHex, syncing, blockNumber, nodeInfo] = await Promise.all([
       callNodeRpc<string>(request.nodeRpcUrl, "net_peerCount"),
       callNodeRpc<EthSyncingResult>(request.nodeRpcUrl, "eth_syncing"),
@@ -171,6 +176,11 @@ async function readNodeHealth(
   }
 }
 
+/**
+ * @notice 获取节点申请的运行时状态快照。
+ * @param request 节点申请记录。
+ * @returns 包含 allowlist 状态、检查时间和节点健康信息的运行时状态对象。
+ */
 export async function getNodeRequestRuntimeStatus(
   request: NodeRequestRecord
 ): Promise<NodeRequestRuntimeStatus> {

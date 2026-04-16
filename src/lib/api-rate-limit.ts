@@ -1,8 +1,16 @@
+/**
+ * @notice API 限流策略与执行工具。
+ * @dev 支持 Redis 优先、内存回退的限流实现，并按策略名称统一限制不同接口。
+ */
 import "server-only";
 
 import { getServerEnv } from "@/lib/env";
 import { getRedis } from "@/lib/redis";
 
+/**
+ * @notice 当前系统支持的 API 限流策略名称集合。
+ * @dev 每个名称对应一套默认的次数与时间窗口限制。
+ */
 export type ApiRateLimitPolicyName =
   | "global"
   | "auth:nonce"
@@ -31,16 +39,28 @@ export type ApiRateLimitPolicyName =
   | "faucet:nonce"
   | "faucet:claim";
 
+/**
+ * @notice 单条 API 限流策略配置。
+ * @dev 由最大请求次数和时间窗口秒数组成。
+ */
 type ApiRateLimitPolicy = {
   max: number;
   windowSeconds: number;
 };
 
+/**
+ * @notice 内存限流条目结构。
+ * @dev 用于 Redis 不可用时记录当前计数和过期时间。
+ */
 type MemoryRateLimitEntry = {
   count: number;
   expiresAt: number;
 };
 
+/**
+ * @notice 内存限流存储类型。
+ * @dev 以请求键为索引，保存内存回退限流条目。
+ */
 type MemoryRateLimitStore = Map<string, MemoryRateLimitEntry>;
 
 declare global {
@@ -156,11 +176,21 @@ function cleanupExpiredEntries(now: number) {
   }
 }
 
+/**
+ * @notice 消耗指定策略的一次请求额度。
+ * @param policyName 限流策略名称。
+ * @param ip 当前请求来源 IP。
+ * @returns 若仍在额度内则返回成功；否则返回重试等待秒数。
+ */
 async function consumeToken(policyName: ApiRateLimitPolicyName, ip: string) {
   const policy = getPolicy(policyName);
   const key = getKey(policyName, ip);
   const redis = await getRedis();
 
+  /**
+   * @notice Redis 可用时优先使用集中式计数。
+   * @dev 这样多实例部署下也能共享限流状态。
+   */
   if (redis) {
     const count = await redis.incr(key);
     if (count === 1) {
@@ -178,6 +208,10 @@ async function consumeToken(policyName: ApiRateLimitPolicyName, ip: string) {
     };
   }
 
+  /**
+   * @notice Redis 不可用时回退到进程内限流。
+   * @dev 该模式无法跨实例共享，但能在本地和降级场景下继续提供基本保护。
+   */
   const now = Date.now();
   cleanupExpiredEntries(now);
 
@@ -202,6 +236,12 @@ async function consumeToken(policyName: ApiRateLimitPolicyName, ip: string) {
   };
 }
 
+/**
+ * @notice 对请求头执行一组 API 限流策略检查。
+ * @param headers 当前请求头对象。
+ * @param policies 当前接口需要附加执行的限流策略列表。
+ * @returns 通过时返回 `ok: true`；命中限流时返回错误状态和等待秒数。
+ */
 export async function enforceApiRateLimits(
   headers: Headers,
   policies: ApiRateLimitPolicyName[]
@@ -225,6 +265,10 @@ export async function enforceApiRateLimits(
   return { ok: true as const };
 }
 
+/**
+ * @notice 重置内存限流状态。
+ * @returns 当前函数不返回值，仅供测试环境清空限流存储。
+ */
 export function __resetApiRateLimitStoreForTests() {
   memoryRateLimitStore.clear();
 }

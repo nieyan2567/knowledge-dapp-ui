@@ -1,3 +1,7 @@
+/**
+ * @notice 前后端环境变量解析与校验工具。
+ * @dev 基于 Zod 统一解析公开环境变量、服务端环境变量，并在生产环境执行额外约束检查。
+ */
 import { z } from "zod";
 
 const emptyStringToUndefined = (value: unknown) => {
@@ -324,6 +328,10 @@ function getServerEnvSource() {
   };
 }
 
+/**
+ * @notice 获取公开环境变量。
+ * @returns 经过校验且带生产环境 URL 约束的公开环境变量对象。
+ */
 export function getPublicEnv(): PublicEnvSchema {
   const rawEnv = {
     ...getPublicEnvSource(),
@@ -334,10 +342,18 @@ export function getPublicEnv(): PublicEnvSchema {
   return parsed;
 }
 
+/**
+ * @notice 获取运行时公开环境变量。
+ * @returns 经过校验并带缓存的公开环境变量对象。
+ */
 export function getPublicRuntimeEnv(): PublicEnvSchema {
   const rawEnv = getPublicEnvSource();
   const cacheKey = JSON.stringify(rawEnv);
 
+  /**
+   * @notice 对相同输入的公开环境变量结果做缓存复用。
+   * @dev 避免前端多处读取环境配置时重复执行 schema 解析。
+   */
   if (cachedPublicRuntimeEnv && cachedPublicRuntimeEnvKey === cacheKey) {
     return cachedPublicRuntimeEnv;
   }
@@ -348,17 +364,33 @@ export function getPublicRuntimeEnv(): PublicEnvSchema {
   return cachedPublicRuntimeEnv;
 }
 
+/**
+ * @notice 获取服务端环境变量。
+ * @returns 经过校验且满足生产环境约束的服务端环境变量对象。
+ */
 export function getServerEnv(): ServerEnvSchema {
   if (typeof window !== "undefined") {
     throw new Error("Server environment variables are not available in the browser");
   }
 
   const rawEnv = getServerEnvSource();
+  /**
+   * @notice 服务端环境变量在解析后还会执行生产环境 URL 约束。
+   * @dev 这样可以同时拦截缺失配置和错误指向 localhost 的生产配置。
+   */
   const parsed = parseEnv(serverEnvSchema, rawEnv, "server");
   assertProductionUrlConfig(rawEnv, parsed, "public");
   assertProductionUrlConfig(rawEnv, parsed, "server");
   return parsed;
 }
 
+/**
+ * @notice 公开环境变量类型别名。
+ * @dev 对外暴露 `publicEnvSchema` 推导出的类型。
+ */
 export type PublicEnv = PublicEnvSchema;
+/**
+ * @notice 服务端环境变量类型别名。
+ * @dev 对外暴露 `serverEnvSchema` 推导出的类型。
+ */
 export type ServerEnv = ServerEnvSchema;

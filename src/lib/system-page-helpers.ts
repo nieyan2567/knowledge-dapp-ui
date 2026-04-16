@@ -1,5 +1,13 @@
+/**
+ * @notice System 页面展示辅助工具。
+ * @dev 定义系统页文案，并提供基础布尔值展示格式化能力。
+ */
 import { BRANDING } from "@/lib/branding";
 
+/**
+ * @notice System 页面静态文案集合。
+ * @dev 供合约地址、治理参数和区块浏览器入口等 UI 区域复用。
+ */
 export const SYSTEM_PAGE_COPY = {
   headerEyebrow: "Contracts / Roles / Treasury",
   headerTitle: "System Overview",
@@ -24,6 +32,11 @@ export const SYSTEM_PAGE_COPY = {
   secondsUnit: "秒",
 } as const;
 
+/**
+ * @notice 将未知值格式化为系统页使用的布尔展示文案。
+ * @param value 待格式化的输入值。
+ * @returns 布尔值对应的文案；若输入不是布尔值则返回 `-`。
+ */
 export function formatSystemBoolean(value: unknown) {
   if (typeof value !== "boolean") {
     return "-";

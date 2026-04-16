@@ -1,3 +1,7 @@
+/**
+ * @notice `upload-sniff` 模块测试。
+ * @dev 覆盖二进制签名识别、文本内容推断以及 MIME 兼容性判断。
+ */
 import { describe, expect, it } from "vitest";
 
 import { areMimeTypesCompatible, inspectUploadFile } from "./upload-sniff";

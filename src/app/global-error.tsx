@@ -1,9 +1,18 @@
 "use client";
 
+/**
+ * 模块说明：提供应用级全局错误边界页面，在根布局或初始化阶段失败时兜底整个文档。
+ */
 import { useEffect } from "react";
 
 import { reportClientError } from "@/lib/observability/client";
 
+/**
+ * 渲染应用级致命错误的回退界面。
+ * @param error 根应用树抛出的致命错误对象。
+ * @param reset Next.js 提供的重试回调，用于重新尝试初始化应用。
+ * @returns 包含完整 `html` 与 `body` 结构的全局错误页面。
+ */
 export default function GlobalError({
   error,
   reset,
@@ -12,6 +21,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    // 全局错误通常意味着根布局或初始化链路失败，需要以更高严重级别记录。
     void reportClientError({
       message: "Next.js global error boundary triggered",
       source: "app.global-error",

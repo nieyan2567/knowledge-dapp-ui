@@ -1,9 +1,17 @@
+/**
+ * @notice 上传会话持久化存储。
+ * @dev 支持 Redis 优先、内存回退的会话创建、读取、续期和撤销逻辑。
+ */
 import "server-only";
 
 import { randomUUID } from "node:crypto";
 
 import { getRedis } from "@/lib/redis";
 
+/**
+ * @notice 上传会话记录结构。
+ * @dev 持久化保存会话标识、地址、来源、版本号和生命周期信息。
+ */
 export type UploadSessionRecord = {
   id: string;
   address: `0x${string}`;
@@ -116,6 +124,17 @@ async function deleteRedisSession(sessionId: string, address: `0x${string}`) {
   await redis.sRem(getAddressSessionsKey(address), sessionId);
 }
 
+/**
+ * @notice 创建一条新的上传会话记录。
+ * @param input 会话创建参数。
+ * @param input.address 会话所属地址。
+ * @param input.chainId 当前链 ID。
+ * @param input.domain 当前域名。
+ * @param input.origin 当前源站地址。
+ * @param input.userAgentHash 当前请求 User-Agent 的哈希。
+ * @param input.ttlSeconds 会话有效期，单位为秒。
+ * @returns 新建的会话记录。
+ */
 export async function createUploadSessionRecord(input: {
   address: `0x${string}`;
   chainId: number;
@@ -166,6 +185,11 @@ export async function createUploadSessionRecord(input: {
   return record;
 }
 
+/**
+ * @notice 读取指定会话记录。
+ * @param sessionId 会话 ID。
+ * @returns 若会话存在且未失效则返回记录，否则返回 `null`。
+ */
 export async function getUploadSessionRecord(sessionId: string) {
   const redis = await getRedis();
 
@@ -200,11 +224,22 @@ export async function getUploadSessionRecord(sessionId: string) {
   return record;
 }
 
+/**
+ * @notice 判断会话版本号是否仍然有效。
+ * @param record 当前会话记录。
+ * @returns 若记录版本仍与地址当前版本一致则返回 `true`。
+ */
 export async function isUploadSessionVersionCurrent(record: UploadSessionRecord) {
   const currentVersion = await getAddressVersion(record.address);
   return currentVersion === 0 || currentVersion === record.version;
 }
 
+/**
+ * @notice 续期并更新会话最后使用时间。
+ * @param record 当前会话记录。
+ * @param ttlSeconds 默认续期秒数。
+ * @returns 更新后的会话记录。
+ */
 export async function touchUploadSessionRecord(
   record: UploadSessionRecord,
   ttlSeconds: number
@@ -231,6 +266,11 @@ export async function touchUploadSessionRecord(
   return updatedRecord;
 }
 
+/**
+ * @notice 撤销单个上传会话。
+ * @param sessionId 目标会话 ID。
+ * @returns 当前函数不返回值，仅执行撤销。
+ */
 export async function revokeUploadSession(sessionId: string) {
   const record = await getUploadSessionRecord(sessionId);
 
@@ -253,6 +293,11 @@ export async function revokeUploadSession(sessionId: string) {
   memoryStore.versions.set(record.address.toLowerCase(), nextVersion);
 }
 
+/**
+ * @notice 撤销某个地址名下的全部上传会话。
+ * @param address 目标钱包地址。
+ * @returns 当前函数不返回值，仅执行批量撤销。
+ */
 export async function revokeUploadSessionsForAddress(address: `0x${string}`) {
   const redis = await getRedis();
 
@@ -279,6 +324,10 @@ export async function revokeUploadSessionsForAddress(address: `0x${string}`) {
   memoryStore.addressSessions.delete(indexKey);
 }
 
+/**
+ * @notice 重置内存会话存储。
+ * @returns 当前函数不返回值，仅供测试环境清空状态。
+ */
 export function __resetUploadSessionStoreForTests() {
   memoryStore.records.clear();
   memoryStore.addressSessions.clear();

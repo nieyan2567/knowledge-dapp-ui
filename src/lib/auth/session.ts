@@ -1,3 +1,7 @@
+/**
+ * @notice 上传鉴权会话管理工具。
+ * @dev 负责会话签名、Cookie 读写、来源校验以及会话续期与撤销。
+ */
 import "server-only";
 
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
@@ -23,6 +27,10 @@ declare global {
   var __knowledgeUploadSessionSecretWarned: boolean | undefined;
 }
 
+/**
+ * @notice 暴露给业务层的上传会话结构。
+ * @dev 不包含内部来源信息和 User-Agent 哈希，仅保留业务所需字段。
+ */
 export type UploadSession = {
   id: string;
   sub: `0x${string}`;
@@ -53,6 +61,10 @@ function getUploadSessionSecret() {
   return env.UPLOAD_AUTH_SECRET;
 }
 
+/**
+ * @notice 获取上传会话 TTL。
+ * @returns 规范化后的会话有效期秒数。
+ */
 export function getUploadSessionTtlSeconds() {
   const ttl =
     getServerEnv().UPLOAD_AUTH_SESSION_TTL_SECONDS ||
@@ -108,6 +120,14 @@ function hashUserAgent(value: string | null) {
     .digest("base64url");
 }
 
+/**
+ * @notice 创建新的上传会话。
+ * @param input 会话创建参数。
+ * @param input.address 当前钱包地址。
+ * @param input.chainId 当前链 ID。
+ * @param input.req 当前请求对象。
+ * @returns 包含业务会话对象和已签名 Cookie token 的结果。
+ */
 export async function createUploadSession(input: {
   address: `0x${string}`;
   chainId: number;
@@ -137,6 +157,11 @@ export async function createUploadSession(input: {
   };
 }
 
+/**
+ * @notice 从请求中读取并验证上传会话。
+ * @param req 当前请求对象。
+ * @returns 若会话合法则返回业务会话结构，否则返回 `null`。
+ */
 export async function readUploadSession(
   req: NextRequest
 ): Promise<UploadSession | null> {
@@ -182,6 +207,11 @@ export async function readUploadSession(
   };
 }
 
+/**
+ * @notice 根据请求中的 Cookie 撤销上传会话。
+ * @param req 当前请求对象。
+ * @returns 当前函数不返回值，仅在存在会话时执行撤销。
+ */
 export async function revokeUploadSessionFromRequest(req: NextRequest) {
   const sessionId = readSignedSessionId(req);
 
@@ -192,6 +222,12 @@ export async function revokeUploadSessionFromRequest(req: NextRequest) {
   await revokeUploadSession(sessionId);
 }
 
+/**
+ * @notice 向响应写入上传会话 Cookie。
+ * @param res 当前响应对象。
+ * @param token 已签名的会话 token。
+ * @returns 当前函数不返回值，仅负责设置 Cookie。
+ */
 export function setUploadSessionCookie(res: NextResponse, token: string) {
   res.cookies.set({
     name: uploadSessionCookieName,
@@ -204,6 +240,11 @@ export function setUploadSessionCookie(res: NextResponse, token: string) {
   });
 }
 
+/**
+ * @notice 清除上传会话 Cookie。
+ * @param res 当前响应对象。
+ * @returns 当前函数不返回值，仅负责覆盖并失效 Cookie。
+ */
 export function clearUploadSessionCookie(res: NextResponse) {
   res.cookies.set({
     name: uploadSessionCookieName,

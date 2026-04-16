@@ -1,10 +1,26 @@
+/**
+ * @notice 上传文件策略校验工具。
+ * @dev 定义上传大小、文件名、高风险扩展名和 MIME 类型规则，并提供客户端与服务端校验函数。
+ */
 import { getServerEnv } from "./env";
 import { scanTextContent } from "./upload-content-scan";
 import { areMimeTypesCompatible, inspectUploadFile } from "./upload-sniff";
 
+/**
+ * @notice 默认上传文件大小上限。
+ * @dev 当前默认值为 512 MB。
+ */
 export const DEFAULT_UPLOAD_MAX_FILE_SIZE_BYTES = 512 * 1024 * 1024;
+/**
+ * @notice 上传文件名最大长度限制。
+ * @dev 超过该长度的文件名会被直接拒绝。
+ */
 export const MAX_UPLOAD_FILENAME_LENGTH = 180;
 
+/**
+ * @notice 高风险上传文件扩展名集合。
+ * @dev 这些扩展名通常可执行或可承载脚本，默认禁止上传。
+ */
 export const HIGH_RISK_UPLOAD_EXTENSIONS = new Set([
   ".bat",
   ".cmd",
@@ -30,6 +46,10 @@ export const HIGH_RISK_UPLOAD_EXTENSIONS = new Set([
   ".vbs",
 ]);
 
+/**
+ * @notice 高风险上传 MIME 类型集合。
+ * @dev 用于拦截可执行脚本、HTML 壳和潜在危险文件类型。
+ */
 export const HIGH_RISK_UPLOAD_MIME_TYPES = new Set([
   "application/javascript",
   "application/x-bat",
@@ -46,6 +66,10 @@ export const HIGH_RISK_UPLOAD_MIME_TYPES = new Set([
   "text/x-shellscript",
 ]);
 
+/**
+ * @notice 上传校验结果结构。
+ * @dev 成功时仅返回 `ok: true`；失败时带回错误文案与 HTTP 状态码。
+ */
 type UploadValidationResult =
   | {
       ok: true;
@@ -67,6 +91,10 @@ function getFileExtension(fileName: string) {
   return normalized.slice(dotIndex);
 }
 
+/**
+ * @notice 获取当前环境下允许的最大上传文件大小。
+ * @returns 允许上传的最大字节数。
+ */
 export function getUploadMaxFileSizeBytes() {
   if (typeof window !== "undefined") {
     return DEFAULT_UPLOAD_MAX_FILE_SIZE_BYTES;
@@ -83,6 +111,11 @@ export function getUploadMaxFileSizeBytes() {
   return Math.floor(value);
 }
 
+/**
+ * @notice 将字节数格式化为便于展示的大小文本。
+ * @param bytes 文件大小，单位为字节。
+ * @returns MB、KB 或 B 级别的格式化字符串。
+ */
 export function formatUploadFileSize(bytes: number) {
   if (bytes >= 1024 * 1024) {
     return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
@@ -95,6 +128,12 @@ export function formatUploadFileSize(bytes: number) {
   return `${bytes} B`;
 }
 
+/**
+ * @notice 执行上传文件的基础策略校验。
+ * @param file 仅包含名称、大小和声明 MIME 的文件对象。
+ * @param maxFileSizeBytes 当前允许的最大文件大小。
+ * @returns 校验结果对象。
+ */
 export function validateUploadFile(
   file: Pick<File, "name" | "size" | "type">,
   maxFileSizeBytes = getUploadMaxFileSizeBytes()
@@ -146,6 +185,11 @@ export function validateUploadFile(
   return { ok: true };
 }
 
+/**
+ * @notice 在服务端执行更严格的上传文件校验。
+ * @param file 包含二进制内容的上传文件对象。
+ * @returns 校验结果对象。
+ */
 export async function validateUploadFileServer(
   file: Pick<File, "name" | "size" | "type" | "arrayBuffer">
 ): Promise<UploadValidationResult> {
@@ -154,6 +198,10 @@ export async function validateUploadFileServer(
     return baseValidation;
   }
 
+  /**
+   * @notice 服务端会继续检查真实 MIME、文本特征与敏感模式。
+   * @dev 该层用于补足浏览器侧仅凭扩展名和声明 MIME 无法发现的风险。
+   */
   const inspection = await inspectUploadFile(file);
 
   if (

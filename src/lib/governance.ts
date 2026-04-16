@@ -1,3 +1,7 @@
+/**
+ * @notice 治理提案解析与状态展示工具。
+ * @dev 负责解析 ProposalCreated 事件，并格式化治理状态、投票区间与阶段倒计时。
+ */
 import { keccak256, stringToBytes, toHex } from "viem";
 
 import { proposalCreatedEvent } from "@/contracts/events";
@@ -7,6 +11,10 @@ import type { ProposalItem } from "@/types/governance";
 
 export { proposalCreatedEvent, summarizeProposalActions };
 
+/**
+ * @notice ProposalCreated 事件参数结构。
+ * @dev 仅抽取当前前端解析提案时所需的事件字段。
+ */
 type ProposalCreatedArgs = {
   proposalId?: bigint;
   proposer?: Address;
@@ -18,12 +26,21 @@ type ProposalCreatedArgs = {
   description?: string;
 };
 
+/**
+ * @notice ProposalCreated 日志结构。
+ * @dev 在事件参数之外保留区块号和交易哈希。
+ */
 type ProposalCreatedLog = {
   args: ProposalCreatedArgs;
   blockNumber?: bigint | null;
   transactionHash?: HexString | null;
 };
 
+/**
+ * @notice 将 ProposalCreated 日志解析为前端提案对象。
+ * @param log 原始 ProposalCreated 日志。
+ * @returns 解析后的提案对象。
+ */
 export function parseProposalCreatedLog(log: ProposalCreatedLog): ProposalItem {
   const args = log.args;
 
@@ -55,6 +72,11 @@ export function parseProposalCreatedLog(log: ProposalCreatedLog): ProposalItem {
   };
 }
 
+/**
+ * @notice 获取治理状态值对应的中文标签。
+ * @param state 治理状态值。
+ * @returns 状态值对应的展示文案。
+ */
 export function governanceStateLabel(state?: bigint) {
   switch (Number(state ?? -1)) {
     case 0:
@@ -78,6 +100,11 @@ export function governanceStateLabel(state?: bigint) {
   }
 }
 
+/**
+ * @notice 获取治理状态值对应的徽标样式类名。
+ * @param state 治理状态值。
+ * @returns 对应状态的样式类字符串。
+ */
 export function governanceStateBadgeClass(state?: bigint) {
   switch (Number(state ?? -1)) {
     case 0:
@@ -99,15 +126,34 @@ export function governanceStateBadgeClass(state?: bigint) {
   }
 }
 
+/**
+ * @notice 格式化提案投票区块范围。
+ * @param start 投票起始区块。
+ * @param end 投票结束区块。
+ * @returns 可展示的区块范围文本。
+ */
 export function formatProposalBlockRange(start?: bigint, end?: bigint) {
   if (start === undefined || end === undefined) return "-";
   return `${start.toString()} -> ${end.toString()}`;
 }
 
+/**
+ * @notice 格式化区块倒计时。
+ * @param blocks 剩余区块数。
+ * @returns 带“区块”单位的倒计时文本。
+ */
 export function formatBlockCountdown(blocks: bigint) {
   return `${blocks.toString()} 个区块`;
 }
 
+/**
+ * @notice 生成治理提案在当前状态下的倒计时摘要。
+ * @param currentBlock 当前区块号。
+ * @param voteStart 投票起始区块。
+ * @param voteEnd 投票结束区块。
+ * @param state 当前治理状态值。
+ * @returns 包含标签与倒计时文本的对象。
+ */
 export function getProposalCountdown(
   currentBlock?: bigint,
   voteStart?: bigint,
@@ -197,6 +243,16 @@ function formatQueuedCountdown(seconds: bigint) {
   return `${secs.toString()}秒`;
 }
 
+/**
+ * @notice 生成治理提案阶段倒计时摘要。
+ * @param currentBlock 当前区块号。
+ * @param voteStart 投票起始区块。
+ * @param voteEnd 投票结束区块。
+ * @param state 当前治理状态值。
+ * @param proposalEta 提案 ETA。
+ * @param nowTs 当前时间戳。
+ * @returns 包含标签与阶段提示文本的对象。
+ */
 export function getProposalStageCountdown(
   currentBlock?: bigint,
   voteStart?: bigint,

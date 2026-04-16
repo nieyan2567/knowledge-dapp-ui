@@ -1,5 +1,8 @@
 ﻿"use client";
 
+/**
+ * 模块说明：治理页面模块，负责提案模板选择、草稿动作编码、提案创建以及提案列表展示。
+ */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useAccount,
@@ -51,6 +54,11 @@ type DraftActionState = {
     | null;
 };
 
+/**
+ * 上报治理页面中的可恢复错误。
+ * @param message 错误摘要信息。
+ * @param error 原始错误对象或下游返回载荷。
+ */
 function reportGovernancePageError(message: string, error: unknown) {
   void reportClientError({
     message,
@@ -61,6 +69,10 @@ function reportGovernancePageError(message: string, error: unknown) {
   });
 }
 
+/**
+ * 渲染治理页面。
+ * @returns 包含提案创建器和提案列表的治理页面。
+ */
 export default function GovernancePage() {
   const { address } = useAccount();
   const { data: blockNumber } = useBlockNumber({ watch: true });
@@ -100,7 +112,7 @@ export default function GovernancePage() {
       const latestBlock = await publicClient.getBlockNumber();
       setLiveBlockNumber(latestBlock);
     } catch {
-      // Keep the latest known block when polling fails transiently.
+      // 轮询偶发失败时保留上一份区块高度，避免页面阶段文本闪烁。
     }
   }, [publicClient]);
 
@@ -160,6 +172,10 @@ export default function GovernancePage() {
     query: { enabled: !!latestProposal },
   });
 
+  /*
+   * 草稿动作需要先走模板校验，再尝试编码成 Governor 可执行的 calldata。
+   * 这里把“模板定义 + 校验结果 + 编码结果”整理成统一的草稿状态，供页面分区复用。
+   */
   const draftStates = useMemo<DraftActionState[]>(() => {
     return draftActions.map((action) => {
       const template = getGovernanceTemplateById(action.templateId);

@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * 模块说明：奖励页面模块，负责待领取奖励、预算消耗、奖励历史和奖励来源列表的展示与领取流程。
+ */
 import Link from "next/link";
 import { Coins, ExternalLink, ShieldCheck, Wallet } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -38,6 +41,11 @@ type LoadRewardActivityOptions = {
   background?: boolean;
 };
 
+/**
+ * 上报奖励页面中的可恢复错误。
+ * @param message 错误摘要信息。
+ * @param error 原始错误对象或下游返回载荷。
+ */
 function reportRewardsPageError(message: string, error: unknown) {
   void reportClientError({
     message,
@@ -48,11 +56,20 @@ function reportRewardsPageError(message: string, error: unknown) {
   });
 }
 
+/**
+ * 构造奖励相关交易的区块浏览器链接。
+ * @param txHash 奖励事件关联的交易哈希。
+ * @returns 可跳转的浏览器链接；若哈希不存在则返回占位地址。
+ */
 function explorerTxUrl(txHash?: `0x${string}`) {
   if (!txHash) return "#";
   return `${BRANDING.explorerUrl}/tx/${txHash}`;
 }
 
+/**
+ * 渲染奖励页面。
+ * @returns 包含待领取奖励、奖励历史和领取操作的页面。
+ */
 export default function RewardsPage() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -102,6 +119,10 @@ export default function RewardsPage() {
   const spent = spentValue ? Number(formatEther(spentValue)) : 0;
   const progress = budget ? Math.min((spent / budget) * 100, 100) : 0;
 
+  /*
+   * 奖励活动列表来自事件层而不是单纯的 pendingRewards 读值，
+   * 因为页面既要展示“可领多少”，也要展示“奖励是如何产生和何时被领取的”。
+   */
   const loadRewardActivity = useCallback(
     async ({ background = false }: LoadRewardActivityOptions = {}) => {
     if (!publicClient || !address) {
@@ -509,6 +530,16 @@ export default function RewardsPage() {
   );
 }
 
+/**
+ * 渲染奖励列表的分页控制器。
+ * @param page 当前页码，从 1 开始。
+ * @param totalPages 总页数。
+ * @param pageSize 当前每页条数。
+ * @param totalItems 当前列表总条目数。
+ * @param onPageChange 切换页码时触发的回调。
+ * @param onPageSizeChange 切换每页条数时触发的回调。
+ * @returns 可复用的奖励分页控制器。
+ */
 function PaginationControls({
   page,
   totalPages,

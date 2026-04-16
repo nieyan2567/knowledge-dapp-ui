@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * 模块说明：治理页面分区组件集合，负责提案动作编辑器、预览卡片、指标卡片和提案列表。
+ */
 import Link from "next/link";
 import { type ReactNode, useEffect, useMemo } from "react";
 import { formatEther } from "viem";
@@ -33,16 +36,38 @@ import type {
   ProposalVotes,
 } from "@/types/governance";
 
+/**
+ * 表示治理草稿动作的校验结果。
+ */
 export type DraftActionValidation = { ok: true } | { ok: false; error: string };
 
+/**
+ * 缩写治理页面中显示的地址。
+ * @param address 需要展示的地址。
+ * @returns 截断后的地址文本。
+ */
 function shortenAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+/**
+ * 格式化提案对应的区块范围。
+ * @param start 起始区块。
+ * @param end 结束区块。
+ * @returns 可直接展示的区块范围文本。
+ */
 function formatBlockRange(start?: bigint, end?: bigint) {
   return formatProposalBlockRange(start, end);
 }
 
+/**
+ * 渲染治理指标卡片。
+ * @param icon 指标图标。
+ * @param label 指标名称。
+ * @param value 指标值。
+ * @param description 指标说明。
+ * @returns 可复用的治理指标卡片。
+ */
 export function GovernanceMetricCard({
   icon,
   label,
@@ -70,6 +95,20 @@ export function GovernanceMetricCard({
   );
 }
 
+/**
+ * 渲染单个治理动作草稿编辑器。
+ * @param index 当前动作在列表中的序号。
+ * @param action 当前动作草稿。
+ * @param template 当前动作对应的模板定义。
+ * @param validation 当前动作校验结果。
+ * @param groupedTemplates 按类别分组后的模板集合。
+ * @param totalActions 当前总动作数。
+ * @param onTemplateChange 模板切换回调。
+ * @param onFieldChange 字段值变更回调。
+ * @param onMoveAction 动作上下移动回调。
+ * @param onRemoveAction 删除动作回调。
+ * @returns 动作草稿编辑器区块。
+ */
 export function DraftActionEditor({
   index,
   action,
@@ -199,6 +238,14 @@ export function DraftActionEditor({
   );
 }
 
+/**
+ * 渲染单个治理模板字段编辑器。
+ * @param actionId 所属动作 ID。
+ * @param field 字段定义。
+ * @param value 当前字段值。
+ * @param onFieldChange 字段更新回调。
+ * @returns 单字段编辑器。
+ */
 function GovernanceFieldEditor({
   actionId,
   field,
@@ -269,6 +316,14 @@ function GovernanceFieldEditor({
   );
 }
 
+/**
+ * 渲染草稿动作预览卡片。
+ * @param action 当前动作草稿。
+ * @param encodedAction 已编码动作。
+ * @param template 当前动作模板。
+ * @param validation 当前动作校验结果。
+ * @returns 动作预览卡片。
+ */
 export function DraftActionPreview({
   index,
   template,
@@ -347,6 +402,12 @@ export function DraftActionPreview({
   );
 }
 
+/**
+ * 渲染治理预览统计项。
+ * @param label 指标名称。
+ * @param value 指标值。
+ * @returns 预览统计项组件。
+ */
 export function PreviewStat({
   label,
   value,
@@ -366,6 +427,13 @@ export function PreviewStat({
   );
 }
 
+/**
+ * 渲染提案列表。
+ * @param proposals 提案数组。
+ * @param liveBlockNumber 当前实时区块高度。
+ * @param nowTs 当前时间戳。
+ * @returns 提案列表区域。
+ */
 export function ProposalList({
   proposals,
   loading,
@@ -407,6 +475,13 @@ export function ProposalList({
   );
 }
 
+/**
+ * 渲染单个提案卡片。
+ * @param proposal 当前提案数据。
+ * @param liveBlockNumber 当前实时区块高度。
+ * @param nowTs 当前时间戳。
+ * @returns 提案摘要卡片。
+ */
 function ProposalCard({
   proposal,
   currentBlock,
@@ -589,6 +664,12 @@ function ProposalCard({
   );
 }
 
+/**
+ * 渲染提案票数统计项。
+ * @param label 票数类型名称。
+ * @param value 票数值。
+ * @returns 票数统计展示项。
+ */
 function VoteStat({
   label,
   value,

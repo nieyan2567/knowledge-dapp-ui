@@ -1,3 +1,7 @@
+/**
+ * @file Faucet 链上客户端模块。
+ * @description 负责 Faucet 合约读取、授权签名生成、代付领取和维护任务执行。
+ */
 import { randomBytes } from "node:crypto";
 
 import {
@@ -31,6 +35,10 @@ import type {
 } from "@/lib/faucet/types";
 import { captureServerEvent } from "@/lib/observability/server";
 
+/**
+ * @notice Faucet 链上客户端集合。
+ * @dev 统一缓存 RPC 读客户端、Relayer 写客户端和签名账户。
+ */
 type FaucetClients = {
   publicClient: ReturnType<typeof createPublicClient>;
   walletClient: ReturnType<typeof createWalletClient>;
@@ -40,6 +48,10 @@ type FaucetClients = {
 
 let faucetClients: FaucetClients | undefined;
 
+/**
+ * @notice 获取 Faucet 所需的链上客户端和账户对象。
+ * @returns Faucet 客户端集合。
+ */
 export async function getFaucetClients(): Promise<FaucetClients> {
   if (faucetClients) {
     return faucetClients;
@@ -68,6 +80,11 @@ export async function getFaucetClients(): Promise<FaucetClients> {
   return clients;
 }
 
+/**
+ * @notice 读取 FaucetVault 当前配置和运行状态。
+ * @returns 包含领取额度、冷却、预算和暂停状态的配置对象。
+ * @throws 当 FaucetVault 合约不存在时抛出基础设施异常。
+ */
 export async function readFaucetVaultConfig() {
   const { publicClient } = await getFaucetClients();
   const faucetVaultAddress = getFaucetVaultAddress();
@@ -121,6 +138,11 @@ export async function readFaucetVaultConfig() {
   };
 }
 
+/**
+ * @notice 查询指定地址上次成功领取 Faucet 的时间戳。
+ * @param address 领取地址。
+ * @returns 最近一次领取时间的链上时间戳。
+ */
 export async function readRecipientLastClaimAt(address: `0x${string}`) {
   const { publicClient } = await getFaucetClients();
   const faucetVaultAddress = getFaucetVaultAddress();
@@ -162,6 +184,11 @@ function encodeClaimRequestHash(input: {
   );
 }
 
+/**
+ * @notice 为指定领取地址生成一次性 Faucet 领取授权。
+ * @param recipient 目标领取地址。
+ * @returns 包含金额、截止时间、随机数和签名的授权对象。
+ */
 export async function createFaucetClaimAuthorization(
   recipient: `0x${string}`
 ): Promise<FaucetClaimAuthorization> {
@@ -190,6 +217,11 @@ export async function createFaucetClaimAuthorization(
   };
 }
 
+/**
+ * @notice 由 Relayer 代付执行 Faucet 领取交易。
+ * @param input 领取所需的全部授权参数。
+ * @returns 成功提交并确认后的交易哈希。
+ */
 export async function submitFaucetClaim(input: {
   recipient: `0x${string}`;
   amount: bigint;
@@ -221,6 +253,10 @@ export async function submitFaucetClaim(input: {
   return txHash;
 }
 
+/**
+ * @notice 调用 RevenueVault 的再平衡逻辑，为 Faucet 补充资金。
+ * @returns 交易哈希；若未配置或未部署 RevenueVault 则返回 `null`。
+ */
 export async function rebalanceRevenueVault() {
   const { relayerAccount, publicClient, walletClient } = await getFaucetClients();
   const revenueVaultAddress = CONTRACTS.RevenueVault as `0x${string}` | undefined;
@@ -281,6 +317,7 @@ async function topUpFaucetRelayerBalance(
   const funderAccount = privateKeyToAccount(funderKey);
   const { publicClient } = await getFaucetClients();
 
+  // Top-up 资金账户不能和 Relayer 复用，否则无法表达独立补充来源，也会放大误配置风险。
   if (funderAccount.address.toLowerCase() === relayerAddress.toLowerCase()) {
     return {
       attempted: false,
@@ -325,6 +362,10 @@ async function topUpFaucetRelayerBalance(
   };
 }
 
+/**
+ * @notice 运行 Faucet 维护巡检。
+ * @returns 维护报告，包含 relayer 余额、FaucetVault 状态、自动补充结果和告警问题列表。
+ */
 export async function runFaucetMaintenance(): Promise<FaucetMaintenanceReport> {
   const { publicClient, relayerAccount } = await getFaucetClients();
   const relayerAlertMinBalance = getFaucetRelayerAlertMinBalance();
@@ -335,6 +376,7 @@ export async function runFaucetMaintenance(): Promise<FaucetMaintenanceReport> {
   const issues: string[] = [];
   let topUp: FaucetMaintenanceReport["topUp"] = { attempted: false };
 
+  // 先检查 Relayer 余额，不足时记录告警并尝试按配置自动补充。
   if (relayerBalance < relayerAlertMinBalance) {
     const lowBalanceMessage = `Faucet relayer balance dropped below threshold: ${formatEther(
       relayerBalance
@@ -394,6 +436,7 @@ export async function runFaucetMaintenance(): Promise<FaucetMaintenanceReport> {
   });
   const faucetVaultAlertMinBalance = getFaucetVaultAlertMinBalance();
 
+  // 再检查 FaucetVault 自身余额，避免前端继续放行领取但链上资金已经接近耗尽。
   if (
     faucetVaultAlertMinBalance !== undefined &&
     faucetVaultBalance < faucetVaultAlertMinBalance

@@ -1,3 +1,6 @@
+/**
+ * 模块说明：管理后台总览组件，负责展示节点申请、验证者申请、allowlist、Validator 集和审计日志摘要。
+ */
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -30,6 +33,10 @@ type OverviewResponse = {
 
 type LoadOverviewOptions = { background?: boolean; silent?: boolean };
 
+/**
+ * 渲染管理后台总览页面。
+ * @returns 管理后台概览页主组件。
+ */
 export function AdminOverviewPage() {
   const { address } = useAccount();
   const { ensureUploadAuth, isAuthenticating } = useUploadAuth();
@@ -38,6 +45,10 @@ export function AdminOverviewPage() {
   const [session, setSession] = useState<AdminSessionResponse>({ authenticated: false, address: null, isAdmin: false });
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
 
+  /*
+   * 总览页需要先确认当前管理会话，再在会话有效且具备管理员权限时继续请求 overview 数据，
+   * 这样可以把“未签名”“已签名但非管理员”“管理员可见数据”三种状态区分开。
+   */
   const loadOverview = useCallback(async ({ background = false, silent = false }: LoadOverviewOptions = {}) => {
     if (!background) setIsLoading(true);
     try {
@@ -168,6 +179,11 @@ export function AdminOverviewPage() {
   );
 }
 
+/**
+ * 把后台动作类型映射成可读文案。
+ * @param action 后台动作枚举值。
+ * @returns 面向页面展示的动作说明文本。
+ */
 function describeAction(action: AdminActionLogRecord["action"]) {
   switch (action) {
     case "node_request_approved": return "已批准节点申请";
@@ -180,21 +196,43 @@ function describeAction(action: AdminActionLogRecord["action"]) {
   }
 }
 
+/**
+ * 渲染节点申请状态标签。
+ * @param status 当前节点申请状态。
+ * @returns 状态徽章组件。
+ */
 function StatusTag({ status }: { status: NodeRequestRecord["status"] }) {
   const styles = status === "approved" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : status === "revoked" ? "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200" : status === "rejected" ? "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300";
   const label = status === "approved" ? "已批准" : status === "revoked" ? "已撤销" : status === "rejected" ? "已拒绝" : "待审批";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${styles}`}>{label}</span>;
 }
 
+/**
+ * 渲染生命周期统计摘要项。
+ * @param label 统计项名称。
+ * @param value 统计项数值。
+ * @param tone 统计项语义颜色。
+ * @returns 生命周期统计卡片。
+ */
 function LifecyclePill({ label, value, tone }: { label: string; value: number; tone: "success" | "warn" | "danger" | "neutral" | "info" }) {
   const toneClass = tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-200" : tone === "warn" ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200" : tone === "danger" ? "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-200" : tone === "info" ? "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/60 dark:bg-sky-950/20 dark:text-sky-200" : "border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-800/30 dark:text-slate-200";
   return <div className={`rounded-2xl border px-4 py-3 ${toneClass}`}><div className="text-xs font-medium">{label}</div><div className="mt-1 text-2xl font-semibold">{value}</div></div>;
 }
 
+/**
+ * 渲染后台列表的空状态容器。
+ * @param children 需要展示的空状态内容。
+ * @returns 空状态容器。
+ */
 function EmptyState({ children }: { children: ReactNode }) {
   return <div className="flex min-h-32 flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">{children}</div>;
 }
 
+/**
+ * 格式化后台时间字段。
+ * @param value ISO 时间字符串。
+ * @returns 本地化日期时间文本。
+ */
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("zh-CN", { hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }

@@ -1,9 +1,18 @@
 "use client";
 
+/**
+ * 模块说明：拖拽上传组件，负责统一封装文件点击选择与拖拽选择交互。
+ */
 import { useRef, useState } from "react";
 import clsx from "clsx";
 import { FileText, UploadCloud } from "lucide-react";
 
+/**
+ * 渲染文件拖拽与点击上传区域。
+ * @param file 当前已选择的文件。
+ * @param onChange 文件变更时触发的回调。
+ * @returns 可复用的文件拖拽上传区域。
+ */
 export function FileDrop({
   file,
   onChange,
@@ -14,15 +23,28 @@ export function FileDrop({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
+  /**
+   * 打开系统文件选择器。
+   * @returns 无返回值。
+   */
   function handleOpen() {
     inputRef.current?.click();
   }
 
+  /**
+   * 从原生 FileList 中取出第一份文件并向上抛出。
+   * @param files 浏览器文件列表对象。
+   * @returns 无返回值。
+   */
   function handleFiles(files: FileList | null) {
     const selected = files?.[0];
     if (selected) onChange(selected);
   }
 
+  /*
+   * 这里同时兼容点击选择和拖拽放入两种交互，
+   * 并用 dragging 状态驱动边框和背景变化，给用户明确反馈。
+   */
   return (
     <div
       onClick={handleOpen}

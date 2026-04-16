@@ -1,3 +1,6 @@
+/**
+ * 模块说明：覆盖 Faucet 领取签名校验、加锁和代领提交流程。
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createJsonRequest } from "@/test/api-route";

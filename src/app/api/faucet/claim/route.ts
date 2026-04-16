@@ -1,4 +1,7 @@
 ﻿import { getAddress, verifyMessage } from "viem";
+/**
+ * 模块说明：Faucet 领取接口，负责验证签名挑战、执行资格校验、加锁并提交代领交易。
+ */
 import { NextRequest, NextResponse } from "next/server";
 
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
@@ -28,8 +31,17 @@ import {
 } from "@/lib/faucet/utils";
 import { captureServerException } from "@/lib/observability/server";
 
+/**
+ * 声明当前接口运行在 Node.js 运行时。
+ * @returns Next.js 路由运行时标记。
+ */
 export const runtime = "nodejs";
 
+/**
+ * 校验 Faucet 签名挑战并提交领取交易。
+ * @param req 携带签名领取载荷的请求对象。
+ * @returns 描述领取结果的 JSON 响应。
+ */
 export async function POST(req: NextRequest) {
   const knowledgeChain = getKnowledgeChain();
   const rateLimit = await enforceApiRateLimits(req.headers, ["faucet:claim"]);

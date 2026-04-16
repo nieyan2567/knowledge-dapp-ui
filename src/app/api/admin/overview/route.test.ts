@@ -1,3 +1,6 @@
+/**
+ * 模块说明：覆盖管理后台总览接口的聚合与鉴权行为。
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createNextRequest } from "@/test/api-route";

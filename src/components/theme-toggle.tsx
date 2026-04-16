@@ -1,13 +1,24 @@
 "use client";
 
+/**
+ * 模块说明：主题切换按钮组件，负责在浅色和深色主题之间切换并处理客户端挂载前占位态。
+ */
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useIsClient } from "@/hooks/useIsClient";
 
+/**
+ * 渲染主题切换按钮。
+ * @returns 一个在客户端可切换主题的按钮；挂载前显示禁用占位态。
+ */
 export function ThemeToggle() {
   const { setTheme, resolvedTheme } = useTheme();
   const isClient = useIsClient();
 
+  /*
+   * 主题状态依赖客户端环境，服务端阶段无法拿到最终主题，
+   * 因此先渲染禁用态按钮，避免首屏出现主题闪烁。
+   */
   if (!isClient || !resolvedTheme) {
     return (
       <button

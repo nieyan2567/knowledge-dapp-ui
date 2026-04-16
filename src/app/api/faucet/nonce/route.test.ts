@@ -1,3 +1,6 @@
+/**
+ * 模块说明：覆盖 Faucet nonce 签发、参数校验和限流行为。
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createNextRequest } from "@/test/api-route";

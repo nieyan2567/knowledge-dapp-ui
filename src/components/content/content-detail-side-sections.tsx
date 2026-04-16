@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * 模块说明：内容详情侧边操作组件集合，负责渲染投票、奖励记账、恢复、编辑和删除相关表单。
+ */
 import { formatEther } from "viem";
 import { Coins, Heart, PencilLine, RotateCcw, Trash2 } from "lucide-react";
 
@@ -12,6 +15,17 @@ import {
   formatUploadVersionDescription,
 } from "@/lib/content-detail-helpers";
 
+/**
+ * 渲染内容详情侧边的快捷操作区。
+ * @param deleted 当前内容是否已删除。
+ * @param isAuthor 当前用户是否为作者。
+ * @param canRestoreContent 当前是否允许恢复内容。
+ * @param restoring 是否正在恢复。
+ * @param onVote 投票回调。
+ * @param onAccrueReward 奖励记账回调。
+ * @param onRestore 恢复回调。
+ * @returns 侧边快捷操作区块。
+ */
 export function ContentActionsSection({
   deleted,
   isAuthor,
@@ -76,6 +90,36 @@ export function ContentActionsSection({
   );
 }
 
+/**
+ * 渲染内容编辑与版本上传区。
+ * @param editTitle 编辑中的标题。
+ * @param editDescription 编辑中的描述。
+ * @param editCid 编辑中的目标 CID。
+ * @param versionFile 当前选中的新版本文件。
+ * @param uploadedVersionUrl 新版本上传后的网关地址。
+ * @param uploadingVersionFile 是否正在上传新版本文件。
+ * @param savingEdit 是否正在保存编辑。
+ * @param deleting 是否正在删除内容。
+ * @param restoring 是否正在恢复内容。
+ * @param isAuthenticating 是否正在进行上传鉴权。
+ * @param updateFee 当前更新费用。
+ * @param uploadMaxFileSizeText 版本文件上传限制说明。
+ * @param newVersionBlockedReason 阻止提交新版本的原因。
+ * @param canEditContent 当前是否允许编辑。
+ * @param isAuthor 当前用户是否为作者。
+ * @param canRestoreContent 当前是否允许恢复。
+ * @param canDeleteContent 当前是否允许删除。
+ * @param currentCid 当前内容 CID。
+ * @param onEditTitleChange 标题变更回调。
+ * @param onEditDescriptionChange 描述变更回调。
+ * @param onEditCidChange CID 变更回调。
+ * @param onVersionFileChange 版本文件变更回调。
+ * @param onUploadVersionFile 上传新版本文件回调。
+ * @param onUpdateContent 更新内容回调。
+ * @param onDeleteContent 删除内容回调。
+ * @param onRestoreContent 恢复内容回调。
+ * @returns 内容编辑与版本上传区块。
+ */
 export function ContentEditSection({
   editTitle,
   editDescription,

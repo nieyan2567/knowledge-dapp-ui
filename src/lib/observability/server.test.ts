@@ -1,3 +1,7 @@
+/**
+ * @notice `observability/server` 模块测试。
+ * @dev 覆盖结构化日志、告警去重和客户端错误上报接入。
+ */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {

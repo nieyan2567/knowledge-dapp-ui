@@ -1,5 +1,8 @@
 ﻿"use client";
 
+/**
+ * 模块说明：应用外壳组件，负责渲染侧边导航、顶部操作区，以及为各页面提供统一布局骨架。
+ */
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -53,6 +56,11 @@ const iconMap = {
   explorer: ExternalLink,
 } as const;
 
+/**
+ * 渲染整个应用的共享外壳布局。
+ * @param children 当前页面需要嵌入外壳中的主体内容。
+ * @returns 带侧边栏、顶栏和主内容区的应用外壳。
+ */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isStandaloneRoute = pathname.startsWith("/faucet");
@@ -71,6 +79,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.setItem("knowledge-sidebar-collapsed", String(collapsed));
   }, [collapsed]);
 
+  /*
+   * Faucet 页面使用独立的沉浸式布局，不复用常规应用外壳，
+   * 因此在这里提前短路，避免侧边栏和顶部操作区介入。
+   */
   if (isStandaloneRoute) {
     return <>{children}</>;
   }

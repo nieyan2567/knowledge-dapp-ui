@@ -1,3 +1,7 @@
+/**
+ * @notice 奖励事件抓取与聚合工具。
+ * @dev 负责读取奖励记账与领取事件，并重建奖励历史和来源统计。
+ */
 import type { PublicClient } from "viem";
 
 import { ABIS, CONTRACTS } from "@/contracts";
@@ -5,6 +9,10 @@ import { rewardAccrueRequestedEvent, rewardClaimedEvent } from "@/contracts/even
 import { collectByBlockRange } from "@/lib/block-range";
 import { asContentData } from "@/lib/web3-types";
 
+/**
+ * @notice 奖励历史项结构。
+ * @dev 统一表示奖励记账和奖励领取两类事件。
+ */
 export type RewardHistoryItem = {
   id: string;
   kind: "accrued" | "claimed";
@@ -19,6 +27,10 @@ export type RewardHistoryItem = {
   voteCountAtAccrual?: bigint;
 };
 
+/**
+ * @notice 奖励来源聚合项结构。
+ * @dev 按内容维度汇总奖励总额、记账次数和最新区块。
+ */
 export type RewardSourceItem = {
   contentId: bigint;
   title: string;
@@ -27,16 +39,30 @@ export type RewardSourceItem = {
   latestBlock: bigint;
 };
 
+/**
+ * @notice 奖励活动查询选项。
+ * @dev 可按作者或受益地址过滤事件。
+ */
 type RewardActivityOptions = {
   author?: `0x${string}`;
   beneficiary?: `0x${string}`;
 };
 
+/**
+ * @notice 抓取并聚合奖励活动数据。
+ * @param publicClient 当前链的公共客户端。
+ * @param options 可选过滤条件。
+ * @returns 包含奖励历史列表和奖励来源聚合列表的对象。
+ */
 export async function fetchRewardActivity(
   publicClient: PublicClient,
   options: RewardActivityOptions = {}
 ) {
   const latestBlock = await publicClient.getBlockNumber();
+  /**
+   * @notice 并行抓取奖励记账和奖励领取两类事件。
+   * @dev 两类日志互不依赖，适合同时请求以缩短等待时间。
+   */
   const [accrualLogs, claimLogs] = await Promise.all([
     collectByBlockRange({
       toBlock: latestBlock,
@@ -78,6 +104,10 @@ export async function fetchRewardActivity(
     )
   );
 
+  /**
+   * @notice 额外补充内容标题和区块时间，供页面展示完整历史记录。
+   * @dev 事件自身不包含全部展示字段，因此需要并行回查内容和区块信息。
+   */
   const [contentEntries, blockEntries] = await Promise.all([
     Promise.all(
       contentIds.map(async (contentId) => {

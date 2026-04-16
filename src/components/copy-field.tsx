@@ -1,8 +1,16 @@
 "use client";
 
+/**
+ * 模块说明：可复制字段组件，负责展示一段文本并提供复制与外链跳转能力。
+ */
 import { Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
+/**
+ * 判断文本是否为可直接访问的 HTTP 链接。
+ * @param value 待判断的文本值。
+ * @returns 若文本是 HTTP 或 HTTPS 链接则返回 `true`。
+ */
 function isHttpUrl(value: string) {
   try {
     const url = new URL(value);
@@ -12,6 +20,12 @@ function isHttpUrl(value: string) {
   }
 }
 
+/**
+ * 渲染带复制按钮的字段块。
+ * @param label 字段名称。
+ * @param value 字段内容。
+ * @returns 可复制的字段展示组件。
+ */
 export function CopyField({
   label,
   value,
@@ -19,6 +33,10 @@ export function CopyField({
   label: string;
   value: string;
 }) {
+  /**
+   * 把当前字段内容写入剪贴板。
+   * @returns 成功时弹出成功提示，失败时弹出错误提示。
+   */
   async function handleCopy() {
     try {
       await navigator.clipboard.writeText(value);
@@ -28,6 +46,10 @@ export function CopyField({
     }
   }
 
+  /*
+   * 如果字段内容本身是 URL，就把它渲染成外链；
+   * 否则保持为普通文本，仍然允许用户复制。
+   */
   const isLink = isHttpUrl(value);
 
   return (

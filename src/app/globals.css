@@ -1,3 +1,4 @@
+/* 模块说明：定义 App Router 全局样式、亮暗主题变量和基础排版。 */
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 

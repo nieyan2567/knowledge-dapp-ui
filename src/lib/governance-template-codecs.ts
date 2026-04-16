@@ -1,6 +1,10 @@
 ﻿import { formatEther } from "viem";
 
 import { ABIS, CONTRACTS } from "@/contracts";
+/**
+ * @file 治理模板编码模块。
+ * @description 负责将治理表单值校验并编码成链上可执行的提案动作。
+ */
 import { BRANDING } from "@/lib/branding";
 import { GOVERNANCE_TEMPLATES } from "@/lib/governance-template-definitions";
 import {
@@ -24,6 +28,9 @@ import type {
   GovernanceRiskLevel,
 } from "@/types/governance";
 
+/**
+ * @notice 描述单个治理模板的校验器和编码器。
+ */
 export type TemplateCodec = {
   validate: (
     values: Record<string, string | boolean>
@@ -40,6 +47,10 @@ const readBoolean = readGovernanceBoolean;
 const formatAddress = formatGovernanceAddress;
 const buildEncodedAction = buildEncodedGovernanceAction;
 
+/**
+ * @notice 治理模板编码器映射表。
+ * @dev 键为模板标识，值为对应的字段校验和 calldata 编码实现。
+ */
 export const templateCodecs: Record<string, TemplateCodec> = {
   "content.setRewardRules": {
     validate(values) {
@@ -617,14 +628,28 @@ export const templateCodecs: Record<string, TemplateCodec> = {
   },
 };
 
+/**
+ * @notice 返回全部治理模板定义。
+ * @returns 治理模板定义数组。
+ */
 export function getGovernanceTemplates() {
   return GOVERNANCE_TEMPLATES;
 }
 
+/**
+ * @notice 按模板标识查找治理模板。
+ * @param templateId 模板唯一标识。
+ * @returns 对应的模板定义；未命中时返回 `null`。
+ */
 export function getGovernanceTemplateById(templateId: string) {
   return GOVERNANCE_TEMPLATES.find((template) => template.id === templateId) ?? null;
 }
 
+/**
+ * @notice 基于模板默认值创建新的治理动作草稿。
+ * @param templateId 目标模板标识；未传时默认使用首个模板。
+ * @returns 新建的治理动作草稿对象。
+ */
 export function createGovernanceDraftAction(templateId = GOVERNANCE_TEMPLATES[0]?.id) {
   const template = templateId ? getGovernanceTemplateById(templateId) : null;
 
@@ -637,6 +662,11 @@ export function createGovernanceDraftAction(templateId = GOVERNANCE_TEMPLATES[0]
   } satisfies GovernanceDraftAction;
 }
 
+/**
+ * @notice 校验治理动作草稿中的字段值。
+ * @param draft 待校验的治理动作草稿。
+ * @returns 校验结果。
+ */
 export function validateGovernanceActionDraft(
   draft: GovernanceDraftAction
 ): ValidationResult {
@@ -655,6 +685,12 @@ export function validateGovernanceActionDraft(
   return codec.validate(draft.values);
 }
 
+/**
+ * @notice 将治理动作草稿编码成提案动作。
+ * @param draft 待编码的治理动作草稿。
+ * @returns 编码后的治理动作。
+ * @throws 当模板缺失或字段校验失败时抛出异常。
+ */
 export function encodeGovernanceActionDraft(draft: GovernanceDraftAction) {
   const validation = validateGovernanceActionDraft(draft);
   if (!validation.ok) {
@@ -669,6 +705,11 @@ export function encodeGovernanceActionDraft(draft: GovernanceDraftAction) {
   return codec.encode(draft.values);
 }
 
+/**
+ * @notice 根据风险等级返回界面徽标样式。
+ * @param riskLevel 风险等级。
+ * @returns 对应的样式类名。
+ */
 export function getRiskBadgeClass(riskLevel: GovernanceRiskLevel) {
   switch (riskLevel) {
     case "low":
@@ -682,6 +723,11 @@ export function getRiskBadgeClass(riskLevel: GovernanceRiskLevel) {
   }
 }
 
+/**
+ * @notice 将风险等级转换为展示标签。
+ * @param riskLevel 风险等级。
+ * @returns 风险等级标签文本。
+ */
 export function getRiskLabel(riskLevel: GovernanceRiskLevel) {
   switch (riskLevel) {
     case "low":
@@ -695,6 +741,11 @@ export function getRiskLabel(riskLevel: GovernanceRiskLevel) {
   }
 }
 
+/**
+ * @notice 将目标地址映射为已知合约名或缩写地址。
+ * @param address 目标合约地址。
+ * @returns 展示用的目标名称。
+ */
 export function formatGovernanceTemplateTarget(address: Address) {
   if (address.toLowerCase() === CONTRACTS.NativeVotes.toLowerCase()) {
     return "NativeVotes";

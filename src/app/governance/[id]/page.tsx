@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * 模块说明：提案详情模块，负责展示单个治理提案的状态、票数、动作摘要和投票执行入口。
+ */
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -41,11 +44,21 @@ import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt, asProposalVotes } from "@/lib/web3-types";
 import type { ProposalItem, ProposalVotes } from "@/types/governance";
 
+/**
+ * 构造提案相关交易的区块浏览器链接。
+ * @param txHash 提案事件关联的交易哈希。
+ * @returns 可跳转的浏览器链接；若哈希不存在则返回占位地址。
+ */
 function explorerProposalUrl(txHash: string) {
   if (!txHash || txHash === "0x") return "#";
   return `${BRANDING.explorerUrl}/tx/${txHash}`;
 }
 
+/**
+ * 上报提案详情页中的可恢复错误。
+ * @param message 错误摘要信息。
+ * @param error 原始错误对象或下游返回载荷。
+ */
 function reportProposalDetailError(message: string, error: unknown) {
   void reportClientError({
     message,
@@ -56,6 +69,10 @@ function reportProposalDetailError(message: string, error: unknown) {
   });
 }
 
+/**
+ * 渲染提案详情页。
+ * @returns 当前提案的状态、票数和操作详情页面。
+ */
 export default function ProposalDetailPage() {
   const params = useParams();
   const publicClient = usePublicClient();
@@ -131,7 +148,7 @@ export default function ProposalDetailPage() {
       const latestBlock = await publicClient.getBlockNumber();
       setLiveBlockNumber(latestBlock);
     } catch {
-      // Keep the latest known block when polling fails transiently.
+      // 轮询偶发失败时保留上一份区块高度，避免页面状态被临时打断。
     }
   }, [publicClient]);
 
@@ -643,6 +660,13 @@ export default function ProposalDetailPage() {
   );
 }
 
+/**
+ * 渲染提案摘要区中的紧凑信息卡片。
+ * @param label 卡片顶部显示的字段名称。
+ * @param value 字段对应的格式化值。
+ * @param compact 是否使用紧凑间距样式。
+ * @returns 可复用的提案元信息卡片。
+ */
 function InfoCard({
   label,
   value,
@@ -676,6 +700,14 @@ function InfoCard({
   );
 }
 
+/**
+ * 把某一类票数渲染成带标签的进度条。
+ * @param label 票数分类名称。
+ * @param value 该分类的原始票数。
+ * @param percent 该分类在总票数中的占比百分比。
+ * @param color 进度条填充色对应的工具类字符串。
+ * @returns 带进度条的票数摘要卡片。
+ */
 function VoteBar({
   label,
   value,

@@ -1,4 +1,7 @@
 ﻿import { getAddress } from "viem";
+/**
+ * 模块说明：Faucet nonce 接口，负责在领取前为指定钱包签发带上下文绑定的签名挑战。
+ */
 import { NextRequest, NextResponse } from "next/server";
 
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
@@ -17,8 +20,17 @@ import {
 import { createFaucetAuthChallenge } from "@/lib/faucet/nonce-store";
 import { captureServerException } from "@/lib/observability/server";
 
+/**
+ * 声明当前接口运行在 Node.js 运行时。
+ * @returns Next.js 路由运行时标记。
+ */
 export const runtime = "nodejs";
 
+/**
+ * 为满足条件的钱包地址创建 Faucet 签名挑战。
+ * @param req 包含候选钱包地址的请求对象。
+ * @returns 包含挑战信息的 JSON 响应。
+ */
 export async function GET(req: NextRequest) {
   const knowledgeChain = getKnowledgeChain();
   const rateLimit = await enforceApiRateLimits(req.headers, ["faucet:nonce"]);

@@ -1,3 +1,7 @@
+/**
+ * @notice `governance-templates` 模块测试。
+ * @dev 覆盖治理模板枚举、草稿创建、输入校验和动作编码逻辑。
+ */
 import { describe, expect, it } from "vitest";
 
 import { CONTRACTS } from "@/contracts";

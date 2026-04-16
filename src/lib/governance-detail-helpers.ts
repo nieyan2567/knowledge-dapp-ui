@@ -1,5 +1,13 @@
+/**
+ * @notice Governance 详情页文案配置。
+ * @dev 集中定义提案详情页的展示文案、状态提示和操作说明。
+ */
 import { BRANDING } from "@/lib/branding";
 
+/**
+ * @notice Governance 详情页静态文案集合。
+ * @dev 供投票分布、动作列表、操作面板和浏览器跳转区域复用。
+ */
 export const GOVERNANCE_DETAIL_COPY = {
   backToList: "返回提案列表",
   pageTitleFallback: "治理提案",

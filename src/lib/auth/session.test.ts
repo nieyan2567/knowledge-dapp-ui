@@ -1,3 +1,7 @@
+/**
+ * @file 上传鉴权会话测试模块。
+ * @description 校验上传会话的签发、读取、失效、吊销和开发环境兜底行为。
+ */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 

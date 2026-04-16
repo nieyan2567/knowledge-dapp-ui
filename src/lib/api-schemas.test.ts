@@ -1,3 +1,7 @@
+/**
+ * @notice `api-schemas` 模块测试。
+ * @dev 覆盖签名请求体、地址查询、上传文件与 Kubo 响应校验规则。
+ */
 import { describe, expect, it } from "vitest";
 
 import {

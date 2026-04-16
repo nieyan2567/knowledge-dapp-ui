@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+/**
+ * 模块说明：管理员地址管理接口，负责列出管理员地址并支持新增管理员地址记录。
+ */
 import {
   createAdminAddressSchema,
 } from "@/lib/admin/schemas";
@@ -14,8 +17,17 @@ import {
   listAdminAddresses,
 } from "@/server/admin/store";
 
+/**
+ * 声明当前接口运行在 Node.js 运行时。
+ * @returns Next.js 路由运行时标记。
+ */
 export const runtime = "nodejs";
 
+/**
+ * 返回当前所有管理员地址记录。
+ * @param req 用于鉴权和限流的请求对象。
+ * @returns 包含管理员地址列表的 JSON 响应。
+ */
 export async function GET(req: NextRequest) {
   const rateLimit = await enforceApiRateLimits(req.headers, [
     "admin:admin-addresses:list",
@@ -66,6 +78,11 @@ export async function GET(req: NextRequest) {
   }
 }
 
+/**
+ * 新增一条管理员地址记录。
+ * @param req 携带管理员地址参数的请求对象。
+ * @returns 包含新建管理员地址记录的 JSON 响应。
+ */
 export async function POST(req: NextRequest) {
   const rateLimit = await enforceApiRateLimits(req.headers, [
     "admin:admin-addresses:create",

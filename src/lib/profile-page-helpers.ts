@@ -1,11 +1,28 @@
+/**
+ * @notice Profile 页面展示辅助工具。
+ * @dev 负责个人页文案、筛选排序配置以及内容和提案展示格式化逻辑。
+ */
 import { formatEther } from "viem";
 
 import { BRANDING } from "@/lib/branding";
 import type { ContentData } from "@/types/content";
 
+/**
+ * @notice 个人页内容筛选类型。
+ * @dev 表示展示全部内容、仅正常内容或仅已删除内容。
+ */
 export type ContentFilter = "all" | "active" | "deleted";
+
+/**
+ * @notice 个人页内容排序类型。
+ * @dev 支持按更新时间、票数或版本数排序。
+ */
 export type ContentSort = "updated_desc" | "votes_desc" | "version_desc";
 
+/**
+ * @notice Profile 页面静态文案集合。
+ * @dev 集中定义个人页摘要、内容列表、提案列表与错误提示文案。
+ */
 export const PROFILE_PAGE_COPY = {
   headerEyebrow: "Wallet / Content / Governance",
   headerTitle: "Profile",
@@ -77,18 +94,31 @@ export const PROFILE_PAGE_COPY = {
   currentCidLabel: "当前 CID",
 } as const;
 
+/**
+ * @notice 内容筛选选项列表。
+ * @dev 用于个人页内容筛选下拉框展示。
+ */
 export const CONTENT_FILTER_OPTIONS: Array<{ value: ContentFilter; label: string }> = [
   { value: "all", label: PROFILE_PAGE_COPY.filterAll },
   { value: "active", label: PROFILE_PAGE_COPY.filterActive },
   { value: "deleted", label: PROFILE_PAGE_COPY.filterDeleted },
 ];
 
+/**
+ * @notice 内容排序选项列表。
+ * @dev 用于个人页内容排序下拉框展示。
+ */
 export const CONTENT_SORT_OPTIONS: Array<{ value: ContentSort; label: string }> = [
   { value: "updated_desc", label: PROFILE_PAGE_COPY.latestFirst },
   { value: "votes_desc", label: PROFILE_PAGE_COPY.votesFirst },
   { value: "version_desc", label: PROFILE_PAGE_COPY.versionsFirst },
 ];
 
+/**
+ * @notice 格式化个人页使用的时间戳。
+ * @param timestamp 秒级 Unix 时间戳。
+ * @returns 本地化后的日期时间字符串。
+ */
 export function formatProfileDate(timestamp: bigint) {
   return new Date(Number(timestamp) * 1000).toLocaleString("zh-CN", {
     year: "numeric",
@@ -100,6 +130,11 @@ export function formatProfileDate(timestamp: bigint) {
   });
 }
 
+/**
+ * @notice 缩短显示用的 CID。
+ * @param cid 完整的 IPFS CID。
+ * @returns 适合列表展示的缩略 CID。
+ */
 export function shortenCid(cid: string) {
   if (cid.length <= 16) {
     return cid;
@@ -108,6 +143,11 @@ export function shortenCid(cid: string) {
   return `${cid.slice(0, 8)}...${cid.slice(-8)}`;
 }
 
+/**
+ * @notice 缩短显示用的提案 ID。
+ * @param proposalId 完整提案 ID。
+ * @returns 适合列表展示的提案 ID 文本。
+ */
 export function shortenProposalId(proposalId: bigint) {
   const value = proposalId.toString();
   if (value.length <= 10) {
@@ -117,16 +157,32 @@ export function shortenProposalId(proposalId: bigint) {
   return `${value.slice(0, 30)}...`;
 }
 
+/**
+ * @notice 缩短显示用的钱包地址。
+ * @param address 钱包地址。
+ * @returns 缩略地址；若地址为空则返回未连接提示。
+ */
 export function shortenAddress(address?: string | null) {
   if (!address) return "未连接";
   if (address.length < 12) return address;
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+/**
+ * @notice 将代币数量格式化为可展示文本。
+ * @param amount 代币数量。
+ * @returns 带原生代币符号的格式化文本。
+ */
 export function formatTokenValue(amount: bigint) {
   return `${formatEther(amount)} ${BRANDING.nativeTokenSymbol}`;
 }
 
+/**
+ * @notice 统一提取错误文案。
+ * @param error 需要解析的错误对象。
+ * @param fallback 默认回退文案。
+ * @returns 解析后的错误文案；若无法解析则返回回退文案。
+ */
 export function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) {
     return `${fallback}：${error.message}`;
@@ -135,6 +191,13 @@ export function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+/**
+ * @notice 根据筛选和排序条件计算可见内容列表。
+ * @param myContents 当前钱包发布的内容列表。
+ * @param contentFilter 当前筛选条件。
+ * @param contentSort 当前排序条件。
+ * @returns 过滤并排序后的内容数组。
+ */
 export function getVisibleContents(
   myContents: ContentData[],
   contentFilter: ContentFilter,
@@ -159,20 +222,41 @@ export function getVisibleContents(
   });
 }
 
+/**
+ * @notice 生成个人内容统计摘要。
+ * @param active 正常内容数量。
+ * @param deleted 已删除内容数量。
+ * @returns 替换占位后的摘要文案。
+ */
 export function formatMyContentsHelp(active: number, deleted: number) {
   return PROFILE_PAGE_COPY.summaryMyContentsHelp
     .replace("{active}", String(active))
     .replace("{deleted}", String(deleted));
 }
 
+/**
+ * @notice 生成个人内容列表描述文案。
+ * @param count 内容总数。
+ * @returns 带数量的描述文本。
+ */
 export function formatContentsDescription(count: number) {
   return PROFILE_PAGE_COPY.myContentsDescription.replace("{count}", String(count));
 }
 
+/**
+ * @notice 生成个人提案列表描述文案。
+ * @param count 提案总数。
+ * @returns 带数量的描述文本。
+ */
 export function formatProposalsDescription(count: number) {
   return PROFILE_PAGE_COPY.myProposalsDescription.replace("{count}", String(count));
 }
 
+/**
+ * @notice 生成“更多动作”提示文案。
+ * @param count 被折叠的额外动作数量。
+ * @returns 带数量的提示文本。
+ */
 export function formatMoreActions(count: number) {
   return PROFILE_PAGE_COPY.moreActions.replace("{count}", String(count));
 }

@@ -1,3 +1,6 @@
+/**
+ * 模块说明：覆盖上传会话查询与注销行为。
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createNextRequest } from "@/test/api-route";

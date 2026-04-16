@@ -1,5 +1,8 @@
 ﻿"use client";
 
+/**
+ * 模块说明：内容卡片组件，负责在列表中展示单条内容摘要，并提供投票和奖励记账快捷操作。
+ */
 import Link from "next/link";
 import { BookOpen, Coins, ExternalLink, Heart } from "lucide-react";
 import { toast } from "sonner";
@@ -11,10 +14,21 @@ import { getIpfsFileUrl } from "@/lib/ipfs";
 import { writeTxToast } from "@/lib/tx-toast";
 import type { ContentCardData } from "@/types/content";
 
+/**
+ * 缩写内容作者地址。
+ * @param address 需要显示的作者地址。
+ * @returns 截断后的地址文本。
+ */
 function shortenAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+/**
+ * 渲染单条内容卡片。
+ * @param content 当前卡片对应的内容数据。
+ * @param onActionComplete 链上操作完成后的回调。
+ * @returns 可用于内容列表的摘要卡片。
+ */
 export function ContentCard({
   content,
   onActionComplete,
@@ -31,6 +45,10 @@ export function ContentCard({
 
   const fileUrl = getIpfsFileUrl(content.ipfsHash);
 
+  /**
+   * 发起内容投票交易。
+   * @returns 成功时等待交易确认并刷新相关页面域。
+   */
   async function handleVote() {
     if (!address) {
       toast.error("请先连接钱包");
@@ -61,6 +79,10 @@ export function ContentCard({
     } catch {}
   }
 
+  /**
+   * 由作者发起奖励记账交易。
+   * @returns 成功时等待交易确认并刷新奖励相关页面域。
+   */
   async function handleDistributeReward() {
     if (!address) {
       toast.error("请先连接钱包");

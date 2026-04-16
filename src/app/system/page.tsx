@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * 模块说明：系统信息页面模块，负责展示核心合约配置、所有权关系和治理参数等只读系统状态。
+ */
 import { useMemo, type ReactNode } from "react";
 import { formatEther } from "viem";
 import { useReadContract } from "wagmi";
@@ -14,10 +17,19 @@ import { PAGE_TEST_IDS } from "@/lib/test-ids";
 import { formatSystemBoolean, SYSTEM_PAGE_COPY } from "@/lib/system-page-helpers";
 import { asBigInt } from "@/lib/web3-types";
 
+/**
+ * 构造系统页面中地址对应的区块浏览器链接。
+ * @param address 需要查看的地址。
+ * @returns 指向区块浏览器的地址详情链接。
+ */
 function explorerAddressUrl(address: string) {
   return `${BRANDING.explorerUrl}/address/${address}`;
 }
 
+/**
+ * 渲染系统信息页面。
+ * @returns 只读的系统配置总览页面。
+ */
 export default function SystemPage() {
   const { data: contentOwner, refetch: refetchContentOwner } = useReadContract({
     address: CONTRACTS.KnowledgeContent as `0x${string}`,
@@ -245,6 +257,12 @@ export default function SystemPage() {
   );
 }
 
+/**
+ * 渲染系统摘要卡片中的单行字段。
+ * @param label 左侧显示的字段名称。
+ * @param children 右侧显示的字段值内容。
+ * @returns 可复用的系统字段行。
+ */
 function SystemRow({
   label,
   children,
@@ -260,6 +278,11 @@ function SystemRow({
   );
 }
 
+/**
+ * 渲染系统地址对应的区块浏览器外链。
+ * @param address 当前系统页面展示的地址。
+ * @returns 按钮样式的外部链接组件。
+ */
 function SystemExplorerLink({ address }: { address: string }) {
   return (
     <div className="pt-2">

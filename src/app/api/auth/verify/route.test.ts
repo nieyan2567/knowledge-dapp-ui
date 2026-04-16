@@ -1,3 +1,6 @@
+/**
+ * 模块说明：覆盖上传鉴权签名校验与会话创建行为。
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createJsonRequest } from "@/test/api-route";

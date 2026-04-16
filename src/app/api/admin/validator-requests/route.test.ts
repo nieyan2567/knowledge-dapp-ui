@@ -1,3 +1,6 @@
+/**
+ * 模块说明：覆盖验证者申请列表、候选过滤和创建行为。
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createJsonRequest, createNextRequest } from "@/test/api-route";

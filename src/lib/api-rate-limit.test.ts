@@ -1,3 +1,7 @@
+/**
+ * @notice `api-rate-limit` 模块测试。
+ * @dev 覆盖全局限流、路由叠加限流和窗口过期后的恢复逻辑。
+ */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {

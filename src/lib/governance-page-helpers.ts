@@ -1,15 +1,31 @@
+/**
+ * @notice Governance 页面展示与流程辅助工具。
+ * @dev 定义治理页文案、模板分组逻辑、流程步骤以及阶段判断函数。
+ */
 import type {
   GovernanceTemplateCategory,
   GovernanceTemplateDefinition,
   ProposalItem,
 } from "@/types/governance";
 
+/**
+ * @notice 单个治理提案允许配置的最大动作数。
+ * @dev 用于限制前端草稿编辑区的动作数量。
+ */
 export const MAX_GOVERNANCE_DRAFT_ACTIONS = 5;
 
+/**
+ * @notice 治理模板按类别分组后的结构类型。
+ * @dev 每一项由模板类别和该类别下的模板数组组成。
+ */
 export type GovernanceGroupedTemplates = Array<
   [GovernanceTemplateCategory, GovernanceTemplateDefinition[]]
 >;
 
+/**
+ * @notice 治理模板类别展示名称映射。
+ * @dev 用于在治理页面按类别展示模板分组标题。
+ */
 export const GOVERNANCE_CATEGORY_LABELS: Record<
   GovernanceTemplateCategory,
   string
@@ -21,6 +37,10 @@ export const GOVERNANCE_CATEGORY_LABELS: Record<
   timelock: "Timelock",
 };
 
+/**
+ * @notice 治理流程步骤定义。
+ * @dev 用于展示从配置提案到最终执行的治理生命周期。
+ */
 export const GOVERNANCE_FLOW_STEPS = [
   {
     step: 1,
@@ -44,6 +64,10 @@ export const GOVERNANCE_FLOW_STEPS = [
   },
 ] as const;
 
+/**
+ * @notice Governance 页面静态文案集合。
+ * @dev 供提案列表、提案创建、提案预览和治理参数区域复用。
+ */
 export const GOVERNANCE_PAGE_COPY = {
   headerTitle: "Governance Center",
   headerDescription:
@@ -127,6 +151,13 @@ export const GOVERNANCE_PAGE_COPY = {
   },
 } as const;
 
+/**
+ * @notice 在数组中移动治理草稿项的位置。
+ * @param items 原始数组。
+ * @param fromIndex 起始索引。
+ * @param toIndex 目标索引。
+ * @returns 重新排序后的新数组。
+ */
 export function moveGovernanceItem<T>(
   items: T[],
   fromIndex: number,
@@ -143,6 +174,11 @@ export function moveGovernanceItem<T>(
   return next;
 }
 
+/**
+ * @notice 获取治理模板类别的排序权重。
+ * @param category 模板类别。
+ * @returns 用于排序的数值权重。
+ */
 export function getGovernanceCategoryOrder(category: GovernanceTemplateCategory) {
   switch (category) {
     case "content":
@@ -158,6 +194,11 @@ export function getGovernanceCategoryOrder(category: GovernanceTemplateCategory)
   }
 }
 
+/**
+ * @notice 按类别对治理模板进行分组并排序。
+ * @param templates 待分组的治理模板数组。
+ * @returns 已分组且按类别顺序排序后的模板结构。
+ */
 export function groupGovernanceTemplates(
   templates: GovernanceTemplateDefinition[]
 ) {
@@ -184,6 +225,16 @@ export function groupGovernanceTemplates(
     ) as GovernanceGroupedTemplates;
 }
 
+/**
+ * @notice 计算治理流程当前所在步骤。
+ * @param input 当前提案及链上状态信息。
+ * @param input.latestProposal 最新提案。
+ * @param input.latestProposalStateValue 最新提案状态值。
+ * @param input.latestProposalEtaValue 最新提案 ETA。
+ * @param input.liveBlockNumber 当前链上区块号。
+ * @param input.nowTs 当前时间戳。
+ * @returns 当前应高亮的治理步骤编号。
+ */
 export function getActiveGovernanceStep(input: {
   latestProposal?: ProposalItem;
   latestProposalStateValue?: bigint;
@@ -226,10 +277,21 @@ export function getActiveGovernanceStep(input: {
         ? 2
         : latestProposal.voteEnd >= liveBlockNumber
           ? 2
-          : 3;
+        : 3;
   }
 }
 
+/**
+ * @notice 生成治理页面当前阶段说明文案。
+ * @param input 当前草稿与最新提案状态信息。
+ * @param input.draftActionCount 当前草稿动作数。
+ * @param input.latestProposal 最新提案。
+ * @param input.latestProposalStateValue 最新提案状态值。
+ * @param input.latestProposalEtaValue 最新提案 ETA。
+ * @param input.nowTs 当前时间戳。
+ * @param input.trimmedDescriptionLength 当前提案描述长度。
+ * @returns 当前阶段的说明文本。
+ */
 export function getCurrentGovernanceStageText(input: {
   draftActionCount: number;
   latestProposal?: ProposalItem;

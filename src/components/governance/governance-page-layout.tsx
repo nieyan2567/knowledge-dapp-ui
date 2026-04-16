@@ -1,3 +1,6 @@
+/**
+ * 模块说明：治理页面布局组件，负责组织治理主页面的流程区、列表区、创建器、预览区和侧边栏。
+ */
 "use client";
 import { formatEther } from "viem";
 import {
@@ -37,6 +40,9 @@ import type {
 
 type DraftActionValidation = { ok: true } | { ok: false; error: string };
 
+/**
+ * 表示治理页面中单个草稿动作的完整派生状态。
+ */
 export type GovernanceDraftState = {
   action: GovernanceDraftAction;
   template: GovernanceTemplateDefinition | null;
@@ -44,10 +50,20 @@ export type GovernanceDraftState = {
   encodedAction: GovernanceEncodedAction | null;
 };
 
+/**
+ * 构造 Governor 合约地址的区块浏览器链接。
+ * @param address 需要展示的合约地址。
+ * @returns 指向浏览器地址详情页的链接。
+ */
 function explorerAddressUrl(address: string) {
   return `${BRANDING.explorerUrl}/address/${address}`;
 }
 
+/**
+ * 渲染治理页面整体布局。
+ * @param props 治理页面所需的全部布局数据与交互回调。
+ * @returns 完整治理页面布局。
+ */
 export function GovernancePageLayout(props: {
   description: string;
   proposalFee?: bigint;
@@ -187,6 +203,12 @@ export function GovernancePageLayout(props: {
   );
 }
 
+/**
+ * 渲染治理流程路径区。
+ * @param activeGovernanceStep 当前所处治理步骤。
+ * @param currentGovernanceStageText 当前阶段说明。
+ * @returns 治理流程路径区块。
+ */
 function GovernanceFlowSection({
   activeGovernanceStep,
   currentGovernanceStageText,

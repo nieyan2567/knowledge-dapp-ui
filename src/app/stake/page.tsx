@@ -1,5 +1,8 @@
 ﻿"use client";
 
+/**
+ * 模块说明：质押页面模块，负责质押、激活、申请提现和完成提现等投票权生命周期操作。
+ */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Clock3, Coins, ShieldCheck, Wallet } from "lucide-react";
 import { formatEther, parseEther } from "viem";
@@ -37,6 +40,10 @@ import {
 import { writeTxToast } from "@/lib/tx-toast";
 import { asBigInt } from "@/lib/web3-types";
 
+/**
+ * 渲染质押页面。
+ * @returns 包含质押、激活和提现流程的页面。
+ */
 export default function StakePage() {
 	const { address } = useAccount();
 	const publicClient = usePublicClient();
@@ -72,7 +79,7 @@ export default function StakePage() {
 			const latestBlock = await publicClient.getBlockNumber();
 			setLiveBlockNumber(latestBlock);
 		} catch {
-			// Ignore transient polling failures and keep the last known block number.
+			// 轮询失败时保留上一份区块高度，避免页面状态被暂时清空。
 		}
 	}, [publicClient]);
 
@@ -89,6 +96,12 @@ export default function StakePage() {
 		runImmediately: true,
 	});
 
+	/**
+	 * 解析用户输入的代币数量。
+	 * @param value 用户输入的十进制金额字符串。
+	 * @param field 当前字段名称，用于拼接提示文案。
+	 * @returns 解析成功时返回 wei 金额，失败时返回 `null`。
+	 */
 	function parseAmount(value: string, field: string) {
 		if (!value.trim()) {
 			toast.error(`${STAKE_COPY.amountRequiredPrefix}${field}`);
@@ -765,6 +778,13 @@ export default function StakePage() {
 	);
 }
 
+/**
+ * 渲染质押表单中的快捷金额按钮。
+ * @param label 按钮显示文案。
+ * @param onClick 点击按钮时执行的回调。
+ * @param disabled 是否禁用该按钮。
+ * @returns 可复用的快捷金额按钮。
+ */
 function QuickAmountButton({
 	label,
 	onClick,
@@ -785,5 +805,3 @@ function QuickAmountButton({
 		</button>
 	);
 }
-
-

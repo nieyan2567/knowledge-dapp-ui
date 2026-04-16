@@ -1,3 +1,6 @@
+/**
+ * 模块说明：覆盖 IPFS 上传接口的鉴权、文件校验与 Kubo 错误处理行为。
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createNextRequest } from "@/test/api-route";

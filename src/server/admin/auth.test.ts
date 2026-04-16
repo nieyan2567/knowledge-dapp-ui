@@ -1,3 +1,7 @@
+/**
+ * @file Admin 鉴权测试模块。
+ * @description 校验管理员上下文读取、环境变量回退和权限拦截行为。
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createNextRequest } from "@/test/api-route";

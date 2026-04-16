@@ -1,5 +1,13 @@
+/**
+ * @notice Content 详情页展示辅助工具。
+ * @dev 定义详情页文案、版本变更摘要、奖励状态展示以及状态摘要构造逻辑。
+ */
 import type { ContentVersionData } from "@/types/content";
 
+/**
+ * @notice Content 详情页静态文案集合。
+ * @dev 供当前文件、版本历史、操作区和状态摘要区域复用。
+ */
 export const CONTENT_DETAIL_COPY = {
   initialVersion: "初始版本",
   fileUpdated: "文件已更新",
@@ -137,12 +145,23 @@ export const CONTENT_DETAIL_COPY = {
   restoreTxFail: "恢复失败",
 } as const;
 
+/**
+ * @notice 格式化内容相关时间戳。
+ * @param timestamp 秒级时间戳。
+ * @returns 本地化后的日期时间字符串。
+ */
 export function formatContentDate(timestamp: bigint) {
   return new Date(Number(timestamp) * 1000).toLocaleString("zh-CN", {
     hour12: false,
   });
 }
 
+/**
+ * @notice 比较当前版本与上一版本，生成变更摘要。
+ * @param version 当前版本。
+ * @param previousVersion 上一个版本；若不存在则视为初始版本。
+ * @returns 表示本次变更点的文案列表。
+ */
 export function getVersionChangeSummary(
   version: ContentVersionData,
   previousVersion?: ContentVersionData
@@ -168,6 +187,11 @@ export function getVersionChangeSummary(
   return changes.length > 0 ? changes : [CONTENT_DETAIL_COPY.unchangedMetadata];
 }
 
+/**
+ * @notice 格式化奖励状态文案。
+ * @param rewardAccrualCount 奖励记账次数。
+ * @returns 奖励状态对应的展示文本。
+ */
 export function formatRewardStatus(rewardAccrualCount: bigint) {
   return rewardAccrualCount > 0n
     ? CONTENT_DETAIL_COPY.rewardStatusCount.replace(
@@ -177,6 +201,11 @@ export function formatRewardStatus(rewardAccrualCount: bigint) {
     : CONTENT_DETAIL_COPY.rewardStatusNone;
 }
 
+/**
+ * @notice 生成版本记录时间文案。
+ * @param timestamp 版本记录时间戳。
+ * @returns 带占位替换的记录时间文案。
+ */
 export function formatVersionRecordedAt(timestamp: bigint) {
   return CONTENT_DETAIL_COPY.recordedAtPrefix.replace(
     "{time}",
@@ -184,6 +213,11 @@ export function formatVersionRecordedAt(timestamp: bigint) {
   );
 }
 
+/**
+ * @notice 生成版本对比说明文案。
+ * @param version 被对比的历史版本号。
+ * @returns 带版本号的对比说明文本。
+ */
 export function formatComparedVersion(version: bigint) {
   return CONTENT_DETAIL_COPY.comparedToVersion.replace(
     "{version}",
@@ -191,6 +225,11 @@ export function formatComparedVersion(version: bigint) {
   );
 }
 
+/**
+ * @notice 生成当前激活版本提示文案。
+ * @param version 当前激活版本号。
+ * @returns 带版本号的激活版本文本。
+ */
 export function formatActiveVersionText(version: bigint) {
   return CONTENT_DETAIL_COPY.activeVersionText.replace(
     "{version}",
@@ -198,10 +237,25 @@ export function formatActiveVersionText(version: bigint) {
   );
 }
 
+/**
+ * @notice 生成新版本上传区域说明文案。
+ * @param maxSize 上传大小上限文本。
+ * @returns 替换占位后的说明文本。
+ */
 export function formatUploadVersionDescription(maxSize: string) {
   return CONTENT_DETAIL_COPY.uploadVersionDescription.replace("{maxSize}", maxSize);
 }
 
+/**
+ * @notice 构造内容状态摘要卡片数据。
+ * @param input 状态摘要所需输入。
+ * @param input.isAuthor 当前钱包是否为作者。
+ * @param input.deleted 内容是否已删除。
+ * @param input.newVersionBlockedReason 新版本创建受阻原因。
+ * @param input.versionCount 当前版本数。
+ * @param input.maxVersionsPerContent 最大允许版本数。
+ * @returns 适合详情页状态摘要区展示的卡片数组。
+ */
 export function buildContentStatusSummary(input: {
   isAuthor: boolean;
   deleted: boolean;

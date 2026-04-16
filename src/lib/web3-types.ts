@@ -1,7 +1,16 @@
+/**
+ * @notice Web3 返回值类型收窄工具。
+ * @dev 将合约读调用返回的未知值转换为前端可直接使用的强类型结构。
+ */
 import type { Address, HexString } from "@/types/contracts";
 import type { ContentData, ContentVersionData } from "@/types/content";
 import type { ProposalVotes } from "@/types/governance";
 
+/**
+ * @notice 将未知值安全收窄为 `bigint`。
+ * @param value 待判断的值。
+ * @returns 合法 `bigint` 值；若无法安全转换则返回 `undefined`。
+ */
 export function asBigInt(value: unknown): bigint | undefined {
   if (typeof value === "bigint") {
     return value;
@@ -14,18 +23,33 @@ export function asBigInt(value: unknown): bigint | undefined {
   return undefined;
 }
 
+/**
+ * @notice 将未知值安全收窄为合约地址。
+ * @param value 待判断的值。
+ * @returns 合法地址字符串；否则返回 `undefined`。
+ */
 export function asAddress(value: unknown): Address | undefined {
   return typeof value === "string" && value.startsWith("0x")
     ? (value as Address)
     : undefined;
 }
 
+/**
+ * @notice 将未知值安全收窄为十六进制字符串。
+ * @param value 待判断的值。
+ * @returns 合法十六进制字符串；否则返回 `undefined`。
+ */
 export function asHex(value: unknown): HexString | undefined {
   return typeof value === "string" && value.startsWith("0x")
     ? (value as HexString)
     : undefined;
 }
 
+/**
+ * @notice 将未知值解析为提案投票结构。
+ * @param value 合约返回的原始投票数组。
+ * @returns 解析后的投票结构；若结构不匹配则返回 `undefined`。
+ */
 export function asProposalVotes(
   value: unknown
 ): ProposalVotes | undefined {
@@ -48,6 +72,11 @@ export function asProposalVotes(
   };
 }
 
+/**
+ * @notice 将未知值解析为内容主数据结构。
+ * @param value 合约返回的原始内容元组。
+ * @returns 解析后的内容对象；若结构不匹配则返回 `undefined`。
+ */
 export function asContentData(value: unknown): ContentData | undefined {
   if (!Array.isArray(value) || value.length < 11) return undefined;
 
@@ -96,6 +125,12 @@ export function asContentData(value: unknown): ContentData | undefined {
   };
 }
 
+/**
+ * @notice 将未知值解析为内容版本结构。
+ * @param value 合约返回的原始版本元组。
+ * @param version 当前版本号。
+ * @returns 解析后的版本对象；若结构不匹配则返回 `undefined`。
+ */
 export function asContentVersion(
   value: unknown,
   version: bigint

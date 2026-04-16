@@ -1,5 +1,8 @@
 ﻿"use client";
 
+/**
+ * 模块说明：内容广场模块，负责内容列表重建、上传到 IPFS、以及内容注册到合约的前端流程。
+ */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useAccount,
@@ -43,6 +46,12 @@ type ContentSortKey =
   | "votes_desc"
   | "versions_desc";
 
+/**
+ * 上报内容广场页面中的可恢复错误。
+ * @param message 错误摘要信息。
+ * @param error 原始错误对象或失败载荷。
+ * @param context 可选的结构化上下文信息。
+ */
 function reportContentPageError(
   message: string,
   error: unknown,
@@ -58,6 +67,10 @@ function reportContentPageError(
   });
 }
 
+/**
+ * 渲染内容广场页面。
+ * @returns 包含内容发布表单和内容列表的页面。
+ */
 export default function ContentPage() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -96,6 +109,10 @@ export default function ContentPage() {
     functionName: "registerFee",
   });
 
+  /*
+   * 内容列表不是后端直接返回的，而是前端按块读取合约中的 content 记录，
+   * 再把奖励累计次数等补充字段一起拼成页面可直接使用的列表项。
+   */
   const readContents = useCallback(
     async (total: number) => {
       if (!publicClient || total <= 0) {
@@ -141,6 +158,10 @@ export default function ContentPage() {
     [publicClient]
   );
 
+  /*
+   * 手动刷新会优先重新读取最新 contentCount，再据此重建整份列表，
+   * 这样可以避免前端只刷新局部状态导致列表和链上真实数据不同步。
+   */
   const refreshContentList = useCallback(async () => {
     if (!publicClient) {
       setContentList([]);
@@ -164,6 +185,10 @@ export default function ContentPage() {
   useEffect(() => {
     let cancelled = false;
 
+    /*
+     * 首次加载和 contentCount 变化时，页面会完整重建内容列表；
+     * 这里用 cancelled 标记防止异步返回顺序晚于组件卸载。
+     */
     async function loadContents() {
       if (!publicClient || contentCount === undefined) {
         setContentList([]);
@@ -220,6 +245,10 @@ export default function ContentPage() {
     }
   }, [page, totalPages]);
 
+  /**
+   * 把用户选择的文件上传到 IPFS。
+   * @returns 成功时写入 CID 和网关地址，失败时仅弹出错误提示。
+   */
   async function handleUploadToIpfs() {
     if (!file) {
       toast.error(CONTENT_PAGE_COPY.selectFileFirst);
@@ -402,4 +431,3 @@ export default function ContentPage() {
     </main>
   );
 }
-

@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * 模块说明：内容详情主区组件集合，负责渲染内容状态摘要、当前文件、元信息快照和版本历史列表。
+ */
 import { BookOpen, CheckCircle2, ExternalLink, FileText, Heart, User } from "lucide-react";
 
 import { AddressBadge } from "@/components/address-badge";
@@ -15,6 +18,11 @@ import {
 import { getIpfsFileUrl } from "@/lib/ipfs";
 import type { ContentVersionData } from "@/types/content";
 
+/**
+ * 渲染内容状态摘要网格。
+ * @param items 需要展示的状态摘要项数组。
+ * @returns 内容状态摘要卡片网格。
+ */
 export function ContentStatusSummaryGrid({
   items,
 }: {
@@ -38,6 +46,17 @@ export function ContentStatusSummaryGrid({
   );
 }
 
+/**
+ * 渲染当前生效文件和当前元信息分区。
+ * @param contentId 内容 ID。
+ * @param latestVersion 当前最新版本号。
+ * @param deleted 当前内容是否已删除。
+ * @param title 当前内容标题。
+ * @param description 当前内容描述。
+ * @param previewUrl 当前文件预览地址。
+ * @param currentCid 当前文件 CID。
+ * @returns 当前版本文件与元数据展示区块。
+ */
 export function ContentCurrentFileSection({
   contentId,
   latestVersion,
@@ -139,6 +158,17 @@ export function ContentCurrentFileSection({
   );
 }
 
+/**
+ * 渲染内容基础快照信息网格。
+ * @param author 作者地址。
+ * @param createdAt 创建时间。
+ * @param latestVersion 最新版本号。
+ * @param versionCount 总版本数。
+ * @param lastUpdatedAt 最后更新时间。
+ * @param voteCount 当前票数。
+ * @param rewardAccrualCount 奖励记账次数。
+ * @returns 内容快照信息网格。
+ */
 export function ContentSnapshotGrid({
   author,
   createdAt,
@@ -190,6 +220,14 @@ export function ContentSnapshotGrid({
   );
 }
 
+/**
+ * 渲染内容版本历史列表。
+ * @param loadingVersions 是否正在加载版本历史。
+ * @param versions 版本历史数组。
+ * @param latestVersion 当前最新版本号。
+ * @param onCopyCid 复制 CID 的回调。
+ * @returns 版本历史列表或对应的空/加载状态。
+ */
 export function ContentVersionHistoryList({
   loadingVersions,
   versions,
@@ -220,6 +258,10 @@ export function ContentVersionHistoryList({
   return (
     <div className="space-y-4">
       {versions.map((version, index) => {
+        /*
+         * 版本历史按倒序渲染，因此“上一版本”实际对应数组中的下一项，
+         * 这里借此计算当前版本和前序版本之间的变更摘要。
+         */
         const isCurrentVersion = version.version === latestVersion;
         const versionUrl = getIpfsFileUrl(version.ipfsHash);
         const previousVersion = versions[index + 1];
@@ -316,6 +358,12 @@ export function ContentVersionHistoryList({
   );
 }
 
+/**
+ * 渲染内容记录摘要中的小型标签项。
+ * @param label 标签名称。
+ * @param value 标签值。
+ * @returns 紧凑型摘要标签。
+ */
 function SummaryPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900/80">
@@ -329,6 +377,12 @@ function SummaryPill({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * 渲染内容信息卡片。
+ * @param label 字段标题。
+ * @param children 字段值内容。
+ * @returns 可复用的信息卡片。
+ */
 function InfoCard({
   label,
   children,
@@ -346,6 +400,13 @@ function InfoCard({
   );
 }
 
+/**
+ * 渲染单个状态摘要卡片。
+ * @param label 状态名称。
+ * @param value 状态值。
+ * @param description 状态说明。
+ * @returns 状态摘要卡片。
+ */
 function StatusSummaryCard({
   label,
   value,

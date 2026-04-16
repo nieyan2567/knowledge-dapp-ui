@@ -1,5 +1,8 @@
 ﻿"use client";
 
+/**
+ * 模块说明：首页仪表盘模块，聚合最新内容、治理提案和奖励动态，作为用户进入系统后的总览入口。
+ */
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -47,20 +50,40 @@ type DashboardActivityItem = {
   kind: "proposal" | "content";
 };
 
+/**
+ * 格式化原生代币数值，供首页卡片显示。
+ * @param amount 链上以 wei 表示的原始金额。
+ * @returns 带代币符号的人类可读字符串。
+ */
 function formatTokenValue(amount: bigint) {
   return `${formatEther(amount)} ${BRANDING.nativeTokenSymbol}`;
 }
 
+/**
+ * 缩写交易哈希，避免首页卡片被长字符串撑开。
+ * @param value 完整交易哈希。
+ * @returns 截断后的哈希文本；若为空则返回占位符。
+ */
 function shortenHash(value?: `0x${string}`) {
   if (!value) return "-";
   return `${value.slice(0, 8)}...${value.slice(-6)}`;
 }
 
+/**
+ * 缩写地址，供摘要卡片和列表行显示。
+ * @param address 需要缩写的钱包地址或合约地址。
+ * @returns 截断后的地址文本；若为空则返回占位符。
+ */
 function shortenAddress(address?: `0x${string}`) {
   if (!address) return "-";
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+/**
+ * 把链上时间戳格式化为首页展示用的本地时间文本。
+ * @param timestamp 以秒为单位的链上时间戳。
+ * @returns 本地化时间字符串；若时间缺失则返回兜底文案。
+ */
 function formatDateTime(timestamp?: bigint) {
   if (timestamp === undefined) {
     return "时间未知";
@@ -75,6 +98,11 @@ function formatDateTime(timestamp?: bigint) {
   });
 }
 
+/**
+ * 根据链上时间戳计算相对时间描述。
+ * @param timestamp 以秒为单位的链上时间戳。
+ * @returns 例如“刚刚”“几分钟前”“几小时前”的相对时间文本。
+ */
 function formatRelativeTime(timestamp: bigint) {
   const nowMs = Date.now();
   const targetMs = Number(timestamp) * 1000;
@@ -98,6 +126,10 @@ function formatRelativeTime(timestamp: bigint) {
   return `${Math.floor(diffMs / day)} 天前`;
 }
 
+/**
+ * 渲染首页仪表盘。
+ * @returns 聚合内容、治理和奖励概览的首页页面。
+ */
 export default function HomePage() {
   const publicClient = usePublicClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -121,6 +153,10 @@ export default function HomePage() {
     functionName: "contentCount",
   });
 
+  /*
+   * 这里直接从内容合约倒序扫描最近若干条内容记录，并额外补读奖励累计次数，
+   * 目的是在首页上构造一个轻量但足够新的“最近内容”摘要列表。
+   */
   const loadRecentContents = useCallback(
     async (countOverride?: bigint) => {
       if (!publicClient) {
@@ -194,6 +230,10 @@ export default function HomePage() {
     [contentCount, publicClient]
   );
 
+  /*
+   * 首页只展示最新一条提案，因此这里先从事件层拿到最新提案，再回读区块时间，
+   * 把事件数据和链上时间数据拼成可以直接渲染的摘要对象。
+   */
   const loadLatestProposal = useCallback(async () => {
     if (!publicClient) {
       setLatestProposal(null);
@@ -226,6 +266,10 @@ export default function HomePage() {
     }
   }, [publicClient]);
 
+  /*
+   * 奖励动态来自事件索引层而不是单一合约读值，因为首页要展示的是“最近发生了什么”，
+   * 包括累计奖励和领取奖励两类历史行为。
+   */
   const loadRecentRewards = useCallback(async () => {
     if (!publicClient) {
       setRecentRewards([]);
@@ -507,6 +551,12 @@ export default function HomePage() {
   );
 }
 
+/**
+ * 渲染面板级错误提示卡片。
+ * @param message 需要展示给用户的错误摘要。
+ * @param onRetry 重新执行加载逻辑的回调。
+ * @returns 可复用的错误提示卡片。
+ */
 function PanelError({
   message,
   onRetry,
@@ -529,6 +579,11 @@ function PanelError({
   );
 }
 
+/**
+ * 渲染首页面板的空状态容器。
+ * @param children 空状态下需要显示的内容。
+ * @returns 可复用的空状态包装容器。
+ */
 function PanelEmpty({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-32 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">

@@ -1,5 +1,17 @@
+/**
+ * 模块说明：页面头部组件，负责统一渲染页面标题、副标题、说明文案和右侧操作区。
+ */
 import { ReactNode } from "react";
 
+/**
+ * 渲染页面统一头部。
+ * @param eyebrow 标题上方的小标签文案。
+ * @param title 页面主标题。
+ * @param description 页面描述文本。
+ * @param right 标题区域右侧附加内容。
+ * @param testId 用于测试定位标题节点的标识。
+ * @returns 可复用的页面头部区域。
+ */
 export function PageHeader({
   eyebrow,
   title,

@@ -1,5 +1,8 @@
 ﻿"use client";
 
+/**
+ * 模块说明：内容详情模块，负责单条内容的详情展示、版本历史、投票、奖励累计和作者侧编辑流程。
+ */
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -38,6 +41,12 @@ import {
 import { asContentData, asContentVersion } from "@/lib/web3-types";
 import type { ContentVersionData } from "@/types/content";
 
+/**
+ * 上报内容详情页中的可恢复错误。
+ * @param message 错误摘要信息。
+ * @param error 原始错误对象或下游返回载荷。
+ * @param context 可选的结构化上下文信息。
+ */
 function reportContentDetailError(
   message: string,
   error: unknown,
@@ -53,6 +62,10 @@ function reportContentDetailError(
   });
 }
 
+/**
+ * 渲染单条内容的详情页。
+ * @returns 当前内容的详情、版本和操作页面。
+ */
 export default function ContentDetailPage() {
   const params = useParams();
   const { address } = useAccount();
@@ -142,6 +155,10 @@ export default function ContentDetailPage() {
     typeof maxVersionsPerContentData === "bigint" ? maxVersionsPerContentData : undefined;
   const updateFee = typeof updateFeeData === "bigint" ? updateFeeData : undefined;
 
+  /*
+   * 版本历史不是一次性嵌在 content 结构里的，需要根据 versionCount
+   * 逐条回读 getContentVersion，再在前端倒序整理成历史列表。
+   */
   const loadVersions = useCallback(
     async (countOverride?: bigint) => {
       if (!publicClient || !contentId) {
@@ -189,6 +206,10 @@ export default function ContentDetailPage() {
     [contentId, publicClient, versionCount]
   );
 
+  /*
+   * 详情刷新同时依赖内容主体和版本数量两个来源，因此这里先并行刷新链上读值，
+   * 再把最新的版本数量传给版本加载逻辑，避免使用旧的 versionCount。
+   */
   const refreshDetail = useCallback(async () => {
     const [, versionResult] = await Promise.all([refetchContent(), refetchVersionCount()]);
     await loadVersions(
@@ -204,6 +225,7 @@ export default function ContentDetailPage() {
   const currentContentDeleted = content?.deleted;
 
   useEffect(() => {
+    // 当链上内容主体变化后，把当前编辑表单同步到最新内容快照。
     if (!currentContentTitle || currentContentDescription === undefined || !currentContentCid) {
       return;
     }
@@ -226,6 +248,12 @@ export default function ContentDetailPage() {
     void loadVersions();
   }, [loadVersions]);
 
+  /**
+   * 复制指定字段到剪贴板。
+   * @param value 需要复制的文本内容。
+   * @param label 用于提示文案的字段名称。
+   * @returns 成功时提示复制成功，失败时上报错误并提示失败。
+   */
   const handleCopyToClipboard = useCallback(
     async (value: string, label: string) => {
       try {

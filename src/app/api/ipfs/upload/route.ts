@@ -1,5 +1,8 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 
+/**
+ * 模块说明：IPFS 上传接口，负责校验上传会话、验证文件并把文件转发到本地 Kubo 节点。
+ */
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { errorResponse, parseValue } from "@/lib/api-validation";
 import {
@@ -17,8 +20,17 @@ import {
 } from "@/lib/observability/server";
 import { validateUploadFileServer } from "@/lib/upload-policy";
 
+/**
+ * 声明当前接口运行在 Node.js 运行时。
+ * @returns Next.js 路由运行时标记。
+ */
 export const runtime = "nodejs";
 
+/**
+ * 把通过校验的文件上传到当前配置的本地 IPFS 服务。
+ * @param req 携带 multipart 文件数据和上传会话的请求对象。
+ * @returns 包含 CID、网关地址等信息的 JSON 响应。
+ */
 export async function POST(req: NextRequest) {
   const rateLimit = await enforceApiRateLimits(req.headers, ["ipfs:upload"]);
   if (!rateLimit.ok) {

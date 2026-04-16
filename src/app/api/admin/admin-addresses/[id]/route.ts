@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+/**
+ * 模块说明：单个管理员地址接口，负责更新指定管理员地址的启用状态和备注信息。
+ */
 import { updateAdminAddressSchema } from "@/lib/admin/schemas";
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { parseJsonBody } from "@/lib/api-validation";
@@ -12,8 +15,18 @@ import {
   updateAdminAddress,
 } from "@/server/admin/store";
 
+/**
+ * 声明当前接口运行在 Node.js 运行时。
+ * @returns Next.js 路由运行时标记。
+ */
 export const runtime = "nodejs";
 
+/**
+ * 更新指定管理员地址记录。
+ * @param req 携带更新参数的请求对象。
+ * @param context 包含管理员地址记录 ID 的路由上下文。
+ * @returns 包含更新后管理员地址记录的 JSON 响应。
+ */
 export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }

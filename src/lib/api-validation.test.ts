@@ -1,3 +1,7 @@
+/**
+ * @notice `api-validation` 模块测试。
+ * @dev 覆盖 JSON 请求体验证、独立值校验和错误响应行为。
+ */
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 

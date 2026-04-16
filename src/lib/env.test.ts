@@ -1,3 +1,7 @@
+/**
+ * @notice `env` 模块测试。
+ * @dev 覆盖公开环境变量、服务端环境变量以及生产环境约束校验。
+ */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { getPublicEnv, getPublicRuntimeEnv, getServerEnv } from "./env";

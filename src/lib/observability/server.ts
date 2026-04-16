@@ -1,3 +1,7 @@
+/**
+ * @file 服务端观测模块。
+ * @description 负责服务端日志采集、异常上报、告警分发和客户端错误落库入口。
+ */
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
@@ -17,6 +21,9 @@ import {
   type RequestContext,
 } from "@/lib/observability/shared";
 
+/**
+ * @notice 标准化后的服务端日志记录结构。
+ */
 type ServerLogEntry = {
   eventId: string;
   timestamp: string;
@@ -31,6 +38,9 @@ type ServerLogEntry = {
   error?: ReturnType<typeof serializeError>;
 };
 
+/**
+ * @notice 服务端事件采集输入结构。
+ */
 type ServerCaptureInput = {
   message: string;
   source: string;
@@ -185,6 +195,7 @@ async function dispatchAlert(entry: ServerLogEntry, fingerprint?: string) {
   const dedupWindowMs = config.alertDedupWindowSeconds * 1000;
   const previous = dedupStore.get(dedupKey);
 
+  // 相同指纹的告警在去重窗口内只发送一次，避免故障风暴期间持续刷屏。
   if (previous && now - previous < dedupWindowMs) {
     return;
   }
@@ -222,6 +233,11 @@ async function dispatchAlert(entry: ServerLogEntry, fingerprint?: string) {
   }
 }
 
+/**
+ * @notice 采集一条服务端事件并按配置输出日志与告警。
+ * @param input 事件采集输入。
+ * @returns 新生成的事件标识。
+ */
 export async function captureServerEvent(input: ServerCaptureInput) {
   const entry = createLogEntry(input);
   emitLog(entry);
@@ -233,6 +249,12 @@ export async function captureServerEvent(input: ServerCaptureInput) {
   return entry.eventId;
 }
 
+/**
+ * @notice 采集一条携带异常对象的服务端事件。
+ * @param message 事件主消息。
+ * @param input 除消息外的其余采集输入，必须包含异常对象。
+ * @returns 新生成的事件标识。
+ */
 export async function captureServerException(
   message: string,
   input: Omit<ServerCaptureInput, "message"> & { error: unknown }
@@ -243,6 +265,12 @@ export async function captureServerException(
   });
 }
 
+/**
+ * @notice 采集客户端上报的错误报告。
+ * @param report 客户端错误报告。
+ * @param input 附加的请求上下文信息。
+ * @returns 命中采样时返回事件标识，否则返回 `null`。
+ */
 export async function captureClientErrorReport(
   report: ClientErrorReport,
   input?: {
@@ -252,6 +280,7 @@ export async function captureClientErrorReport(
 ) {
   const config = getServerObservabilityConfig();
 
+  // 客户端错误可能量级较大，这里按采样率过滤，避免日志与告警成本失控。
   if (Math.random() > config.clientErrorSampleRate) {
     return null;
   }

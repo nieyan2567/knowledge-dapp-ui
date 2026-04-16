@@ -1,3 +1,6 @@
+/**
+ * 模块说明：验证者申请管理组件，负责提交验证者申请、审批申请以及发起 Validator 移除投票。
+ */
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -15,6 +18,10 @@ type LoadValidatorRequestsOptions = { background?: boolean; silent?: boolean };
 
 const emptyCreateForm = { nodeRequestId: "", validatorAddress: "", description: "" };
 
+/**
+ * 渲染验证者申请管理页面。
+ * @returns 验证者申请管理主组件。
+ */
 export function ValidatorRequestsAdminPage() {
   const { address } = useAccount();
   const { ensureUploadAuth, isAuthenticating } = useUploadAuth();
@@ -32,6 +39,10 @@ export function ValidatorRequestsAdminPage() {
   const [reviewDrafts, setReviewDrafts] = useState<ReviewDraftState>({});
   const [form, setForm] = useState(emptyCreateForm);
 
+  /*
+   * 验证者页面除了申请列表，还要同时读取当前可申请节点和当前 Validator 集，
+   * 因此把这三类数据都折叠进一个接口响应中，避免前端维护多份会话状态。
+   */
   const loadRequests = useCallback(async ({ background = false, silent = false }: LoadValidatorRequestsOptions = {}) => {
     if (!background) setIsLoading(true);
     try {
@@ -236,6 +247,12 @@ export function ValidatorRequestsAdminPage() {
   );
 }
 
+/**
+ * 根据验证者申请和当前 Validator 集状态推导生命周期文案。
+ * @param request 验证者申请记录。
+ * @param isInCurrentValidatorSet 该地址是否已在当前 Validator 集中。
+ * @returns 生命周期标签、说明和语义色调。
+ */
 function getValidatorLifecycle(request: ValidatorRequestRecord, isInCurrentValidatorSet: boolean) {
   if (request.status === "pending") {
     return { label: "等待审批", description: "申请已提交，等待管理员审批。批准后服务端会发起 QBFT 加入投票。", tone: "warn" as const };

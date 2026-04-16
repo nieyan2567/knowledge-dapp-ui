@@ -1,5 +1,13 @@
+/**
+ * @notice Stake 页面展示与格式化工具。
+ * @dev 定义质押流程说明文案，并提供金额、时间和数量格式化辅助函数。
+ */
 import { parseEther } from "viem";
 
+/**
+ * @notice Stake 流程步骤定义。
+ * @dev 用于页面流程卡片展示 Deposit、Activate、Withdraw 等阶段。
+ */
 export const STAKE_FLOW_STEPS = [
   {
     id: 1,
@@ -23,6 +31,10 @@ export const STAKE_FLOW_STEPS = [
   },
 ] as const;
 
+/**
+ * @notice Stake 页面静态文案集合。
+ * @dev 集中管理按钮文本、提示文案、状态说明和各区域标题。
+ */
 export const STAKE_COPY = {
   headerTitle: "Stake & Voting Power",
   headerDescription:
@@ -118,6 +130,11 @@ export const STAKE_COPY = {
   withdrawHelperReady: "当前待提取余额已满足条件，可以立即提取。",
 } as const;
 
+/**
+ * @notice 将用户输入解析为质押金额。
+ * @param value 用户输入的字符串金额。
+ * @returns 合法且大于 0 的金额值；否则返回 `null`。
+ */
 export function tryParseStakeAmount(value: string) {
   if (!value.trim()) {
     return null;
@@ -131,6 +148,11 @@ export function tryParseStakeAmount(value: string) {
   }
 }
 
+/**
+ * @notice 格式化质押金额输入框展示值。
+ * @param formatted 已格式化的金额字符串。
+ * @returns 去除尾随零后的展示文本。
+ */
 export function formatStakeTokenInput(formatted: string) {
   if (!formatted.includes(".")) {
     return formatted;
@@ -139,6 +161,11 @@ export function formatStakeTokenInput(formatted: string) {
   return formatted.replace(/\.?0+$/, "") || "0";
 }
 
+/**
+ * @notice 将秒数格式化为质押页面使用的时长文案。
+ * @param seconds 需要格式化的秒数。
+ * @returns 中文时长描述；若已到期则返回立即可操作提示。
+ */
 export function formatStakeDuration(seconds: bigint) {
   if (seconds <= 0n) return "现在即可操作";
 
@@ -154,12 +181,24 @@ export function formatStakeDuration(seconds: bigint) {
   return `${remainSeconds}秒`;
 }
 
+/**
+ * @notice 将秒级时间戳格式化为本地时间文本。
+ * @param timestamp 秒级 Unix 时间戳。
+ * @returns 本地化后的日期时间字符串。
+ */
 export function formatStakeTimestamp(timestamp: bigint) {
   return new Date(Number(timestamp) * 1000).toLocaleString("zh-CN", {
     hour12: false,
   });
 }
 
+/**
+ * @notice 按比例缩放质押数量。
+ * @param base 基础数量。
+ * @param numerator 缩放分子。
+ * @param denominator 缩放分母。
+ * @returns 缩放后的非负数量。
+ */
 export function getScaledStakeAmount(
   base: bigint,
   numerator: bigint,

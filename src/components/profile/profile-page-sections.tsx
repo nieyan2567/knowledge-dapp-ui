@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * 模块说明：个人中心分区组件集合，负责渲染个人摘要卡片、内容区、提案区和断连提示等区块。
+ */
 import Link from "next/link";
 import { type ReactNode, useMemo } from "react";
 import { CheckCircle2, ExternalLink, FileText, Gavel, RefreshCw } from "lucide-react";
@@ -31,6 +34,14 @@ import { asBigInt } from "@/lib/web3-types";
 import type { ContentData } from "@/types/content";
 import type { ProposalItem } from "@/types/governance";
 
+/**
+ * 渲染个人中心摘要卡片。
+ * @param icon 摘要图标。
+ * @param label 摘要标题。
+ * @param value 摘要值。
+ * @param description 摘要说明。
+ * @returns 个人摘要卡片。
+ */
 export function ProfileSummaryCard({
   icon,
   label,
@@ -58,6 +69,13 @@ export function ProfileSummaryCard({
   );
 }
 
+/**
+ * 渲染个人中心筛选按钮。
+ * @param active 当前按钮是否处于激活状态。
+ * @param onClick 点击回调。
+ * @param children 按钮显示内容。
+ * @returns 可复用的筛选按钮。
+ */
 export function ProfileFilterButton({
   active,
   onClick,
@@ -82,6 +100,13 @@ export function ProfileFilterButton({
   );
 }
 
+/**
+ * 渲染个人中心区块内联错误状态。
+ * @param message 错误信息。
+ * @param retryLabel 重试按钮文案。
+ * @param onRetry 重试回调。
+ * @returns 内联错误提示组件。
+ */
 export function ProfileInlineErrorState({
   message,
   retryLabel,
@@ -106,6 +131,11 @@ export function ProfileInlineErrorState({
   );
 }
 
+/**
+ * 渲染个人中心的居中空状态或加载状态。
+ * @param children 需要展示的提示内容。
+ * @returns 居中状态容器。
+ */
 export function ProfileCenteredState({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
@@ -114,6 +144,19 @@ export function ProfileCenteredState({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * 渲染个人内容分区。
+ * @param myContents 当前用户全部内容数组。
+ * @param visibleContents 当前筛选后的可见内容数组。
+ * @param contentFilter 当前筛选项。
+ * @param contentSort 当前排序项。
+ * @param loadingContents 是否正在加载内容。
+ * @param contentError 当前内容区错误信息。
+ * @param onFilterChange 筛选切换回调。
+ * @param onSortChange 排序切换回调。
+ * @param onRefresh 重载内容回调。
+ * @returns 个人内容区块。
+ */
 export function ProfileContentSection({
   myContents,
   visibleContents,
@@ -274,6 +317,14 @@ export function ProfileContentSection({
   );
 }
 
+/**
+ * 渲染个人提案分区。
+ * @param proposals 当前用户提案数组。
+ * @param loadingProposals 是否正在加载提案。
+ * @param proposalError 当前提案区错误信息。
+ * @param onRefresh 重载提案回调。
+ * @returns 个人提案区块。
+ */
 export function ProfileProposalSection({
   myProposals,
   loadingProposals,
@@ -335,6 +386,11 @@ export function ProfileProposalSection({
   );
 }
 
+/**
+ * 渲染单个个人提案卡片。
+ * @param proposal 需要展示的提案数据。
+ * @returns 提案摘要卡片。
+ */
 function ProfileProposalCard({ proposal }: { proposal: ProposalItem }) {
   const { data: state } = useReadContract({
     address: CONTRACTS.KnowledgeGovernor as `0x${string}`,
@@ -440,6 +496,10 @@ function ProfileProposalCard({ proposal }: { proposal: ProposalItem }) {
   );
 }
 
+/**
+ * 渲染未连接钱包时的个人中心占位态。
+ * @returns 未连接钱包提示组件。
+ */
 export function ProfileDisconnectedState() {
   return (
     <SectionCard
@@ -453,6 +513,11 @@ export function ProfileDisconnectedState() {
   );
 }
 
+/**
+ * 缩写个人中心摘要中的地址。
+ * @param address 需要展示的地址。
+ * @returns 截断后的地址摘要文本。
+ */
 export function formatAddressSummaryValue(address: string) {
   return (
     <span title={address} className="block truncate text-sm font-medium text-slate-950 dark:text-slate-100">

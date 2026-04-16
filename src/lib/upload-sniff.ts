@@ -1,3 +1,7 @@
+/**
+ * @notice 上传文件类型嗅探工具。
+ * @dev 通过文件头和文本内容推断真实 MIME 类型，并判断声明类型是否可信。
+ */
 import { fileTypeFromBuffer } from "file-type";
 
 const GENERIC_DECLARED_MIME_TYPES = new Set([
@@ -16,6 +20,10 @@ const SAFE_TEXTUAL_MIME_TYPES = new Set([
   "text/xml",
 ]);
 
+/**
+ * @notice 上传文件探测结果结构。
+ * @dev 包含原始缓冲区、声明 MIME、嗅探 MIME、识别来源和文本性质判断。
+ */
 export type UploadInspection = {
   buffer: Buffer;
   declaredMime: string | null;
@@ -111,6 +119,13 @@ function inferTextMime(text: string) {
   }
 }
 
+/**
+ * @notice 判断声明 MIME 与服务端嗅探 MIME 是否兼容。
+ * @param declaredMime 客户端声明的 MIME 类型。
+ * @param sniffedMime 服务端嗅探得到的 MIME 类型。
+ * @param isTextLike 当前文件是否表现为文本内容。
+ * @returns 若两者可以接受地匹配则返回 `true`。
+ */
 export function areMimeTypesCompatible(
   declaredMime: string | null,
   sniffedMime: string | null,
@@ -135,11 +150,20 @@ export function areMimeTypesCompatible(
   return false;
 }
 
+/**
+ * @notice 检测上传文件的真实类型与内容属性。
+ * @param file 需要检测的文件对象，只要求提供二进制内容与声明 MIME。
+ * @returns 包含检测结果的 `UploadInspection` 对象。
+ */
 export async function inspectUploadFile(file: Pick<File, "arrayBuffer" | "type">) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const declaredMime = normalizeMime(file.type);
   const binaryType = await fileTypeFromBuffer(buffer);
 
+  /**
+   * @notice 优先使用文件头特征识别二进制格式。
+   * @dev 若识别成功，则直接按二进制类型返回，避免误判为文本。
+   */
   if (binaryType) {
     return {
       buffer,
@@ -151,6 +175,10 @@ export async function inspectUploadFile(file: Pick<File, "arrayBuffer" | "type">
     } satisfies UploadInspection;
   }
 
+  /**
+   * @notice 无法识别为二进制时，再尝试按文本内容推断类型。
+   * @dev 这样可以处理 markdown、json、xml 等没有强文件头的文本格式。
+   */
   if (isLikelyTextBuffer(buffer)) {
     const textSample = new TextDecoder("utf-8", { fatal: false }).decode(
       buffer.subarray(0, Math.min(buffer.length, 128 * 1024))

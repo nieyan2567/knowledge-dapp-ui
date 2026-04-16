@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+/**
+ * 模块说明：验证者移除投票接口，负责为已生效验证者发起移除投票。
+ */
 import { reviewValidatorRequestSchema } from "@/lib/admin/schemas";
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { parseJsonBody } from "@/lib/api-validation";
@@ -8,8 +11,18 @@ import { captureServerException } from "@/lib/observability/server";
 import { requireAdminRequest } from "@/server/admin/auth";
 import { AdminStoreNotFoundError, getValidatorRequestById, logAdminAction } from "@/server/admin/store";
 
+/**
+ * 声明当前接口运行在 Node.js 运行时。
+ * @returns Next.js 路由运行时标记。
+ */
 export const runtime = "nodejs";
 
+/**
+ * 为指定验证者发起移除投票。
+ * @param req 携带移除说明的请求对象。
+ * @param context 包含验证者申请 ID 的路由上下文。
+ * @returns 表示移除投票已成功发起的 JSON 响应。
+ */
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const rateLimit = await enforceApiRateLimits(req.headers, ["admin:validator-requests:remove"]);
   if (!rateLimit.ok) return NextResponse.json({ error: rateLimit.error }, { status: rateLimit.status });

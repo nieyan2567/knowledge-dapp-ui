@@ -1,5 +1,13 @@
+/**
+ * @notice Faucet 页面与接口文案配置。
+ * @dev 集中定义 Faucet 错误提示、页面文案与动态格式化函数。
+ */
 import { BRANDING } from "@/lib/branding";
 
+/**
+ * @notice Faucet 文案集合。
+ * @dev 同时包含错误文案、页面区域文案与动态格式化函数。
+ */
 export const FAUCET_COPY = {
   errors: {
     invalidAddress: "无效的钱包地址",
@@ -87,18 +95,38 @@ export const FAUCET_COPY = {
   },
 } as const;
 
+/**
+ * @notice 生成 Faucet 冷却提示文案。
+ * @param seconds 剩余冷却秒数。
+ * @returns 带秒数占位替换的提示文本。
+ */
 export function getFaucetCooldownMessage(seconds: number) {
   return FAUCET_COPY.formatters.cooldown(seconds);
 }
 
+/**
+ * @notice 生成 Faucet 最低余额提示文案。
+ * @param minAllowedBalance 最低余额阈值文本。
+ * @returns 带阈值占位替换的提示文本。
+ */
 export function getFaucetMinBalanceMessage(minAllowedBalance: string) {
   return FAUCET_COPY.formatters.minBalance(minAllowedBalance);
 }
 
+/**
+ * @notice 生成 Faucet 限流提示文案。
+ * @param seconds 剩余等待秒数。
+ * @returns 带秒数占位替换的限流提示文本。
+ */
 export function getFaucetRateLimitMessage(seconds: number) {
   return FAUCET_COPY.formatters.rateLimit(seconds);
 }
 
+/**
+ * @notice 生成 Faucet 成功标题文案。
+ * @param claimAmount 可选的领取金额文本。
+ * @returns 带金额信息的成功标题。
+ */
 export function getFaucetSuccessTitle(claimAmount?: string | null) {
   return FAUCET_COPY.formatters.successTitle(claimAmount);
 }

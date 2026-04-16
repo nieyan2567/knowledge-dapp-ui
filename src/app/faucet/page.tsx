@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * 模块说明：Faucet 页面模块，负责领取签名挑战、钱包签名和水龙头领取请求提交流程。
+ */
 import { useState } from "react";
 import { formatEther } from "viem";
 import { toast } from "sonner";
@@ -34,6 +37,11 @@ type FaucetNonceError = {
   error?: string;
 };
 
+/**
+ * 判断错误是否表示用户主动拒绝了钱包签名。
+ * @param error 钱包集成层抛出的未知错误对象。
+ * @returns 若错误属于用户主动拒签则返回 `true`。
+ */
 function isUserRejectedError(error: unknown) {
   if (!error || typeof error !== "object") {
     return false;
@@ -54,6 +62,12 @@ function isUserRejectedError(error: unknown) {
   );
 }
 
+/**
+ * 上报 Faucet 页面中的可恢复错误。
+ * @param message 错误摘要信息。
+ * @param error 原始错误对象或下游返回载荷。
+ * @param context 可选的结构化上下文信息。
+ */
 function reportFaucetPageError(
   message: string,
   error: unknown,
@@ -69,6 +83,10 @@ function reportFaucetPageError(
   });
 }
 
+/**
+ * 渲染 Faucet 页面。
+ * @returns 包含领取流程和领取结果展示的页面。
+ */
 export default function FaucetPage() {
   const { address, isConnected, isCorrectChain } = useWalletReady();
   const { signMessageAsync } = useSignMessage();

@@ -1,9 +1,17 @@
+/**
+ * @notice Redis 客户端访问封装。
+ * @dev 负责创建、缓存并复用 Redis 连接，同时提供原子读取后删除的辅助方法。
+ */
 import "server-only";
 
 import { createClient } from "redis";
 import { getServerEnv } from "@/lib/env";
 import { captureServerException } from "@/lib/observability/server";
 
+/**
+ * @notice 当前项目使用的 Redis 客户端类型。
+ * @dev 直接复用 `redis` 官方客户端的返回类型。
+ */
 type KnowledgeRedisClient = ReturnType<typeof createClient>;
 
 declare global {
@@ -13,6 +21,10 @@ declare global {
     | undefined;
 }
 
+/**
+ * @notice 按服务端环境配置创建 Redis 客户端。
+ * @returns 若配置了 Redis 地址则返回客户端，否则返回 `null`。
+ */
 function createRedisClient(): KnowledgeRedisClient | null {
   const { REDIS_URL: url } = getServerEnv();
 
@@ -41,6 +53,10 @@ end
 return value
 `;
 
+/**
+ * @notice 获取可复用的 Redis 客户端实例。
+ * @returns 已连接的 Redis 客户端；若未配置 Redis 则返回 `null`。
+ */
 export async function getRedis(): Promise<KnowledgeRedisClient | null> {
   if (!getServerEnv().REDIS_URL) {
     return null;
@@ -57,6 +73,10 @@ export async function getRedis(): Promise<KnowledgeRedisClient | null> {
     globalThis.__knowledgeRedisClient = client;
   }
 
+  /**
+   * @notice 已建立连接时直接复用客户端。
+   * @dev 避免重复发起并发连接请求。
+   */
   if (client.isOpen) {
     return client;
   }
@@ -74,6 +94,11 @@ export async function getRedis(): Promise<KnowledgeRedisClient | null> {
   return globalThis.__knowledgeRedisConnectPromise;
 }
 
+/**
+ * @notice 以原子方式读取并删除指定键。
+ * @param key 目标 Redis 键。
+ * @returns 读取到的字符串值；若键不存在或 Redis 不可用则返回 `null`。
+ */
 export async function atomicGetDel(key: string): Promise<string | null> {
   const client = await getRedis();
 

@@ -1,3 +1,7 @@
+/**
+ * @notice Faucet 领取资格检查工具。
+ * @dev 综合冷却、合约暂停、钱包余额和预算余量判断当前地址是否可领取。
+ */
 import "server-only";
 
 import {
@@ -9,6 +13,12 @@ import { formatFaucetAmount } from "@/lib/faucet/request-context";
 import { getCooldownRemainingSeconds } from "@/lib/faucet/store";
 import type { FaucetClaimEligibilityResult } from "@/lib/faucet/types";
 
+/**
+ * @notice 检查当前地址是否满足 Faucet 领取条件。
+ * @param address 当前钱包地址。
+ * @param ip 当前请求来源 IP。
+ * @returns 领取资格检查结果。
+ */
 export async function checkFaucetClaimEligibility(
   address: `0x${string}`,
   ip: string | null

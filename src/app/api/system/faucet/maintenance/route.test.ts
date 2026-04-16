@@ -1,3 +1,6 @@
+/**
+ * 模块说明：覆盖系统鉴权下的 Faucet 维护执行行为。
+ */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createNextRequest } from "@/test/api-route";

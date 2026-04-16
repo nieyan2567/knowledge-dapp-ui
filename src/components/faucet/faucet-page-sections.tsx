@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * 模块说明：Faucet 页面分区组件集合，负责渲染顶部连接按钮、Hero 区、领取卡片和说明网格。
+ */
 import Link from "next/link";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import {
@@ -19,6 +22,10 @@ import { useEnsureKnowledgeChain } from "@/hooks/useEnsureKnowledgeChain";
 import { BRANDING } from "@/lib/branding";
 import { FAUCET_COPY, getFaucetSuccessTitle } from "@/lib/faucet/copy";
 
+/**
+ * 渲染 Faucet 页面顶部的钱包连接动作区。
+ * @returns 根据连接状态动态切换的钱包操作按钮。
+ */
 export function ConnectAction() {
   const { ensureChain, hasWalletRequest, isSwitching } = useEnsureKnowledgeChain({
     errorMessage: `切换到 ${BRANDING.chainName} 失败，请重试`,
@@ -96,6 +103,13 @@ export function ConnectAction() {
   );
 }
 
+/**
+ * 渲染 Faucet 功能亮点卡片。
+ * @param icon 卡片图标。
+ * @param title 卡片标题。
+ * @param description 卡片说明。
+ * @returns 功能亮点卡片。
+ */
 function FaucetFeatureCard({
   icon,
   title,
@@ -118,6 +132,11 @@ function FaucetFeatureCard({
   );
 }
 
+/**
+ * 渲染 Faucet Hero 区。
+ * @param walletBalanceText 当前钱包余额文本。
+ * @returns Faucet 页面顶部介绍区。
+ */
 export function FaucetHeroSection({
   walletBalanceText,
 }: {
@@ -178,6 +197,17 @@ export function FaucetHeroSection({
   );
 }
 
+/**
+ * 渲染 Faucet 领取操作卡片。
+ * @param address 当前连接地址。
+ * @param isConnected 当前是否已连接钱包。
+ * @param isCorrectChain 当前是否处于正确链。
+ * @param loading 是否正在领取。
+ * @param txHash 最近一次领取交易哈希。
+ * @param claimAmount 最近一次领取金额。
+ * @param onClaim 触发领取回调。
+ * @returns Faucet 领取操作卡片。
+ */
 export function FaucetRequestCard({
   address,
   isConnected,
@@ -268,6 +298,10 @@ export function FaucetRequestCard({
   );
 }
 
+/**
+ * 渲染 Faucet 说明信息网格。
+ * @returns Faucet 规则与说明网格。
+ */
 export function FaucetInfoGrid() {
   return (
     <section className="mt-16 grid gap-6 lg:grid-cols-3">
@@ -310,6 +344,10 @@ export function FaucetInfoGrid() {
   );
 }
 
+/**
+ * 渲染 Faucet 页面顶部工具栏。
+ * @returns 包含主题切换、钱包连接和导航链接的顶栏。
+ */
 export function FaucetPageTopbar() {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">

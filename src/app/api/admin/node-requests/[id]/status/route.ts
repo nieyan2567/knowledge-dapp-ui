@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 
+/**
+ * 模块说明：节点运行状态接口，负责查询指定节点申请对应节点的实时运行状态。
+ */
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { getNodeRequestRuntimeStatus } from "@/server/admin/node-runtime-status";
 import { getNodeRequestById } from "@/server/admin/store";
 import { readAdminRequestContext } from "@/server/admin/auth";
 
+/**
+ * 声明当前接口运行在 Node.js 运行时。
+ * @returns Next.js 路由运行时标记。
+ */
 export const runtime = "nodejs";
 
+/**
+ * 返回指定节点申请对应的运行状态。
+ * @param req 用于鉴权和限流的请求对象。
+ * @param context 包含节点申请 ID 的路由上下文。
+ * @returns 包含运行状态快照的 JSON 响应。
+ */
 export async function GET(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }

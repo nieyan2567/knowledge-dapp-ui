@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+/**
+ * 模块说明：验证者申请接口，负责列出验证者申请、可用节点候选，并支持创建新申请。
+ */
 import { createValidatorRequestSchema } from "@/lib/admin/schemas";
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import { parseJsonBody } from "@/lib/api-validation";
@@ -9,8 +12,17 @@ import { captureServerException } from "@/lib/observability/server";
 import { AdminStoreConflictError, createValidatorRequest, getNodeRequestById, listApprovedNodeRequests, listApprovedNodeRequestsByApplicant, listValidatorRequests, listValidatorRequestsByApplicant } from "@/server/admin/store";
 import { readAdminRequestContext, requireAuthenticatedRequest } from "@/server/admin/auth";
 
+/**
+ * 声明当前接口运行在 Node.js 运行时。
+ * @returns Next.js 路由运行时标记。
+ */
 export const runtime = "nodejs";
 
+/**
+ * 返回验证者申请列表以及当前仍可提交申请的节点候选。
+ * @param req 用于鉴权和限流的请求对象。
+ * @returns 包含验证者申请与候选节点信息的 JSON 响应。
+ */
 export async function GET(req: NextRequest) {
   const rateLimit = await enforceApiRateLimits(req.headers, ["admin:validator-requests:list"]);
   if (!rateLimit.ok) return NextResponse.json({ error: rateLimit.error }, { status: rateLimit.status });
@@ -45,6 +57,11 @@ export async function GET(req: NextRequest) {
   );
 }
 
+/**
+ * 为当前认证用户创建新的验证者申请。
+ * @param req 携带验证者申请参数的请求对象。
+ * @returns 包含新建验证者申请记录的 JSON 响应。
+ */
 export async function POST(req: NextRequest) {
   const rateLimit = await enforceApiRateLimits(req.headers, ["admin:validator-requests:create"]);
   if (!rateLimit.ok) return NextResponse.json({ error: rateLimit.error }, { status: rateLimit.status });

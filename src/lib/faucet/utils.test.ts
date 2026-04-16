@@ -1,3 +1,7 @@
+/**
+ * @notice `faucet/utils` 聚合入口测试。
+ * @dev 覆盖默认锁 TTL、请求上下文哈希和 Faucet 错误识别逻辑。
+ */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {

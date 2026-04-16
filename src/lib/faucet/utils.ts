@@ -1,3 +1,7 @@
+/**
+ * @notice Faucet 模块服务端聚合导出入口。
+ * @dev 统一转发 Faucet 配置、客户端、资格校验、限流和类型定义，供 API 与任务复用。
+ */
 import "server-only";
 
 import { FAUCET_COPY, getFaucetCooldownMessage, getFaucetMinBalanceMessage, getFaucetRateLimitMessage } from "@/lib/faucet/copy";
@@ -52,6 +56,10 @@ import {
   type FaucetMaintenanceReport,
 } from "@/lib/faucet/types";
 
+/**
+ * @notice 重新导出 Faucet 共享类型。
+ * @dev 便于其他模块从单一入口导入 Faucet 类型定义。
+ */
 export type {
   FaucetClaimAuthorization,
   FaucetClaimEligibilityResult,
@@ -60,6 +68,10 @@ export type {
   FaucetMaintenanceReport,
 };
 
+/**
+ * @notice 重新导出 Faucet 服务端能力集合。
+ * @dev 包括文案、配置读取、客户端调用、资格校验和状态存储等能力。
+ */
 export {
   FAUCET_COPY,
   FaucetError,

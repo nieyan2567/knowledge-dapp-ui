@@ -1,3 +1,6 @@
+/**
+ * 模块说明：节点申请管理组件，负责提交节点申请、审批节点申请以及查看节点实时运行状态。
+ */
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,6 +20,10 @@ type LoadRequestsOptions = { background?: boolean };
 
 const emptyCreateForm = { nodeName: "", serverHost: "", nodeRpcUrl: "", enode: "", description: "" };
 
+/**
+ * 渲染节点申请管理页面。
+ * @returns 节点申请管理主组件。
+ */
 export function NodeRequestsAdminPage() {
   const { address } = useAccount();
   const { ensureUploadAuth, isAuthenticating } = useUploadAuth();
@@ -32,6 +39,10 @@ export function NodeRequestsAdminPage() {
   const [reviewDrafts, setReviewDrafts] = useState<ReviewDraftState>({});
   const [form, setForm] = useState(emptyCreateForm);
 
+  /*
+   * 这里先读取节点申请列表，再根据列表中的申请 ID 衍生实时状态查询。
+   * 列表和运行状态分成两段请求，可以避免单次接口负担过重，也便于局部刷新。
+   */
   const loadRequests = useCallback(async ({ background = false }: LoadRequestsOptions = {}) => {
     if (!background) setIsLoading(true);
     try {
@@ -254,6 +265,12 @@ export function NodeRequestsAdminPage() {
   );
 }
 
+/**
+ * 根据节点申请与运行状态推导下一步提示文案。
+ * @param request 节点申请记录。
+ * @param runtimeStatus 节点实时运行状态。
+ * @returns 面向用户的下一步操作提示。
+ */
 function buildNextStepMessage(request: NodeRequestRecord, runtimeStatus?: NodeRequestRuntimeStatus) {
   if (request.status === "pending") return "申请已提交，请等待管理员审批后再让该节点承载正式网络流量。";
   if (request.status === "rejected") return request.reviewComment ? `申请已被拒绝。审批备注：${request.reviewComment}` : "申请已被拒绝。请完善节点信息后重新提交。";
@@ -270,6 +287,11 @@ function buildNextStepMessage(request: NodeRequestRecord, runtimeStatus?: NodeRe
   }
 }
 
+/**
+ * 格式化节点健康阶段。
+ * @param stage 健康检查阶段值。
+ * @returns 健康阶段显示文案。
+ */
 function formatHealthStage(stage: NodeRequestRuntimeStatus["health"]["stage"]) {
   switch (stage) {
     case "not_configured": return "未填写 RPC";
@@ -281,6 +303,11 @@ function formatHealthStage(stage: NodeRequestRuntimeStatus["health"]["stage"]) {
   }
 }
 
+/**
+ * 把节点健康阶段映射成语义颜色。
+ * @param stage 健康检查阶段值。
+ * @returns 适合状态胶囊使用的语义色调。
+ */
 function mapHealthTone(stage?: NodeRequestRuntimeStatus["health"]["stage"]) {
   switch (stage) {
     case "healthy": return "success";

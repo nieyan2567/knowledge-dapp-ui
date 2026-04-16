@@ -1,3 +1,7 @@
+/**
+ * @notice 交易提示与错误分类工具。
+ * @dev 统一处理交易模拟、提交阶段的提示文案、错误分类和客户端可观测性上报。
+ */
 import type { Abi } from "viem";
 import { BaseError } from "viem";
 import { toast } from "sonner";
@@ -21,6 +25,10 @@ type WriteContractAsyncLike = (
   request: ContractWriteRequest
 ) => Promise<`0x${string}`>;
 
+/**
+ * @notice 交易错误分类枚举。
+ * @dev 用于区分用户拒绝、错链、余额不足、合约回滚等场景。
+ */
 export type TransactionErrorCategory =
   | "user_rejected"
   | "wrong_chain"
@@ -32,8 +40,16 @@ export type TransactionErrorCategory =
   | "simulation_failed"
   | "unknown";
 
+/**
+ * @notice 交易错误发生阶段。
+ * @dev 分为预检模拟阶段和正式提交阶段。
+ */
 export type TransactionErrorPhase = "simulation" | "submission";
 
+/**
+ * @notice 归类后的交易错误结构。
+ * @dev 包含类别、阶段、展示文案、原始消息以及是否需要上报。
+ */
 export type ClassifiedTransactionError = {
   category: TransactionErrorCategory;
   phase: TransactionErrorPhase;
@@ -185,6 +201,13 @@ function includesAny(message: string, patterns: string[]) {
   return patterns.some((pattern) => message.includes(pattern));
 }
 
+/**
+ * @notice 对交易错误进行归类并生成统一展示信息。
+ * @param error 原始错误对象。
+ * @param fallback 无法识别时使用的回退文案。
+ * @param phase 当前错误所处阶段，默认值为 `submission`。
+ * @returns 归类后的交易错误对象。
+ */
 export function classifyTransactionError(
   error: unknown,
   fallback: string,
@@ -363,6 +386,14 @@ export function classifyTransactionError(
   };
 }
 
+/**
+ * @notice 根据错误分类展示交易提示并在必要时上报可观测性。
+ * @param error 原始错误对象。
+ * @param fail 失败回退文案。
+ * @param id 已存在的 toast ID。
+ * @param phase 当前错误所处阶段。
+ * @returns 当前函数不返回值，仅负责提示与上报。
+ */
 function showTxErrorToast(
   error: unknown,
   fail: string,
@@ -394,6 +425,14 @@ function showTxErrorToast(
   toast.error(classified.message, { id });
 }
 
+/**
+ * @notice 为 Promise 交易流程包裹统一 toast 提示。
+ * @param promise 代表交易流程的 Promise。
+ * @param loading 加载中提示文案。
+ * @param success 成功提示文案。
+ * @param fail 失败提示文案。
+ * @returns 原 Promise 成功解析后的结果。
+ */
 export async function txToast<T>(
   promise: Promise<T>,
   loading: string,
@@ -412,6 +451,17 @@ export async function txToast<T>(
   }
 }
 
+/**
+ * @notice 为合约写入流程提供预检与 toast 提示封装。
+ * @param input 写入流程所需输入。
+ * @param input.publicClient 可选的公共客户端，用于交易前模拟。
+ * @param input.writeContractAsync 实际执行写入的函数。
+ * @param input.request 合约写入请求参数。
+ * @param input.loading 加载中提示文案。
+ * @param input.success 成功提示文案。
+ * @param input.fail 失败提示文案。
+ * @returns 成功时返回交易哈希；若模拟或提交失败则返回 `null`。
+ */
 export async function writeTxToast({
   publicClient,
   writeContractAsync,
@@ -427,6 +477,10 @@ export async function writeTxToast({
   success: string;
   fail: string;
 }): Promise<`0x${string}` | null> {
+  /**
+   * @notice 若提供公共客户端，则先执行模拟预检。
+   * @dev 这样可以在真正弹出钱包前尽早暴露可预见的链上错误。
+   */
   if (publicClient) {
     try {
       await publicClient.simulateContract(request);
