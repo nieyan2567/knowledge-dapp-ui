@@ -11,22 +11,22 @@ import { parseEther } from "viem";
 export const STAKE_FLOW_STEPS = [
   {
     id: 1,
-    title: "Deposit",
+    title: "存入",
     description: "先存入原生币，形成待激活质押。",
   },
   {
     id: 2,
-    title: "Activate",
+    title: "激活",
     description: "等待激活区块达到后启用投票权。",
   },
   {
     id: 3,
-    title: "Request Withdraw",
+    title: "申请退出",
     description: "申请退出后，质押会进入冷却阶段。",
   },
   {
     id: 4,
-    title: "Withdraw",
+    title: "提取",
     description: "冷却结束后提取原生币回到钱包。",
   },
 ] as const;
@@ -36,7 +36,7 @@ export const STAKE_FLOW_STEPS = [
  * @dev 集中管理按钮文本、提示文案、状态说明和各区域标题。
  */
 export const STAKE_COPY = {
-  headerTitle: "Stake & Voting Power",
+  headerTitle: "质押与投票权",
   headerDescription:
     "先质押原生币并激活投票权，再参与内容投票和 DAO 治理；退出质押需要先申请，再等待冷却期结束。",
   depositSectionTitle: "质押、激活与撤回待激活",

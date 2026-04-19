@@ -9,8 +9,8 @@ import { BRANDING } from "@/lib/branding";
  * @dev 供合约地址、治理参数和区块浏览器入口等 UI 区域复用。
  */
 export const SYSTEM_PAGE_COPY = {
-  headerEyebrow: "Contracts / Roles / Treasury",
-  headerTitle: "System Overview",
+  headerEyebrow: "合约 / 角色 / 金库",
+  headerTitle: "系统信息",
   headerDescription: "查看当前合约绑定关系、治理参数以及金库状态。",
   openExplorer: `打开 ${BRANDING.explorerName}`,
   contractAddress: "合约地址",

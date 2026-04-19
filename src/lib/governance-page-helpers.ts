@@ -30,11 +30,11 @@ export const GOVERNANCE_CATEGORY_LABELS: Record<
   GovernanceTemplateCategory,
   string
 > = {
-  content: "Content",
-  stake: "Stake",
-  treasury: "Treasury",
-  governor: "Governor",
-  timelock: "Timelock",
+  content: "内容",
+  stake: "质押",
+  treasury: "金库",
+  governor: "治理器",
+  timelock: "时间锁",
 };
 
 /**
@@ -69,7 +69,7 @@ export const GOVERNANCE_FLOW_STEPS = [
  * @dev 供提案列表、提案创建、提案预览和治理参数区域复用。
  */
 export const GOVERNANCE_PAGE_COPY = {
-  headerTitle: "Governance Center",
+  headerTitle: "治理中心",
   headerDescription:
     "在同一页面查看治理流程、浏览提案、核对参数，并完成提案创建与提交前确认。",
   listTitle: "提案列表",

@@ -24,8 +24,8 @@ export type ContentSort = "updated_desc" | "votes_desc" | "version_desc";
  * @dev 集中定义个人页摘要、内容列表、提案列表与错误提示文案。
  */
 export const PROFILE_PAGE_COPY = {
-  headerEyebrow: "Wallet / Content / Governance",
-  headerTitle: "Profile",
+  headerEyebrow: "钱包 / 内容 / 治理",
+  headerTitle: "个人中心",
   headerDescription:
     "集中查看当前钱包的内容记录、治理参与、质押状态与待领奖励。",
   refresh: "刷新数据",

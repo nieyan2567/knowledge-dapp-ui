@@ -12,7 +12,6 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 
 import {
   ContentCurrentFileSection,
-  ContentSnapshotGrid,
   ContentStatusSummaryGrid,
   ContentVersionHistoryList,
 } from "@/components/content/content-detail-sections";
@@ -855,7 +854,7 @@ export default function ContentDetailPage() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
+    <main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
       <div className="flex items-center justify-between gap-4">
         <Link
           href="/content"
@@ -903,31 +902,19 @@ export default function ContentDetailPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-6">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-5">
           <SectionCard
             title={CONTENT_DETAIL_COPY.currentFileTitle}
-            description={CONTENT_DETAIL_COPY.currentFileDescription}
+            description="查看当前文件、访问地址和链上快照信息。"
+            className="p-5"
           >
             <ContentCurrentFileSection
-              contentId={contentRecord.id}
               latestVersion={contentRecord.latestVersion}
-              deleted={contentRecord.deleted}
-              title={contentRecord.title}
-              description={contentRecord.description}
               previewUrl={previewUrl}
               currentCid={content.ipfsHash}
-            />
-          </SectionCard>
-
-          <SectionCard
-            title={CONTENT_DETAIL_COPY.snapshotTitle}
-            description={CONTENT_DETAIL_COPY.snapshotDescription}
-          >
-            <ContentSnapshotGrid
               author={contentRecord.author}
               createdAt={contentRecord.timestamp}
-              latestVersion={contentRecord.latestVersion}
               versionCount={versionCount}
               lastUpdatedAt={contentRecord.lastUpdatedAt}
               voteCount={contentRecord.voteCount}
@@ -938,6 +925,7 @@ export default function ContentDetailPage() {
           <SectionCard
             title={CONTENT_DETAIL_COPY.versionHistoryTitle}
             description={CONTENT_DETAIL_COPY.versionHistoryDescription}
+            className="p-5"
           >
             <ContentVersionHistoryList
               loadingVersions={loadingVersions}
@@ -948,7 +936,7 @@ export default function ContentDetailPage() {
           </SectionCard>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           <ContentActionsSection
             deleted={contentRecord.deleted}
             isAuthor={isAuthor}

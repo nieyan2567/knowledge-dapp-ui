@@ -386,8 +386,8 @@ export default function HomePage() {
   return (
     <main className="mx-auto max-w-7xl space-y-8 px-6 py-10">
       <PageHeader
-        eyebrow="Dashboard · Content · Governance · Rewards"
-        title="Dashboard"
+        eyebrow="总览 · 内容 · 治理 · 奖励"
+        title="系统总览"
         description="聚合展示最近奖励变化与最新链上动作，方便从首页快速进入对应内容或提案。"
         testId={PAGE_TEST_IDS.dashboard}
         right={
@@ -518,7 +518,7 @@ export default function HomePage() {
                                 : "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
                             }`}
                           >
-                            {item.kind === "proposal" ? "Proposal" : "Content"}
+                            {item.kind === "proposal" ? "提案" : "内容"}
                           </span>
                         </div>
                         <Link

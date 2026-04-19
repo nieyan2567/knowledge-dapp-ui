@@ -47,7 +47,7 @@ export const CONTENT_DETAIL_COPY = {
   statusDeleted: "已删除",
   titleLabel: "标题",
   descriptionLabel: "描述",
-  openCurrentFileTitle: "打开当前文件",
+  openCurrentFileTitle: "打开文件",
   activeVersionText: "当前激活版本为 v{version}",
   openFile: "打开文件",
   currentMetadataTitle: "当前元数据",

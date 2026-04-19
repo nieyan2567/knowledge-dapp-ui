@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * 模块说明：内容详情主区组件集合，负责渲染内容状态摘要、当前文件、元信息快照和版本历史列表。
+ * @file 内容详情主区域组件集合，负责渲染状态摘要、当前文件、内容快照和版本历史。
  */
-import { BookOpen, CheckCircle2, ExternalLink, FileText, Heart, User } from "lucide-react";
+import { CheckCircle2, ExternalLink, FileText, Heart, User } from "lucide-react";
 
 import { AddressBadge } from "@/components/address-badge";
 import { CopyField } from "@/components/copy-field";
@@ -19,9 +19,9 @@ import { getIpfsFileUrl } from "@/lib/ipfs";
 import type { ContentVersionData } from "@/types/content";
 
 /**
- * 渲染内容状态摘要网格。
- * @param items 需要展示的状态摘要项数组。
- * @returns 内容状态摘要卡片网格。
+ * @notice 渲染内容状态摘要网格。
+ * @param items 需要展示的状态摘要数据。
+ * @returns 状态摘要卡片网格。
  */
 export function ContentStatusSummaryGrid({
   items,
@@ -47,93 +47,62 @@ export function ContentStatusSummaryGrid({
 }
 
 /**
- * 渲染当前生效文件和当前元信息分区。
- * @param contentId 内容 ID。
+ * @notice 渲染当前文件、当前元数据和内容快照区域。
  * @param latestVersion 当前最新版本号。
- * @param deleted 当前内容是否已删除。
  * @param title 当前内容标题。
  * @param description 当前内容描述。
- * @param previewUrl 当前文件预览地址。
+ * @param previewUrl 当前文件访问地址。
  * @param currentCid 当前文件 CID。
- * @returns 当前版本文件与元数据展示区块。
+ * @param author 作者地址。
+ * @param createdAt 创建时间。
+ * @param versionCount 版本总数。
+ * @param lastUpdatedAt 最后更新时间。
+ * @param voteCount 当前票数。
+ * @param rewardAccrualCount 奖励累计次数。
+ * @returns 当前文件信息区块。
  */
 export function ContentCurrentFileSection({
-  contentId,
   latestVersion,
-  deleted,
-  title,
-  description,
   previewUrl,
   currentCid,
+  author,
+  createdAt,
+  versionCount,
+  lastUpdatedAt,
+  voteCount,
+  rewardAccrualCount,
 }: {
-  contentId: bigint;
   latestVersion: bigint;
-  deleted: boolean;
-  title: string;
-  description: string;
   previewUrl: string;
   currentCid: string;
+  author: `0x${string}`;
+  createdAt: bigint;
+  versionCount: bigint;
+  lastUpdatedAt: bigint;
+  voteCount: bigint;
+  rewardAccrualCount: bigint;
 }) {
   return (
-    <div className="space-y-5">
-      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-          <BookOpen className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-          {CONTENT_DETAIL_COPY.recordSummaryTitle}
-        </div>
-        <div className="grid gap-2 sm:grid-cols-3">
-          <SummaryPill
-            label={CONTENT_DETAIL_COPY.contentIdLabel}
-            value={`#${contentId.toString()}`}
-          />
-          <SummaryPill
-            label={CONTENT_DETAIL_COPY.latestVersionLabel}
-            value={`v${latestVersion.toString()}`}
-          />
-          <SummaryPill
-            label={CONTENT_DETAIL_COPY.statusLabel}
-            value={deleted ? CONTENT_DETAIL_COPY.statusDeleted : CONTENT_DETAIL_COPY.statusNormal}
-          />
-        </div>
-        <div className="mt-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900/80">
-          <div className="flex items-start gap-2">
-            <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {CONTENT_DETAIL_COPY.titleLabel}
-            </span>
-            <span className="min-w-0 flex-1 truncate font-medium text-slate-900 dark:text-slate-100">
-              {title}
-            </span>
-          </div>
-          <div className="mt-2 flex items-start gap-2">
-            <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {CONTENT_DETAIL_COPY.descriptionLabel}
-            </span>
-            <span className="flex-1 text-xs leading-5 text-slate-700 dark:text-slate-300">
-              {description || CONTENT_DETAIL_COPY.noDescription}
-            </span>
-          </div>
-        </div>
-      </div>
-
+    <div className="space-y-3">
       <a
         href={previewUrl}
         target="_blank"
         rel="noreferrer"
-        className="group block rounded-3xl border border-slate-200 bg-slate-50 p-8 transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:hover:border-slate-700 dark:hover:bg-slate-800"
+        className="group block rounded-3xl border border-slate-200 bg-slate-50 p-6 transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/50 dark:hover:border-slate-700 dark:hover:bg-slate-800"
       >
-        <div className="flex flex-col items-center justify-center gap-4 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">
-            <FileText className="h-8 w-8" />
+        <div className="flex flex-col items-center justify-center gap-3 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">
+            <FileText className="h-7 w-7" />
           </div>
 
           <div>
-            <div className="text-base font-semibold text-slate-950 dark:text-slate-100">
+            <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
               {CONTENT_DETAIL_COPY.openCurrentFileTitle}
             </div>
-            <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               {CONTENT_DETAIL_COPY.activeVersionText.replace(
                 "{version}",
-                latestVersion.toString()
+                latestVersion.toString(),
               )}
             </div>
           </div>
@@ -145,13 +114,30 @@ export function ContentCurrentFileSection({
         </div>
       </a>
 
-      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/50">
-        <div className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">
-          {CONTENT_DETAIL_COPY.currentMetadataTitle}
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+          <div className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">
+            {CONTENT_DETAIL_COPY.currentMetadataTitle}
+          </div>
+          <div className="space-y-2.5">
+            <CopyField label={CONTENT_DETAIL_COPY.currentCidLabel} value={currentCid} />
+            <CopyField label={CONTENT_DETAIL_COPY.gatewayUrlLabel} value={previewUrl} />
+          </div>
         </div>
-        <div className="space-y-3">
-          <CopyField label={CONTENT_DETAIL_COPY.currentCidLabel} value={currentCid} />
-          <CopyField label={CONTENT_DETAIL_COPY.gatewayUrlLabel} value={previewUrl} />
+
+        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+          <div className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">
+            {CONTENT_DETAIL_COPY.snapshotTitle}
+          </div>
+          <ContentSnapshotGrid
+            author={author}
+            createdAt={createdAt}
+            latestVersion={latestVersion}
+            versionCount={versionCount}
+            lastUpdatedAt={lastUpdatedAt}
+            voteCount={voteCount}
+            rewardAccrualCount={rewardAccrualCount}
+          />
         </div>
       </div>
     </div>
@@ -159,14 +145,14 @@ export function ContentCurrentFileSection({
 }
 
 /**
- * 渲染内容基础快照信息网格。
+ * @notice 渲染内容基础快照信息网格。
  * @param author 作者地址。
  * @param createdAt 创建时间。
  * @param latestVersion 最新版本号。
  * @param versionCount 总版本数。
  * @param lastUpdatedAt 最后更新时间。
  * @param voteCount 当前票数。
- * @param rewardAccrualCount 奖励记账次数。
+ * @param rewardAccrualCount 奖励累计次数。
  * @returns 内容快照信息网格。
  */
 export function ContentSnapshotGrid({
@@ -221,7 +207,7 @@ export function ContentSnapshotGrid({
 }
 
 /**
- * 渲染内容版本历史列表。
+ * @notice 渲染内容版本历史列表。
  * @param loadingVersions 是否正在加载版本历史。
  * @param versions 版本历史数组。
  * @param latestVersion 当前最新版本号。
@@ -258,10 +244,6 @@ export function ContentVersionHistoryList({
   return (
     <div className="space-y-4">
       {versions.map((version, index) => {
-        /*
-         * 版本历史按倒序渲染，因此“上一版本”实际对应数组中的下一项，
-         * 这里借此计算当前版本和前序版本之间的变更摘要。
-         */
         const isCurrentVersion = version.version === latestVersion;
         const versionUrl = getIpfsFileUrl(version.ipfsHash);
         const previousVersion = versions[index + 1];
@@ -277,7 +259,7 @@ export function ContentVersionHistoryList({
                 <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">
                   {CONTENT_DETAIL_COPY.versionPrefix.replace(
                     "{version}",
-                    version.version.toString()
+                    version.version.toString(),
                   )}
                 </div>
                 <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -359,26 +341,7 @@ export function ContentVersionHistoryList({
 }
 
 /**
- * 渲染内容记录摘要中的小型标签项。
- * @param label 标签名称。
- * @param value 标签值。
- * @returns 紧凑型摘要标签。
- */
-function SummaryPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900/80">
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-        {label}
-      </div>
-      <div className="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100">
-        {value}
-      </div>
-    </div>
-  );
-}
-
-/**
- * 渲染内容信息卡片。
+ * @notice 渲染内容信息卡片。
  * @param label 字段标题。
  * @param children 字段值内容。
  * @returns 可复用的信息卡片。
@@ -391,8 +354,8 @@ function InfoCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
+      <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
         {label}
       </div>
       <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{children}</div>
@@ -401,7 +364,7 @@ function InfoCard({
 }
 
 /**
- * 渲染单个状态摘要卡片。
+ * @notice 渲染单个状态摘要卡片。
  * @param label 状态名称。
  * @param value 状态值。
  * @param description 状态说明。

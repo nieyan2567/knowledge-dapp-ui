@@ -491,7 +491,7 @@ export default function StakePage() {
 	return (
 		<main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
 			<PageHeader
-				eyebrow="Staking · Voting Power"
+				eyebrow="质押 · 投票权"
 				title={STAKE_COPY.headerTitle}
 				description={STAKE_COPY.headerDescription}
 				testId={PAGE_TEST_IDS.stake}

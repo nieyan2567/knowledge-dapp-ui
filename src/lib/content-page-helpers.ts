@@ -37,8 +37,8 @@ export const CONTENT_PAGE_COPY = {
     "链上登记已确认，但上传记录回写失败，后台清理任务会自动修正状态",
   orphanCleanupFailed:
     "链上登记失败后的自动清理未完成，请稍后执行系统清理",
-  headerEyebrow: "Content Registry / Local IPFS",
-  headerTitle: "Content Hub",
+  headerEyebrow: "内容登记 / 本地 IPFS",
+  headerTitle: "内容广场",
   headerDescription:
     "前端会在一次操作中完成身份验证、文件上传到本地 IPFS，以及将 CID 和元数据自动登记到链上。",
   listTitle: "内容列表",
