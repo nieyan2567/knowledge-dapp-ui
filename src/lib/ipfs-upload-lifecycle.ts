@@ -1,6 +1,6 @@
 /**
  * @file IPFS 上传生命周期服务模块。
- * @description 负责上传记录写入、链上登记校验、Kubo 回收以及批量孤儿文件清理。
+ * @description 负责孤儿上传清理、软删除宽限期调度，以及按整条内容批量清理全部版本文件。
  */
 import "server-only";
 
@@ -18,18 +18,17 @@ import {
 } from "@/lib/ipfs-kubo";
 import { asContentData } from "@/lib/web3-types";
 import {
+  cancelSoftDeleteForContent,
   getIpfsUploadRecordById,
+  listDueSoftDeletedContentIds,
   listExpiredIpfsUploadRecords,
+  listIpfsUploadRecordsByContentId,
   markIpfsUploadCleaned,
   markIpfsUploadCleanupFailed,
   markIpfsUploadRegistered,
-  type IpfsUploadRecord,
+  scheduleSoftDeleteForContent,
 } from "@/lib/upload-record-store";
 
-/**
- * @notice 单次 CID 清理的执行结果。
- * @dev 用于区分已登记、已清理、清理失败或记录不存在等不同结果。
- */
 export type CleanupIpfsUploadOutcome =
   | "missing"
   | "forbidden"
@@ -39,14 +38,26 @@ export type CleanupIpfsUploadOutcome =
   | "cleaned"
   | "failed";
 
-/**
- * @notice 单条上传记录清理报告。
- * @dev 同时返回记录 ID 与 CID，便于前端和系统接口展示处理结果。
- */
 export type CleanupIpfsUploadReport = {
   recordId: number;
   cid: string;
   outcome: CleanupIpfsUploadOutcome;
+  detail?: string;
+  garbageCollected?: boolean;
+  gcSkipped?: boolean;
+};
+
+export type SoftDeletedContentCleanupOutcome =
+  | "cleaned"
+  | "restored"
+  | "nothing_to_clean"
+  | "failed";
+
+export type SoftDeletedContentCleanupReport = {
+  contentId: string;
+  outcome: SoftDeletedContentCleanupOutcome;
+  cleanedRecordCount: number;
+  cleanedCidCount: number;
   detail?: string;
   garbageCollected?: boolean;
   gcSkipped?: boolean;
@@ -61,11 +72,6 @@ function getKnowledgePublicClient() {
   });
 }
 
-/**
- * @notice 检查某个 CID 是否已经被链上内容登记引用。
- * @param cid 待检查的目标 CID。
- * @returns 若链上存在使用该 CID 的内容记录则返回 `true`。
- */
 export async function isIpfsCidRegisteredOnChain(cid: string) {
   const contentAddress = CONTRACTS.KnowledgeContent as `0x${string}` | undefined;
 
@@ -115,13 +121,43 @@ export async function isIpfsCidRegisteredOnChain(cid: string) {
   return false;
 }
 
-/**
- * @notice 对单条上传记录执行孤儿文件清理。
- * @param recordId 目标上传记录 ID。
- * @param reason 本次清理原因说明。
- * @param expectedAddress 可选的预期地址；传入后会阻止非本人清理其他人的记录。
- * @returns 本次清理的执行结果。
- */
+export async function readContentDeletedState(contentId: bigint) {
+  const contentAddress = CONTRACTS.KnowledgeContent as `0x${string}` | undefined;
+
+  if (!contentAddress) {
+    return null;
+  }
+
+  const publicClient = getKnowledgePublicClient();
+  const raw = await publicClient.readContract({
+    address: contentAddress,
+    abi: ABIS.KnowledgeContent,
+    functionName: "contents",
+    args: [contentId],
+  });
+  const content = asContentData(raw);
+
+  return content?.deleted ?? null;
+}
+
+export async function scheduleSoftDeletedContentCleanup(contentId: bigint) {
+  const retentionSeconds = getServerEnv().CONTENT_SOFT_DELETE_RETENTION_SECONDS;
+  const deletedAt = new Date();
+  const scheduledAt = new Date(deletedAt.getTime() + retentionSeconds * 1000);
+
+  await scheduleSoftDeleteForContent(contentId, scheduledAt, deletedAt);
+
+  return {
+    contentId,
+    deletedAt,
+    scheduledAt,
+  };
+}
+
+export async function cancelSoftDeletedContentCleanup(contentId: bigint) {
+  await cancelSoftDeleteForContent(contentId);
+}
+
 export async function cleanupIpfsUploadRecordById(input: {
   recordId: number;
   reason: string;
@@ -168,7 +204,11 @@ export async function cleanupIpfsUploadRecordById(input: {
   }
 
   if (await isIpfsCidRegisteredOnChain(record.cid)) {
-    await markIpfsUploadRegistered(record.id, record.registerTxHash);
+    await markIpfsUploadRegistered(record.id, {
+      txHash: record.registerTxHash,
+      contentId: record.contentId,
+      versionNumber: record.versionNumber,
+    });
     return {
       recordId: record.id,
       cid: record.cid,
@@ -208,11 +248,6 @@ export async function cleanupIpfsUploadRecordById(input: {
   }
 }
 
-/**
- * @notice 批量清理已经过期的孤儿上传记录。
- * @param limit 本次最多处理多少条记录。
- * @returns 批量清理报告，包含处理明细与汇总统计。
- */
 export async function cleanupExpiredIpfsUploadRecords(limit: number) {
   const records = await listExpiredIpfsUploadRecords(limit);
   const reports: CleanupIpfsUploadReport[] = [];
@@ -248,6 +283,142 @@ export async function cleanupExpiredIpfsUploadRecords(limit: number) {
     registeredCount: reports.filter(
       (item) => item.outcome === "marked_registered_by_chain"
     ).length,
+    failedCount: reports.filter((item) => item.outcome === "failed").length,
+    gcReport,
+  };
+}
+
+export async function cleanupSoftDeletedContentById(input: {
+  contentId: bigint;
+  reason: string;
+  runGarbageCollection?: boolean;
+}) {
+  const records = await listIpfsUploadRecordsByContentId(input.contentId);
+
+  if (records.length === 0) {
+    return {
+      contentId: input.contentId.toString(),
+      outcome: "nothing_to_clean",
+      cleanedRecordCount: 0,
+      cleanedCidCount: 0,
+      detail: "no upload records bound to this content",
+    } satisfies SoftDeletedContentCleanupReport;
+  }
+
+  const isDeleted = await readContentDeletedState(input.contentId);
+
+  if (!isDeleted) {
+    await cancelSoftDeleteForContent(input.contentId);
+    return {
+      contentId: input.contentId.toString(),
+      outcome: "restored",
+      cleanedRecordCount: 0,
+      cleanedCidCount: 0,
+      detail: "content has already been restored on-chain",
+    } satisfies SoftDeletedContentCleanupReport;
+  }
+
+  const pendingRecords = records.filter((record) => !record.purgedAt);
+
+  if (pendingRecords.length === 0) {
+    return {
+      contentId: input.contentId.toString(),
+      outcome: "nothing_to_clean",
+      cleanedRecordCount: 0,
+      cleanedCidCount: 0,
+      detail: "all version files have already been purged",
+    } satisfies SoftDeletedContentCleanupReport;
+  }
+
+  const byCid = new Map<string, typeof pendingRecords>();
+  for (const record of pendingRecords) {
+    const list = byCid.get(record.cid) ?? [];
+    list.push(record);
+    byCid.set(record.cid, list);
+  }
+
+  let cleanedRecordCount = 0;
+  let cleanedCidCount = 0;
+
+  try {
+    for (const [cid, groupedRecords] of byCid.entries()) {
+      await unpinLocalIpfsCid(cid);
+      cleanedCidCount += 1;
+
+      for (const record of groupedRecords) {
+        await markIpfsUploadCleaned(record.id, input.reason);
+        cleanedRecordCount += 1;
+      }
+    }
+
+    let garbageCollected = false;
+    let gcSkipped = false;
+
+    if (input.runGarbageCollection !== false) {
+      const gcReport = await runKuboGarbageCollection();
+      garbageCollected = gcReport.triggered;
+      gcSkipped = gcReport.skipped;
+    }
+
+    return {
+      contentId: input.contentId.toString(),
+      outcome: "cleaned",
+      cleanedRecordCount,
+      cleanedCidCount,
+      garbageCollected,
+      gcSkipped,
+    } satisfies SoftDeletedContentCleanupReport;
+  } catch (error) {
+    const detail =
+      error instanceof Error ? error.message : "unknown soft-delete cleanup error";
+
+    for (const record of pendingRecords) {
+      await markIpfsUploadCleanupFailed(record.id, detail);
+    }
+
+    return {
+      contentId: input.contentId.toString(),
+      outcome: "failed",
+      cleanedRecordCount,
+      cleanedCidCount,
+      detail,
+    } satisfies SoftDeletedContentCleanupReport;
+  }
+}
+
+export async function cleanupDueSoftDeletedContents(limit: number) {
+  const contentIds = await listDueSoftDeletedContentIds(limit);
+  const reports: SoftDeletedContentCleanupReport[] = [];
+
+  for (const contentId of contentIds) {
+    reports.push(
+      await cleanupSoftDeletedContentById({
+        contentId,
+        reason: "soft_deleted_content_retention_elapsed",
+        runGarbageCollection: false,
+      })
+    );
+  }
+
+  const cleanedCount = reports.filter((item) => item.outcome === "cleaned").length;
+  let gcReport:
+    | {
+        triggered: boolean;
+        skipped: boolean;
+        reason: "cooldown_active" | "gc_executed";
+        detail?: string;
+      }
+    | undefined;
+
+  if (cleanedCount > 0) {
+    gcReport = await runKuboGarbageCollection();
+  }
+
+  return {
+    total: contentIds.length,
+    reports,
+    cleanedCount,
+    restoredCount: reports.filter((item) => item.outcome === "restored").length,
     failedCount: reports.filter((item) => item.outcome === "failed").length,
     gcReport,
   };

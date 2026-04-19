@@ -1,39 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * 模块说明：上传记录回写接口，负责在内容成功上链后把对应上传记录标记为已登记。
+ * @file 上传记录登记回写接口。
+ * @description 在链上内容注册或版本更新确认后，验证交易回执并把上传记录绑定到具体 content/version。
  */
 import { enforceApiRateLimits } from "@/lib/api-rate-limit";
 import {
   clearUploadSessionCookie,
   readUploadSession,
 } from "@/lib/auth/session";
-import {
-  uploadRegisterCompleteBodySchema,
-} from "@/lib/api-schemas";
-import {
-  errorResponse,
-  parseJsonBody,
-} from "@/lib/api-validation";
-import {
-  captureServerException,
-} from "@/lib/observability/server";
+import { uploadRegisterCompleteBodySchema } from "@/lib/api-schemas";
+import { errorResponse, parseJsonBody } from "@/lib/api-validation";
+import { readVerifiedContentMutationFromTx } from "@/lib/content-chain-verification";
+import { captureServerException } from "@/lib/observability/server";
 import {
   getIpfsUploadRecordById,
   markIpfsUploadRegistered,
 } from "@/lib/upload-record-store";
 
-/**
- * 声明当前接口运行在 Node.js 运行时。
- * @returns Next.js 路由运行时标记。
- */
 export const runtime = "nodejs";
 
-/**
- * 把已确认的链上登记结果回写到上传记录中。
- * @param req 携带上传记录 ID 与交易哈希的 JSON 请求。
- * @returns 包含回写结果的 JSON 响应。
- */
 export async function POST(req: NextRequest) {
   const rateLimit = await enforceApiRateLimits(req.headers, [
     "ipfs:register-complete",
@@ -74,10 +60,16 @@ export async function POST(req: NextRequest) {
       return errorResponse("当前会话无权回写该上传记录", 403);
     }
 
-    const updated = await markIpfsUploadRegistered(
-      record.id,
-      body.value.txHash
-    );
+    const verified = await readVerifiedContentMutationFromTx({
+      txHash: body.value.txHash as `0x${string}`,
+      kind: body.value.kind,
+    });
+
+    const updated = await markIpfsUploadRegistered(record.id, {
+      txHash: body.value.txHash,
+      contentId: verified.contentId,
+      versionNumber: verified.versionNumber,
+    });
 
     if (!updated) {
       return errorResponse("上传记录回写失败", 500);
@@ -89,9 +81,11 @@ export async function POST(req: NextRequest) {
       cid: updated.cid,
       status: updated.status,
       txHash: updated.registerTxHash,
+      contentId: updated.contentId?.toString() ?? null,
+      versionNumber: updated.versionNumber?.toString() ?? null,
     });
   } catch (error) {
-    await captureServerException("Failed to mark upload record as registered", {
+    await captureServerException("Failed to bind upload record to content", {
       source: "api.ipfs.register_complete",
       severity: "error",
       request: req,

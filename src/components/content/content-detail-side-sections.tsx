@@ -6,7 +6,6 @@
 import { formatEther } from "viem";
 import { Coins, Heart, PencilLine, RotateCcw, Trash2 } from "lucide-react";
 
-import { CopyField } from "@/components/copy-field";
 import { FileDrop } from "@/components/file-drop";
 import { SectionCard } from "@/components/section-card";
 import { BRANDING } from "@/lib/branding";
@@ -114,13 +113,13 @@ export function ContentActionsSection({
  * @param onEditDescriptionChange 描述变更回调。
  * @param onEditCidChange CID 变更回调。
  * @param onVersionFileChange 版本文件变更回调。
- * @param onUploadVersionFile 上传新版本文件回调。
  * @param onUpdateContent 更新内容回调。
  * @param onDeleteContent 删除内容回调。
  * @param onRestoreContent 恢复内容回调。
  * @returns 内容编辑与版本上传区块。
  */
 export function ContentEditSection({
+  deleted,
   editTitle,
   editDescription,
   editCid,
@@ -143,11 +142,11 @@ export function ContentEditSection({
   onEditDescriptionChange,
   onEditCidChange,
   onVersionFileChange,
-  onUploadVersionFile,
   onUpdateContent,
   onDeleteContent,
   onRestoreContent,
 }: {
+  deleted: boolean;
   editTitle: string;
   editDescription: string;
   editCid: string;
@@ -170,17 +169,31 @@ export function ContentEditSection({
   onEditDescriptionChange: (value: string) => void;
   onEditCidChange: (value: string) => void;
   onVersionFileChange: (file: File) => void;
-  onUploadVersionFile: () => void;
   onUpdateContent: () => void;
   onDeleteContent: () => void;
   onRestoreContent: () => void;
 }) {
+  const helperNotice = newVersionBlockedReason
+    ? newVersionBlockedReason
+    : canEditContent
+      ? "选择新文件后，点击一次“创建新版本”即可自动完成上传并上链。"
+      : isAuthor
+        ? CONTENT_DETAIL_COPY.editHintAuthorBlocked
+        : CONTENT_DETAIL_COPY.editHintNonAuthor;
+
+  const feeLabel =
+    updateFee === undefined
+      ? CONTENT_DETAIL_COPY.loadingFee
+      : updateFee > 0n
+        ? `${formatEther(updateFee)} ${BRANDING.nativeTokenSymbol}`
+        : CONTENT_DETAIL_COPY.freeNow;
+
   return (
     <SectionCard
       title={CONTENT_DETAIL_COPY.editTitle}
       description={CONTENT_DETAIL_COPY.editDescription}
     >
-      <div className="space-y-4">
+      <div className="space-y-3">
         <input
           value={editTitle}
           onChange={(event) => onEditTitleChange(event.target.value)}
@@ -194,35 +207,18 @@ export function ContentEditSection({
           onChange={(event) => onEditDescriptionChange(event.target.value)}
           disabled={!!newVersionBlockedReason || savingEdit || uploadingVersionFile}
           placeholder={CONTENT_DETAIL_COPY.descriptionPlaceholder}
-          rows={4}
+          rows={3}
           className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
         />
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-          <div className="mb-3 text-sm font-medium text-slate-900 dark:text-slate-100">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/50">
+          <div className="mb-2 text-sm font-medium text-slate-900 dark:text-slate-100">
             {CONTENT_DETAIL_COPY.uploadVersionTitle}
           </div>
           <FileDrop file={versionFile} onChange={onVersionFileChange} />
-          <div className="mt-3 text-xs leading-6 text-slate-500 dark:text-slate-400">
+          <div className="mt-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
             {formatUploadVersionDescription(uploadMaxFileSizeText)}
           </div>
-          <button
-            onClick={onUploadVersionFile}
-            disabled={
-              !!newVersionBlockedReason ||
-              !versionFile ||
-              savingEdit ||
-              uploadingVersionFile ||
-              isAuthenticating
-            }
-            className="mt-3 w-full rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            {isAuthenticating
-              ? CONTENT_DETAIL_COPY.uploadVersionAuthenticating
-              : uploadingVersionFile
-                ? CONTENT_DETAIL_COPY.uploadVersionLoading
-                : CONTENT_DETAIL_COPY.uploadVersionIdle}
-          </button>
         </div>
 
         <input
@@ -233,42 +229,48 @@ export function ContentEditSection({
           className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-400"
         />
 
-        <CopyField label={CONTENT_DETAIL_COPY.currentCidLabel} value={currentCid} />
         {uploadedVersionUrl ? (
-          <CopyField
-            label={CONTENT_DETAIL_COPY.newVersionGatewayUrlLabel}
-            value={uploadedVersionUrl}
-          />
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-800/50">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              {CONTENT_DETAIL_COPY.newVersionGatewayUrlLabel}
+            </div>
+            <div className="mt-1 break-all text-xs text-slate-700 dark:text-slate-200">
+              {uploadedVersionUrl}
+            </div>
+          </div>
         ) : null}
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
-          <div className="font-medium text-slate-900 dark:text-slate-100">
-            {CONTENT_DETAIL_COPY.updateFeeTitle}
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-800/50">
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <div className="font-medium text-slate-900 dark:text-slate-100">
+              {CONTENT_DETAIL_COPY.updateFeeTitle}
+            </div>
+            <div className="font-medium text-slate-700 dark:text-slate-200">{feeLabel}</div>
           </div>
-          <div className="mt-1">
-            {updateFee === undefined
-              ? CONTENT_DETAIL_COPY.loadingFee
-              : updateFee > 0n
-                ? `${formatEther(updateFee)} ${BRANDING.nativeTokenSymbol}`
-                : CONTENT_DETAIL_COPY.freeNow}
-          </div>
-          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <div className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
             {CONTENT_DETAIL_COPY.updateFeeDescription}
           </div>
         </div>
 
-        {newVersionBlockedReason ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-6 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
-            {newVersionBlockedReason}
+        {editCid !== currentCid ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-800/50">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              {CONTENT_DETAIL_COPY.currentCidLabel}
+            </div>
+            <div className="mt-1 break-all text-xs text-slate-700 dark:text-slate-200">
+              {currentCid}
+            </div>
           </div>
         ) : null}
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
-          {canEditContent
-            ? CONTENT_DETAIL_COPY.editHintEditable
-            : isAuthor
-              ? CONTENT_DETAIL_COPY.editHintAuthorBlocked
-              : CONTENT_DETAIL_COPY.editHintNonAuthor}
+        <div
+          className={`rounded-2xl border px-3 py-2 text-xs leading-6 ${
+            newVersionBlockedReason
+              ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+              : "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300"
+          }`}
+        >
+          {helperNotice}
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -283,26 +285,30 @@ export function ContentEditSection({
             className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
           >
             <PencilLine className="h-4 w-4" />
-            {savingEdit
-              ? CONTENT_DETAIL_COPY.createVersionLoading
-              : CONTENT_DETAIL_COPY.createVersionIdle}
+            {isAuthenticating
+              ? CONTENT_DETAIL_COPY.uploadVersionAuthenticating
+              : uploadingVersionFile
+                ? CONTENT_DETAIL_COPY.uploadVersionLoading
+                : savingEdit
+                  ? CONTENT_DETAIL_COPY.createVersionLoading
+                  : CONTENT_DETAIL_COPY.createVersionIdle}
           </button>
 
           <button
-            onClick={canRestoreContent ? onRestoreContent : onDeleteContent}
-            disabled={canRestoreContent ? restoring : !canDeleteContent || deleting}
+            onClick={deleted ? onRestoreContent : onDeleteContent}
+            disabled={deleted ? !canRestoreContent || restoring : !canDeleteContent || deleting}
             className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
-              canRestoreContent
+              deleted
                 ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
                 : "border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/30"
             }`}
           >
-            {canRestoreContent ? (
+            {deleted ? (
               <RotateCcw className="h-4 w-4" />
             ) : (
               <Trash2 className="h-4 w-4" />
             )}
-            {canRestoreContent
+            {deleted
               ? restoring
                 ? CONTENT_DETAIL_COPY.restoreLoading
                 : CONTENT_DETAIL_COPY.restoreButton

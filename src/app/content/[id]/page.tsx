@@ -41,6 +41,15 @@ import {
 import { asContentData, asContentVersion } from "@/lib/web3-types";
 import type { ContentVersionData } from "@/types/content";
 
+type ContentStorageLifecycleSummary = {
+  contentId: number;
+  totalRecords: number;
+  purgedCount: number;
+  hasPendingPurge: boolean;
+  scheduledAt: string | null;
+  fullyPurged: boolean;
+};
+
 /**
  * 上报内容详情页中的可恢复错误。
  * @param message 错误摘要信息。
@@ -78,6 +87,7 @@ export default function ContentDetailPage() {
   const [editDescription, setEditDescription] = useState("");
   const [editCid, setEditCid] = useState("");
   const [versionFile, setVersionFile] = useState<File | null>(null);
+  const [uploadedVersionUploadId, setUploadedVersionUploadId] = useState<number | null>(null);
   const [uploadedVersionUrl, setUploadedVersionUrl] = useState("");
   const [uploadingVersionFile, setUploadingVersionFile] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -85,6 +95,8 @@ export default function ContentDetailPage() {
   const [restoring, setRestoring] = useState(false);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [versions, setVersions] = useState<ContentVersionData[]>([]);
+  const [contentLifecycleSummary, setContentLifecycleSummary] =
+    useState<ContentStorageLifecycleSummary | null>(null);
 
   const rawId = params?.id;
   const contentId = useMemo(() => {
@@ -141,6 +153,18 @@ export default function ContentDetailPage() {
     functionName: "maxVersionsPerContent",
   });
 
+  const { data: editLockVotesData } = useReadContract({
+    address: CONTRACTS.KnowledgeContent as `0x${string}`,
+    abi: ABIS.KnowledgeContent,
+    functionName: "editLockVotes",
+  });
+
+  const { data: allowDeleteAfterVoteData } = useReadContract({
+    address: CONTRACTS.KnowledgeContent as `0x${string}`,
+    abi: ABIS.KnowledgeContent,
+    functionName: "allowDeleteAfterVote",
+  });
+
   const { data: updateFeeData } = useReadContract({
     address: CONTRACTS.KnowledgeContent as `0x${string}`,
     abi: ABIS.KnowledgeContent,
@@ -153,6 +177,10 @@ export default function ContentDetailPage() {
     typeof rewardAccrualCountData === "bigint" ? rewardAccrualCountData : 0n;
   const maxVersionsPerContent =
     typeof maxVersionsPerContentData === "bigint" ? maxVersionsPerContentData : undefined;
+  const editLockVotes =
+    typeof editLockVotesData === "bigint" ? editLockVotesData : undefined;
+  const allowDeleteAfterVote =
+    typeof allowDeleteAfterVoteData === "boolean" ? allowDeleteAfterVoteData : undefined;
   const updateFee = typeof updateFeeData === "bigint" ? updateFeeData : undefined;
 
   /*
@@ -206,6 +234,45 @@ export default function ContentDetailPage() {
     [contentId, publicClient, versionCount]
   );
 
+  /**
+   * 拉取当前内容对应的链下文件生命周期状态。
+   * @returns 完整摘要；若尚未建立记录则返回 null。
+   */
+  const loadContentLifecycleSummary = useCallback(async () => {
+    if (!contentId) {
+      setContentLifecycleSummary(null);
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/ipfs/content-lifecycle?contentId=${contentId.toString()}`,
+        {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+        }
+      );
+
+      const result = (await response.json()) as {
+        summary?: ContentStorageLifecycleSummary | null;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to load content lifecycle summary");
+      }
+
+      setContentLifecycleSummary(result.summary ?? null);
+      return result.summary ?? null;
+    } catch (error) {
+      reportContentDetailError("Failed to load content lifecycle summary", error, {
+        contentId: contentId.toString(),
+      });
+      return null;
+    }
+  }, [contentId]);
+
   /*
    * 详情刷新同时依赖内容主体和版本数量两个来源，因此这里先并行刷新链上读值，
    * 再把最新的版本数量传给版本加载逻辑，避免使用旧的 versionCount。
@@ -215,7 +282,8 @@ export default function ContentDetailPage() {
     await loadVersions(
       typeof versionResult.data === "bigint" ? versionResult.data : undefined
     );
-  }, [loadVersions, refetchContent, refetchVersionCount]);
+    await loadContentLifecycleSummary();
+  }, [loadContentLifecycleSummary, loadVersions, refetchContent, refetchVersionCount]);
 
   const currentContentId = content?.id;
   const currentContentTitle = content?.title;
@@ -234,6 +302,7 @@ export default function ContentDetailPage() {
     setEditDescription(currentContentDescription);
     setEditCid(currentContentCid);
     setVersionFile(null);
+    setUploadedVersionUploadId(null);
     setUploadedVersionUrl("");
   }, [
     currentContentCid,
@@ -247,6 +316,10 @@ export default function ContentDetailPage() {
   useEffect(() => {
     void loadVersions();
   }, [loadVersions]);
+
+  useEffect(() => {
+    void loadContentLifecycleSummary();
+  }, [loadContentLifecycleSummary]);
 
   /**
    * 复制指定字段到剪贴板。
@@ -265,6 +338,123 @@ export default function ContentDetailPage() {
           label,
         });
         toast.error(`复制${label}失败`);
+      }
+    },
+    [contentId]
+  );
+
+  function handleVersionFileChange(selectedFile: File) {
+    const uploadValidation = validateUploadFile(selectedFile);
+
+    if (!uploadValidation.ok) {
+      toast.error(uploadValidation.error);
+      return;
+    }
+
+    setVersionFile(selectedFile);
+  }
+
+  /**
+   * 在链上更新成功后，把本次版本文件上传记录绑定到具体内容版本。
+   * @param uploadId 上传记录 ID。
+   * @param txHash 更新交易哈希。
+   * @returns 服务端确认后返回，否则抛错。
+   */
+  const markVersionUploadRegistered = useCallback(
+    async (uploadId: number, txHash: `0x${string}`) => {
+      const response = await fetch("/api/ipfs/register-complete", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          uploadId,
+          txHash,
+          kind: "update",
+        }),
+      });
+
+      const result = (await response.json()) as {
+        ok?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || "Failed to bind uploaded version to content");
+      }
+    },
+    []
+  );
+
+  /**
+   * 在版本更新最终失败后，回滚刚上传但未登记的新版本文件。
+   * @param uploadId 上传记录 ID。
+   * @param reason 清理原因。
+   * @returns 请求完成后结束；失败时仅提示，不阻断页面。
+   */
+  const cleanupFailedVersionUpload = useCallback(
+    async (uploadId: number, reason: string) => {
+      try {
+        const response = await fetch("/api/ipfs/cleanup-orphan", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            uploadId,
+            reason,
+          }),
+        });
+
+        const result = (await response.json()) as {
+          ok?: boolean;
+          error?: string;
+        };
+
+        if (!response.ok || result.ok === false) {
+          throw new Error(result.error || "Failed to clean uploaded version asset");
+        }
+      } catch (error) {
+        reportContentDetailError("Failed to clean orphan version upload", error, {
+          uploadId,
+          reason,
+        });
+        toast.error("新版本文件回收失败，请稍后通过系统清理任务处理。");
+      }
+    },
+    []
+  );
+
+  /**
+   * 同步链上删除/恢复结果到链下文件生命周期表。
+   * @param action 当前内容生命周期动作。
+   * @param txHash 对应的成功交易哈希。
+   * @returns 成功时结束；失败时抛错，由调用方决定是否仅提示。
+   */
+  const syncContentLifecycleAction = useCallback(
+    async (action: "delete" | "restore", txHash: `0x${string}`) => {
+      const response = await fetch("/api/ipfs/content-lifecycle", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          contentId: Number(contentId),
+          txHash,
+          action,
+        }),
+      });
+
+      const result = (await response.json()) as {
+        ok?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || "Failed to sync content storage lifecycle");
       }
     },
     [contentId]
@@ -306,15 +496,25 @@ export default function ContentDetailPage() {
   const previewUrl = getIpfsFileUrl(contentRecord.ipfsHash);
   const isAuthor =
     !!address && contentRecord.author.toLowerCase() === address.toLowerCase();
+  const contentFilesFullyPurged = contentLifecycleSummary?.fullyPurged ?? false;
+  const isEditLocked =
+    editLockVotes !== undefined &&
+    editLockVotes > 0n &&
+    contentRecord.voteCount >= editLockVotes;
   const hasReachedMaxVersions =
     maxVersionsPerContent !== undefined && versionCount >= maxVersionsPerContent;
-  const canEditContent = isAuthor && !contentRecord.deleted && !hasReachedMaxVersions;
-  const canDeleteContent = isAuthor && !contentRecord.deleted;
-  const canRestoreContent = isAuthor && contentRecord.deleted;
+  const canEditContent =
+    isAuthor && !contentRecord.deleted && !hasReachedMaxVersions && !isEditLocked;
+  const deleteBlockedByVotes =
+    allowDeleteAfterVote === false && contentRecord.voteCount > 0n;
+  const canDeleteContent = isAuthor && !contentRecord.deleted && !deleteBlockedByVotes;
+  const canRestoreContent = isAuthor && contentRecord.deleted && !contentFilesFullyPurged;
   const newVersionBlockedReason = !isAuthor
     ? "只有内容作者可以创建新版本。"
     : contentRecord.deleted
       ? "内容已软删除，恢复后才能继续创建新版本。"
+      : isEditLocked
+        ? `当前内容票数已达到编辑锁定阈值（${contentRecord.voteCount.toString()} / ${editLockVotes?.toString() ?? "0"}），不能再创建新版本。`
       : hasReachedMaxVersions
         ? `已达到当前内容的最大版本数上限（${maxVersionsPerContent?.toString() ?? versionCount.toString()}）。`
         : null;
@@ -325,91 +525,6 @@ export default function ContentDetailPage() {
     versionCount,
     maxVersionsPerContent,
   });
-
-  function handleVersionFileChange(selectedFile: File) {
-    const uploadValidation = validateUploadFile(selectedFile);
-
-    if (!uploadValidation.ok) {
-      toast.error(uploadValidation.error);
-      return;
-    }
-
-    setVersionFile(selectedFile);
-  }
-
-  async function handleUploadVersionFile() {
-    if (!content) {
-      toast.error(CONTENT_DETAIL_COPY.unavailable);
-      return;
-    }
-
-    if (newVersionBlockedReason) {
-      toast.error(newVersionBlockedReason);
-      return;
-    }
-
-    if (!versionFile) {
-      toast.error(CONTENT_DETAIL_COPY.uploadVersionFileRequired);
-      return;
-    }
-
-    const uploadValidation = validateUploadFile(versionFile);
-    if (!uploadValidation.ok) {
-      toast.error(uploadValidation.error);
-      return;
-    }
-
-    const isAuthorized = await ensureUploadAuth();
-
-    if (!isAuthorized) {
-      return;
-    }
-
-    setUploadingVersionFile(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", versionFile);
-
-      const data = await txToast(
-        (async () => {
-          const response = await fetch("/api/ipfs/upload", {
-            method: "POST",
-            body: formData,
-            credentials: "same-origin",
-          });
-
-          const result = (await response.json()) as {
-            cid?: string;
-            url?: string;
-            error?: string;
-          };
-
-          if (!response.ok || !result.cid || !result.url) {
-            throw new Error(result.error || CONTENT_DETAIL_COPY.uploadVersionFailed);
-          }
-
-          return {
-            cid: result.cid,
-            url: result.url,
-          };
-        })(),
-        CONTENT_DETAIL_COPY.uploadVersionLoadingToast,
-        CONTENT_DETAIL_COPY.uploadVersionSuccess,
-        CONTENT_DETAIL_COPY.uploadVersionFailed
-      );
-
-      setEditCid(data.cid);
-      setUploadedVersionUrl(data.url);
-    } catch (error) {
-      reportContentDetailError("Failed to upload replacement content file", error, {
-        contentId: content.id.toString(),
-        fileName: versionFile.name,
-      });
-    } finally {
-      setUploadingVersionFile(false);
-    }
-  }
 
   async function handleVote() {
     if (!address) {
@@ -482,7 +597,9 @@ export default function ContentDetailPage() {
       return;
     }
 
-    if (!editCid.trim()) {
+    const hasVersionFile = !!versionFile;
+
+    if (!hasVersionFile && !editCid.trim()) {
       toast.error(CONTENT_DETAIL_COPY.updateCidRequired);
       return;
     }
@@ -493,8 +610,88 @@ export default function ContentDetailPage() {
     }
 
     setSavingEdit(true);
+    let versionRegistered = false;
+    let uploadedAsset:
+      | {
+          uploadId: number;
+          cid: string;
+          url: string;
+        }
+      | null = null;
 
     try {
+      let targetCid = editCid.trim();
+
+      if (hasVersionFile) {
+        const uploadValidation = validateUploadFile(versionFile);
+
+        if (!uploadValidation.ok) {
+          toast.error(uploadValidation.error);
+          return;
+        }
+
+        const isAuthorized = await ensureUploadAuth();
+
+        if (!isAuthorized) {
+          return;
+        }
+
+        setUploadingVersionFile(true);
+
+        try {
+          const formData = new FormData();
+          formData.append("file", versionFile);
+
+          uploadedAsset = await txToast(
+            (async () => {
+              const response = await fetch("/api/ipfs/upload", {
+                method: "POST",
+                body: formData,
+                credentials: "same-origin",
+              });
+
+              const result = (await response.json()) as {
+                uploadId?: number;
+                cid?: string;
+                url?: string;
+                error?: string;
+              };
+
+              if (
+                !response.ok ||
+                typeof result.uploadId !== "number" ||
+                !result.cid ||
+                !result.url
+              ) {
+                throw new Error(result.error || CONTENT_DETAIL_COPY.uploadVersionFailed);
+              }
+
+              return {
+                uploadId: result.uploadId,
+                cid: result.cid,
+                url: result.url,
+              };
+            })(),
+            CONTENT_DETAIL_COPY.uploadVersionLoadingToast,
+            CONTENT_DETAIL_COPY.uploadVersionSuccess,
+            CONTENT_DETAIL_COPY.uploadVersionFailed
+          );
+        } catch (error) {
+          reportContentDetailError("Failed to upload replacement content file", error, {
+            contentId: contentRecord.id.toString(),
+            fileName: versionFile.name,
+          });
+          return;
+        } finally {
+          setUploadingVersionFile(false);
+        }
+
+        targetCid = uploadedAsset.cid;
+        setUploadedVersionUploadId(uploadedAsset.uploadId);
+        setUploadedVersionUrl(uploadedAsset.url);
+        setEditCid(uploadedAsset.cid);
+      }
+
       const hash = await writeTxToast({
         publicClient,
         writeContractAsync,
@@ -504,7 +701,7 @@ export default function ContentDetailPage() {
           functionName: "updateContent",
           args: [
             contentRecord.id,
-            editCid.trim(),
+            targetCid,
             editTitle.trim(),
             editDescription.trim(),
           ],
@@ -516,12 +713,51 @@ export default function ContentDetailPage() {
         fail: CONTENT_DETAIL_COPY.updateFail,
       });
 
-      if (!hash) return;
+      if (!hash) {
+        if (uploadedAsset) {
+          await cleanupFailedVersionUpload(
+            uploadedAsset.uploadId,
+            "content_update_submission_failed"
+          );
+        }
+        return;
+      }
+
+      if (publicClient) {
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+        if (receipt.status !== "success") {
+          throw new Error("updateContent transaction reverted");
+        }
+      }
+      versionRegistered = true;
+
+      if (uploadedAsset) {
+        try {
+          await markVersionUploadRegistered(uploadedAsset.uploadId, hash);
+        } catch (error) {
+          reportContentDetailError("Failed to bind uploaded version after update", error, {
+            contentId: contentRecord.id.toString(),
+            uploadId: uploadedAsset.uploadId,
+            txHash: hash,
+          });
+          toast.warning("新版本链上已生效，但上传记录绑定失败，请稍后检查系统清理状态。");
+        }
+      }
 
       await refreshAfterTx(hash, refreshDetail, ["content", "dashboard"]);
       setVersionFile(null);
+      setUploadedVersionUploadId(null);
       setUploadedVersionUrl("");
+    } catch (error) {
+      if (!versionRegistered && uploadedAsset) {
+        await cleanupFailedVersionUpload(
+          uploadedAsset.uploadId,
+          "content_update_confirmation_failed"
+        );
+      }
     } finally {
+      setUploadingVersionFile(false);
       setSavingEdit(false);
     }
   }
@@ -557,6 +793,16 @@ export default function ContentDetailPage() {
 
       if (!hash) return;
       await refreshAfterTx(hash, refreshDetail, ["content", "dashboard"]);
+      try {
+        await syncContentLifecycleAction("delete", hash);
+        await loadContentLifecycleSummary();
+      } catch (error) {
+        reportContentDetailError("Failed to sync content soft delete lifecycle", error, {
+          contentId: contentRecord.id.toString(),
+          txHash: hash,
+        });
+        toast.warning("链上已删除成功，但延迟清理计划写入失败，请稍后重试或手动触发系统清理。");
+      }
     } finally {
       setDeleting(false);
     }
@@ -593,6 +839,16 @@ export default function ContentDetailPage() {
 
       if (!hash) return;
       await refreshAfterTx(hash, refreshDetail, ["content", "dashboard"]);
+      try {
+        await syncContentLifecycleAction("restore", hash);
+        await loadContentLifecycleSummary();
+      } catch (error) {
+        reportContentDetailError("Failed to cancel scheduled content cleanup", error, {
+          contentId: contentRecord.id.toString(),
+          txHash: hash,
+        });
+        toast.warning("链上已恢复成功，但链下清理计划取消失败，请稍后检查系统状态。");
+      }
     } finally {
       setRestoring(false);
     }
@@ -628,6 +884,24 @@ export default function ContentDetailPage() {
       />
 
       <ContentStatusSummaryGrid items={contentStatusSummary} />
+
+      {contentRecord.deleted && contentLifecycleSummary?.hasPendingPurge ? (
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+          当前内容已进入延迟清理阶段，计划清理时间：
+          {contentLifecycleSummary.scheduledAt
+            ? ` ${new Date(contentLifecycleSummary.scheduledAt).toLocaleString("zh-CN", {
+                hour12: false,
+              })}`
+            : " 待系统任务执行"}
+          。在此之前恢复内容，可取消整条记录下所有版本文件的清理计划。
+        </div>
+      ) : null}
+
+      {contentRecord.deleted && contentFilesFullyPurged ? (
+        <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm leading-6 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200">
+          当前内容对应的版本文件已经完成物理清理，链上记录仍保留用于历史追踪，但文件本体已不可恢复，因此不再允许执行恢复操作。
+        </div>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
@@ -686,6 +960,7 @@ export default function ContentDetailPage() {
           />
 
           <ContentEditSection
+            deleted={contentRecord.deleted}
             editTitle={editTitle}
             editDescription={editDescription}
             editCid={editCid}
@@ -708,7 +983,6 @@ export default function ContentDetailPage() {
             onEditDescriptionChange={setEditDescription}
             onEditCidChange={setEditCid}
             onVersionFileChange={handleVersionFileChange}
-            onUploadVersionFile={handleUploadVersionFile}
             onUpdateContent={handleUpdateContent}
             onDeleteContent={handleDeleteContent}
             onRestoreContent={handleRestoreContent}

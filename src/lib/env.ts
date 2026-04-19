@@ -100,6 +100,7 @@ const serverEnvSchema = publicEnvSchema
     UPLOAD_MAX_FILE_SIZE_BYTES: positiveIntWithDefault(512 * 1024 * 1024),
     UPLOAD_ORPHAN_TTL_SECONDS: positiveIntWithDefault(24 * 60 * 60),
     UPLOAD_CLEANUP_BATCH_SIZE: positiveIntWithDefault(50),
+    CONTENT_SOFT_DELETE_RETENTION_SECONDS: positiveIntWithDefault(7 * 24 * 60 * 60),
     DATABASE_URL: optionalUrl,
     REDIS_URL: optionalUrl,
     BESU_ADMIN_RPC_URL: optionalUrl,
@@ -293,6 +294,8 @@ function getServerEnvSource() {
     UPLOAD_MAX_FILE_SIZE_BYTES: process.env.UPLOAD_MAX_FILE_SIZE_BYTES,
     UPLOAD_ORPHAN_TTL_SECONDS: process.env.UPLOAD_ORPHAN_TTL_SECONDS,
     UPLOAD_CLEANUP_BATCH_SIZE: process.env.UPLOAD_CLEANUP_BATCH_SIZE,
+    CONTENT_SOFT_DELETE_RETENTION_SECONDS:
+      process.env.CONTENT_SOFT_DELETE_RETENTION_SECONDS,
     DATABASE_URL: process.env.DATABASE_URL,
     REDIS_URL: process.env.REDIS_URL,
     BESU_ADMIN_RPC_URL: process.env.BESU_ADMIN_RPC_URL,

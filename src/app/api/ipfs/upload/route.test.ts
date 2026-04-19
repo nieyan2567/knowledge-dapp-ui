@@ -55,6 +55,7 @@ describe("POST /api/ipfs/upload", () => {
       UPLOAD_MAX_FILE_SIZE_BYTES: 1024,
       UPLOAD_ORPHAN_TTL_SECONDS: 86400,
       UPLOAD_CLEANUP_BATCH_SIZE: 50,
+      CONTENT_SOFT_DELETE_RETENTION_SECONDS: 604800,
       REDIS_URL: undefined,
       DATABASE_URL: undefined,
       BESU_ADMIN_RPC_URL: undefined,

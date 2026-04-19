@@ -3,7 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * 模块说明：系统级 IPFS 清理接口，供受信任运维方批量回收已过期且未登记的孤儿文件。
  */
-import { cleanupExpiredIpfsUploadRecords } from "@/lib/ipfs-upload-lifecycle";
+import {
+  cleanupDueSoftDeletedContents,
+  cleanupExpiredIpfsUploadRecords,
+} from "@/lib/ipfs-upload-lifecycle";
 import { captureServerException } from "@/lib/observability/server";
 import {
   getSystemApiToken,
@@ -37,14 +40,22 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const report = await cleanupExpiredIpfsUploadRecords(
+    const orphanReport = await cleanupExpiredIpfsUploadRecords(
+      getServerEnv().UPLOAD_CLEANUP_BATCH_SIZE
+    );
+    const softDeletedContentReport = await cleanupDueSoftDeletedContents(
       getServerEnv().UPLOAD_CLEANUP_BATCH_SIZE
     );
 
     return NextResponse.json(
       {
-        ok: report.failedCount === 0,
-        report,
+        ok:
+          orphanReport.failedCount === 0 &&
+          softDeletedContentReport.failedCount === 0,
+        report: {
+          orphanUploads: orphanReport,
+          softDeletedContents: softDeletedContentReport,
+        },
       },
       {
         headers: {

@@ -306,7 +306,11 @@ export default function ContentPage() {
    * @param txHash 对应的链上交易哈希。
    */
   const markUploadRegistered = useCallback(
-    async (uploadId: number, txHash: `0x${string}`) => {
+    async (
+      uploadId: number,
+      txHash: `0x${string}`,
+      kind: "register" | "update"
+    ) => {
       const response = await fetch("/api/ipfs/register-complete", {
         method: "POST",
         headers: {
@@ -316,6 +320,7 @@ export default function ContentPage() {
         body: JSON.stringify({
           uploadId,
           txHash,
+          kind,
         }),
       });
 
@@ -462,7 +467,7 @@ export default function ContentPage() {
       chainRegistered = true;
 
       try {
-        await markUploadRegistered(uploadedAsset.uploadId, hash);
+        await markUploadRegistered(uploadedAsset.uploadId, hash, "register");
       } catch (error) {
         reportContentPageError("Failed to mark upload as registered", error, {
           uploadId: uploadedAsset.uploadId,

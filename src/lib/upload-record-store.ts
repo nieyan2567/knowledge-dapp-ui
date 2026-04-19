@@ -1,27 +1,18 @@
 /**
  * @file IPFS 上传记录存储模块。
- * @description 负责记录已上传但尚未上链登记的文件元数据，并在登记或清理后更新状态。
+ * @description 负责记录上传文件、绑定链上内容版本、维护软删除宽限期，以及在清理后更新状态。
  */
 import "server-only";
 
 import { getServerEnv } from "@/lib/env";
 import { queryPostgres } from "@/server/db/postgres";
 
-/**
- * @notice IPFS 上传记录状态。
- * @dev `uploaded` 表示已上传待登记，`registered` 表示已绑定链上内容，
- * `cleaned` 表示已从本地 IPFS 回收，`cleanup_failed` 表示最近一次清理失败。
- */
 export type IpfsUploadRecordStatus =
   | "uploaded"
   | "registered"
   | "cleaned"
   | "cleanup_failed";
 
-/**
- * @notice IPFS 上传记录结构。
- * @dev 该结构既用于 PostgreSQL 查询结果，也用于无数据库时的内存回退存储。
- */
 export type IpfsUploadRecord = {
   id: number;
   address: string;
@@ -37,12 +28,13 @@ export type IpfsUploadRecord = {
   cleanedAt: Date | null;
   registerTxHash: string | null;
   cleanupReason: string | null;
+  contentId: bigint | null;
+  versionNumber: bigint | null;
+  softDeletedAt: Date | null;
+  deletionScheduledAt: Date | null;
+  purgedAt: Date | null;
 };
 
-/**
- * @notice 创建上传记录时需要的输入参数。
- * @dev 由上传接口在 Kubo 返回 CID 后立即写入，用于后续登记回写与孤儿清理。
- */
 export type CreateIpfsUploadRecordInput = {
   address: string;
   sessionId: string;
@@ -51,6 +43,12 @@ export type CreateIpfsUploadRecordInput = {
   fileName: string;
   fileSize: number;
   expiresAt: Date;
+};
+
+type MarkRegisteredInput = {
+  txHash?: string | null;
+  contentId?: bigint | null;
+  versionNumber?: bigint | null;
 };
 
 type IpfsUploadRecordRow = {
@@ -68,6 +66,11 @@ type IpfsUploadRecordRow = {
   cleaned_at: Date | string | null;
   register_tx_hash: string | null;
   cleanup_reason: string | null;
+  content_id: string | number | null;
+  version_number: string | number | null;
+  soft_deleted_at: Date | string | null;
+  deletion_scheduled_at: Date | string | null;
+  purged_at: Date | string | null;
 };
 
 declare global {
@@ -109,6 +112,18 @@ function normalizeDate(value: Date | string | null) {
   return value instanceof Date ? value : new Date(value);
 }
 
+function normalizeBigInt(value: string | number | null) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "number") {
+    return BigInt(value);
+  }
+
+  return BigInt(value);
+}
+
 function normalizeRecord(row: IpfsUploadRecordRow): IpfsUploadRecord {
   return {
     id: Number(row.id),
@@ -125,17 +140,64 @@ function normalizeRecord(row: IpfsUploadRecordRow): IpfsUploadRecord {
     cleanedAt: normalizeDate(row.cleaned_at),
     registerTxHash: row.register_tx_hash,
     cleanupReason: row.cleanup_reason,
+    contentId: normalizeBigInt(row.content_id),
+    versionNumber: normalizeBigInt(row.version_number),
+    softDeletedAt: normalizeDate(row.soft_deleted_at),
+    deletionScheduledAt: normalizeDate(row.deletion_scheduled_at),
+    purgedAt: normalizeDate(row.purged_at),
   };
 }
 
-/**
- * @notice 创建一条新的 IPFS 上传记录。
- * @param input 上传成功后需要落库的记录字段。
- * @returns 新创建的上传记录。
- */
-export async function createIpfsUploadRecord(
-  input: CreateIpfsUploadRecordInput
-) {
+function cloneRecord(record: IpfsUploadRecord): IpfsUploadRecord {
+  return {
+    ...record,
+    uploadedAt: new Date(record.uploadedAt),
+    expiresAt: new Date(record.expiresAt),
+    registeredAt: record.registeredAt ? new Date(record.registeredAt) : null,
+    cleanedAt: record.cleanedAt ? new Date(record.cleanedAt) : null,
+    softDeletedAt: record.softDeletedAt ? new Date(record.softDeletedAt) : null,
+    deletionScheduledAt: record.deletionScheduledAt
+      ? new Date(record.deletionScheduledAt)
+      : null,
+    purgedAt: record.purgedAt ? new Date(record.purgedAt) : null,
+  };
+}
+
+async function queryRecordById(id: number) {
+  const result = await queryPostgres<IpfsUploadRecordRow>(
+    `
+      select
+        id,
+        address,
+        session_id,
+        session_version,
+        cid,
+        file_name,
+        file_size,
+        status,
+        uploaded_at,
+        expires_at,
+        registered_at,
+        cleaned_at,
+        register_tx_hash,
+        cleanup_reason,
+        content_id,
+        version_number,
+        soft_deleted_at,
+        deletion_scheduled_at,
+        purged_at
+      from ipfs_upload_records
+      where id = $1
+      limit 1
+    `,
+    [id]
+  );
+
+  const row = result.rows[0];
+  return row ? normalizeRecord(row) : null;
+}
+
+export async function createIpfsUploadRecord(input: CreateIpfsUploadRecordInput) {
   if (!hasPostgresUploadStore()) {
     const id = nextFallbackId();
     const record: IpfsUploadRecord = {
@@ -153,9 +215,14 @@ export async function createIpfsUploadRecord(
       cleanedAt: null,
       registerTxHash: null,
       cleanupReason: null,
+      contentId: null,
+      versionNumber: null,
+      softDeletedAt: null,
+      deletionScheduledAt: null,
+      purgedAt: null,
     };
     getFallbackStore().set(id, record);
-    return record;
+    return cloneRecord(record);
   }
 
   const result = await queryPostgres<IpfsUploadRecordRow>(
@@ -185,7 +252,12 @@ export async function createIpfsUploadRecord(
         registered_at,
         cleaned_at,
         register_tx_hash,
-        cleanup_reason
+        cleanup_reason,
+        content_id,
+        version_number,
+        soft_deleted_at,
+        deletion_scheduled_at,
+        purged_at
     `,
     [
       input.address,
@@ -201,51 +273,19 @@ export async function createIpfsUploadRecord(
   return normalizeRecord(result.rows[0] as IpfsUploadRecordRow);
 }
 
-/**
- * @notice 根据记录 ID 读取上传记录。
- * @param id 上传记录主键。
- * @returns 对应记录；若不存在则返回 `null`。
- */
 export async function getIpfsUploadRecordById(id: number) {
   if (!hasPostgresUploadStore()) {
-    return getFallbackStore().get(id) ?? null;
+    const record = getFallbackStore().get(id);
+    return record ? cloneRecord(record) : null;
   }
 
-  const result = await queryPostgres<IpfsUploadRecordRow>(
-    `
-      select
-        id,
-        address,
-        session_id,
-        session_version,
-        cid,
-        file_name,
-        file_size,
-        status,
-        uploaded_at,
-        expires_at,
-        registered_at,
-        cleaned_at,
-        register_tx_hash,
-        cleanup_reason
-      from ipfs_upload_records
-      where id = $1
-      limit 1
-    `,
-    [id]
-  );
-
-  const row = result.rows[0];
-  return row ? normalizeRecord(row) : null;
+  return queryRecordById(id);
 }
 
-/**
- * @notice 把上传记录标记为已完成链上登记。
- * @param id 上传记录主键。
- * @param txHash 对应的链上交易哈希。
- * @returns 更新后的上传记录；若不存在则返回 `null`。
- */
-export async function markIpfsUploadRegistered(id: number, txHash?: string | null) {
+export async function markIpfsUploadRegistered(
+  id: number,
+  input: MarkRegisteredInput = {}
+) {
   if (!hasPostgresUploadStore()) {
     const record = getFallbackStore().get(id);
     if (!record) {
@@ -256,51 +296,42 @@ export async function markIpfsUploadRegistered(id: number, txHash?: string | nul
       ...record,
       status: "registered",
       registeredAt: record.registeredAt ?? new Date(),
-      registerTxHash: txHash ?? record.registerTxHash,
+      registerTxHash: input.txHash ?? record.registerTxHash,
       cleanupReason: null,
+      contentId: input.contentId ?? record.contentId,
+      versionNumber: input.versionNumber ?? record.versionNumber,
+      softDeletedAt: null,
+      deletionScheduledAt: null,
     };
     getFallbackStore().set(id, updated);
-    return updated;
+    return cloneRecord(updated);
   }
 
-  const result = await queryPostgres<IpfsUploadRecordRow>(
+  await queryPostgres(
     `
       update ipfs_upload_records
       set
         status = 'registered',
         registered_at = coalesce(registered_at, now()),
         register_tx_hash = coalesce($2, register_tx_hash),
-        cleanup_reason = null
+        cleanup_reason = null,
+        content_id = coalesce($3, content_id),
+        version_number = coalesce($4, version_number),
+        soft_deleted_at = null,
+        deletion_scheduled_at = null
       where id = $1
-      returning
-        id,
-        address,
-        session_id,
-        session_version,
-        cid,
-        file_name,
-        file_size,
-        status,
-        uploaded_at,
-        expires_at,
-        registered_at,
-        cleaned_at,
-        register_tx_hash,
-        cleanup_reason
     `,
-    [id, txHash ?? null]
+    [
+      id,
+      input.txHash ?? null,
+      input.contentId?.toString() ?? null,
+      input.versionNumber?.toString() ?? null,
+    ]
   );
 
-  const row = result.rows[0];
-  return row ? normalizeRecord(row) : null;
+  return queryRecordById(id);
 }
 
-/**
- * @notice 把上传记录标记为已回收。
- * @param id 上传记录主键。
- * @param reason 本次清理原因说明。
- * @returns 更新后的记录；若不存在则返回 `null`。
- */
 export async function markIpfsUploadCleaned(id: number, reason: string) {
   if (!hasPostgresUploadStore()) {
     const record = getFallbackStore().get(id);
@@ -313,48 +344,28 @@ export async function markIpfsUploadCleaned(id: number, reason: string) {
       status: "cleaned",
       cleanedAt: new Date(),
       cleanupReason: reason,
+      purgedAt: new Date(),
     };
     getFallbackStore().set(id, updated);
-    return updated;
+    return cloneRecord(updated);
   }
 
-  const result = await queryPostgres<IpfsUploadRecordRow>(
+  await queryPostgres(
     `
       update ipfs_upload_records
       set
         status = 'cleaned',
         cleaned_at = now(),
-        cleanup_reason = $2
+        cleanup_reason = $2,
+        purged_at = now()
       where id = $1
-      returning
-        id,
-        address,
-        session_id,
-        session_version,
-        cid,
-        file_name,
-        file_size,
-        status,
-        uploaded_at,
-        expires_at,
-        registered_at,
-        cleaned_at,
-        register_tx_hash,
-        cleanup_reason
     `,
     [id, reason]
   );
 
-  const row = result.rows[0];
-  return row ? normalizeRecord(row) : null;
+  return queryRecordById(id);
 }
 
-/**
- * @notice 记录一次孤儿文件清理失败。
- * @param id 上传记录主键。
- * @param reason 失败原因或上下文描述。
- * @returns 更新后的记录；若不存在则返回 `null`。
- */
 export async function markIpfsUploadCleanupFailed(id: number, reason: string) {
   if (!hasPostgresUploadStore()) {
     const record = getFallbackStore().get(id);
@@ -368,55 +379,36 @@ export async function markIpfsUploadCleanupFailed(id: number, reason: string) {
       cleanupReason: reason,
     };
     getFallbackStore().set(id, updated);
-    return updated;
+    return cloneRecord(updated);
   }
 
-  const result = await queryPostgres<IpfsUploadRecordRow>(
+  await queryPostgres(
     `
       update ipfs_upload_records
       set
         status = 'cleanup_failed',
         cleanup_reason = $2
       where id = $1
-      returning
-        id,
-        address,
-        session_id,
-        session_version,
-        cid,
-        file_name,
-        file_size,
-        status,
-        uploaded_at,
-        expires_at,
-        registered_at,
-        cleaned_at,
-        register_tx_hash,
-        cleanup_reason
     `,
     [id, reason]
   );
 
-  const row = result.rows[0];
-  return row ? normalizeRecord(row) : null;
+  return queryRecordById(id);
 }
 
-/**
- * @notice 查询已经过期且仍需处理的上传记录。
- * @param limit 本次最多返回多少条记录。
- * @returns 已经过期、尚未登记成功的上传记录列表。
- */
 export async function listExpiredIpfsUploadRecords(limit: number) {
   if (!hasPostgresUploadStore()) {
     const now = Date.now();
     return Array.from(getFallbackStore().values())
       .filter(
         (record) =>
+          record.contentId === null &&
           (record.status === "uploaded" || record.status === "cleanup_failed") &&
           record.expiresAt.getTime() <= now
       )
       .sort((left, right) => left.expiresAt.getTime() - right.expiresAt.getTime())
-      .slice(0, limit);
+      .slice(0, limit)
+      .map(cloneRecord);
   }
 
   const result = await queryPostgres<IpfsUploadRecordRow>(
@@ -435,10 +427,16 @@ export async function listExpiredIpfsUploadRecords(limit: number) {
         registered_at,
         cleaned_at,
         register_tx_hash,
-        cleanup_reason
+        cleanup_reason,
+        content_id,
+        version_number,
+        soft_deleted_at,
+        deletion_scheduled_at,
+        purged_at
       from ipfs_upload_records
       where
-        status in ('uploaded', 'cleanup_failed')
+        content_id is null
+        and status in ('uploaded', 'cleanup_failed')
         and expires_at <= now()
       order by expires_at asc, id asc
       limit $1
@@ -447,4 +445,169 @@ export async function listExpiredIpfsUploadRecords(limit: number) {
   );
 
   return result.rows.map(normalizeRecord);
+}
+
+export async function scheduleSoftDeleteForContent(
+  contentId: bigint,
+  scheduledAt: Date,
+  deletedAt = new Date()
+) {
+  if (!hasPostgresUploadStore()) {
+    const store = getFallbackStore();
+    for (const [id, record] of store.entries()) {
+      if (record.contentId === contentId && record.purgedAt === null) {
+        store.set(id, {
+          ...record,
+          softDeletedAt: deletedAt,
+          deletionScheduledAt: scheduledAt,
+        });
+      }
+    }
+
+    return;
+  }
+
+  await queryPostgres(
+    `
+      update ipfs_upload_records
+      set
+        soft_deleted_at = $2,
+        deletion_scheduled_at = $3
+      where
+        content_id = $1
+        and purged_at is null
+    `,
+    [contentId.toString(), deletedAt.toISOString(), scheduledAt.toISOString()]
+  );
+}
+
+export async function cancelSoftDeleteForContent(contentId: bigint) {
+  if (!hasPostgresUploadStore()) {
+    const store = getFallbackStore();
+    for (const [id, record] of store.entries()) {
+      if (record.contentId === contentId && record.purgedAt === null) {
+        store.set(id, {
+          ...record,
+          softDeletedAt: null,
+          deletionScheduledAt: null,
+        });
+      }
+    }
+
+    return;
+  }
+
+  await queryPostgres(
+    `
+      update ipfs_upload_records
+      set
+        soft_deleted_at = null,
+        deletion_scheduled_at = null
+      where
+        content_id = $1
+        and purged_at is null
+    `,
+    [contentId.toString()]
+  );
+}
+
+export async function listDueSoftDeletedContentIds(limit: number) {
+  if (!hasPostgresUploadStore()) {
+    const now = Date.now();
+    const ids = new Set<string>();
+
+    for (const record of getFallbackStore().values()) {
+      if (
+        record.contentId !== null &&
+        record.deletionScheduledAt &&
+        record.deletionScheduledAt.getTime() <= now &&
+        record.purgedAt === null
+      ) {
+        ids.add(record.contentId.toString());
+      }
+    }
+
+    return Array.from(ids)
+      .slice(0, limit)
+      .map((value) => BigInt(value));
+  }
+
+  const result = await queryPostgres<{ content_id: string }>(
+    `
+      select distinct content_id
+      from ipfs_upload_records
+      where
+        content_id is not null
+        and deletion_scheduled_at is not null
+        and deletion_scheduled_at <= now()
+        and purged_at is null
+      order by content_id asc
+      limit $1
+    `,
+    [limit]
+  );
+
+  return result.rows.map((row) => BigInt(row.content_id));
+}
+
+export async function listIpfsUploadRecordsByContentId(contentId: bigint) {
+  if (!hasPostgresUploadStore()) {
+    return Array.from(getFallbackStore().values())
+      .filter((record) => record.contentId === contentId)
+      .sort((left, right) => Number((left.versionNumber ?? 0n) - (right.versionNumber ?? 0n)))
+      .map(cloneRecord);
+  }
+
+  const result = await queryPostgres<IpfsUploadRecordRow>(
+    `
+      select
+        id,
+        address,
+        session_id,
+        session_version,
+        cid,
+        file_name,
+        file_size,
+        status,
+        uploaded_at,
+        expires_at,
+        registered_at,
+        cleaned_at,
+        register_tx_hash,
+        cleanup_reason,
+        content_id,
+        version_number,
+        soft_deleted_at,
+        deletion_scheduled_at,
+        purged_at
+      from ipfs_upload_records
+      where content_id = $1
+      order by version_number asc nulls last, id asc
+    `,
+    [contentId.toString()]
+  );
+
+  return result.rows.map(normalizeRecord);
+}
+
+export async function getContentStorageLifecycleSummary(contentId: bigint) {
+  const records = await listIpfsUploadRecordsByContentId(contentId);
+
+  if (records.length === 0) {
+    return null;
+  }
+
+  const scheduledAt = records
+    .map((item) => item.deletionScheduledAt)
+    .find((item) => !!item) ?? null;
+  const purgedCount = records.filter((item) => item.purgedAt).length;
+
+  return {
+    contentId,
+    totalRecords: records.length,
+    purgedCount,
+    hasPendingPurge: !!scheduledAt,
+    scheduledAt,
+    fullyPurged: purgedCount === records.length,
+  };
 }
