@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * 模块说明：内容广场分区组件集合，负责把内容列表区和内容上传区拆成可复用的展示单元。
+ * @file 内容广场分区组件集合。
+ * @description 负责把内容列表区和内容发布区拆成可复用的展示单元。
  */
 import { formatEther } from "viem";
 
@@ -19,8 +20,8 @@ import {
 import type { ContentCardData } from "@/types/content";
 
 /**
- * 渲染内容列表分区。
- * @param search 当前搜索关键词。
+ * @notice 渲染内容列表分区。
+ * @param search 当前搜索关键字。
  * @param scope 当前筛选范围。
  * @param sortBy 当前排序方式。
  * @param page 当前页码。
@@ -157,30 +158,29 @@ export function ContentListSection({
 }
 
 /**
- * 渲染内容上传与链上注册分区。
+ * @notice 渲染内容上传与链上登记分区。
  * @param title 待发布内容标题。
  * @param desc 待发布内容描述。
  * @param file 当前选中的文件。
- * @param uploadedCid 已上传文件的 CID。
- * @param uploadedUrl 已上传文件的网关地址。
- * @param uploading 是否正在上传。
- * @param registering 是否正在注册上链。
+ * @param lastPublishedCid 最近一次成功上传的 CID。
+ * @param lastPublishedUrl 最近一次成功上传的网关地址。
+ * @param uploading 是否正在上传文件。
+ * @param registering 是否正在登记上链。
  * @param isAuthenticating 是否正在进行上传鉴权。
- * @param registerFee 当前内容注册费用。
+ * @param registerFee 当前内容登记费用。
  * @param uploadMaxFileSizeText 上传大小限制文本。
  * @param onTitleChange 标题变更回调。
  * @param onDescriptionChange 描述变更回调。
  * @param onFileChange 文件变更回调。
- * @param onUpload 上传触发回调。
- * @param onRegister 注册触发回调。
- * @returns 内容上传与注册区块。
+ * @param onPublish 发布触发回调。
+ * @returns 内容发布区块。
  */
 export function ContentUploadSection({
   title,
   desc,
   file,
-  uploadedCid,
-  uploadedUrl,
+  lastPublishedCid,
+  lastPublishedUrl,
   uploading,
   registering,
   isAuthenticating,
@@ -189,14 +189,13 @@ export function ContentUploadSection({
   onTitleChange,
   onDescriptionChange,
   onFileChange,
-  onUpload,
-  onRegister,
+  onPublish,
 }: {
   title: string;
   desc: string;
   file: File | null;
-  uploadedCid: string;
-  uploadedUrl: string;
+  lastPublishedCid: string;
+  lastPublishedUrl: string;
   uploading: boolean;
   registering: boolean;
   isAuthenticating: boolean;
@@ -205,9 +204,16 @@ export function ContentUploadSection({
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onFileChange: (file: File) => void;
-  onUpload: () => void;
-  onRegister: () => void;
+  onPublish: () => void;
 }) {
+  const publishLabel = isAuthenticating
+    ? CONTENT_PAGE_COPY.authenticating
+    : uploading
+      ? CONTENT_PAGE_COPY.uploading
+      : registering
+        ? CONTENT_PAGE_COPY.registering
+        : CONTENT_PAGE_COPY.uploadAndRegister;
+
   return (
     <div>
       <SectionCard
@@ -253,33 +259,26 @@ export function ContentUploadSection({
           </div>
 
           <button
-            onClick={onUpload}
-            disabled={!file || uploading || isAuthenticating}
+            type="button"
+            onClick={onPublish}
+            disabled={!file || uploading || registering || isAuthenticating}
             className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
           >
-            {isAuthenticating
-              ? CONTENT_PAGE_COPY.authenticating
-              : uploading
-                ? CONTENT_PAGE_COPY.uploading
-                : CONTENT_PAGE_COPY.uploadToLocalIpfs}
+            {publishLabel}
           </button>
 
-          {uploadedCid && (
-            <div className="space-y-3">
-              <CopyField label="CID" value={uploadedCid} />
-              <CopyField label={CONTENT_PAGE_COPY.localGatewayUrl} value={uploadedUrl} />
+          {lastPublishedCid && (
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+              <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                {CONTENT_PAGE_COPY.lastPublishResult}
+              </div>
+              <CopyField label="CID" value={lastPublishedCid} />
+              <CopyField
+                label={CONTENT_PAGE_COPY.localGatewayUrl}
+                value={lastPublishedUrl}
+              />
             </div>
           )}
-
-          <button
-            onClick={onRegister}
-            disabled={!uploadedCid || registering || registerFee === undefined}
-            className="w-full rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            {registering
-              ? CONTENT_PAGE_COPY.registering
-              : CONTENT_PAGE_COPY.registerOnchain}
-          </button>
         </div>
       </SectionCard>
     </div>

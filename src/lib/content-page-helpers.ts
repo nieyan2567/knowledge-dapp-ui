@@ -1,23 +1,24 @@
 /**
- * @notice Content 页面展示与列表辅助工具。
- * @dev 定义内容页文案、列表过滤排序分页逻辑以及上传策略展示格式化函数。
+ * @file Content 页面展示与列表辅助工具。
+ * @description 定义内容页面文案、列表过滤排序分页逻辑，以及上传策略展示格式化函数。
  */
 import type { ContentCardData, ContentData } from "@/types/content";
 
 /**
- * @notice 内容列表链上抓取分块大小。
+ * @notice Content 页面链上抓取分块大小。
  * @dev 用于分页读取内容合约时减少单次批量读取压力。
  */
 export const CONTENT_FETCH_CHUNK_SIZE = 20;
+
 /**
- * @notice 内容页默认每页展示数量。
+ * @notice Content 页面默认每页展示数量。
  * @dev 该值用于前端分页切片。
  */
 export const CONTENTS_PER_PAGE = 8;
 
 /**
  * @notice Content 页面静态文案集合。
- * @dev 供内容列表、上传表单和分页区域复用。
+ * @dev 供内容列表、发布表单和分页区域复用。
  */
 export const CONTENT_PAGE_COPY = {
   loadListFailed: "加载内容列表失败",
@@ -25,17 +26,21 @@ export const CONTENT_PAGE_COPY = {
   uploadFailed: "文件上传失败",
   uploadLoading: "正在上传文件到 IPFS...",
   uploadSuccess: "文件上传成功",
+  publishFailed: "内容发布失败",
   connectWalletFirst: "请先连接钱包",
-  uploadToIpfsFirst: "请先上传文件到 IPFS",
   titleRequired: "请输入内容标题",
   registerFeeLoading: "发布费用尚未加载完成",
   registerLoading: "正在提交链上登记交易...",
   registerSuccess: "链上登记交易已提交",
   registerFailed: "链上登记失败",
+  registerTrackingWarning:
+    "链上登记已确认，但上传记录回写失败，后台清理任务会自动修正状态",
+  orphanCleanupFailed:
+    "链上登记失败后的自动清理未完成，请稍后执行系统清理",
   headerEyebrow: "Content Registry / Local IPFS",
   headerTitle: "Content Hub",
   headerDescription:
-    "先完成钱包身份验证，再上传文件到本地 IPFS，最后将 CID 和元数据登记到链上。",
+    "前端会在一次操作中完成身份验证、文件上传到本地 IPFS，以及将 CID 和元数据自动登记到链上。",
   listTitle: "内容列表",
   searchPlaceholder: "搜索标题、描述或 CID...",
   scopeAll: "全部内容",
@@ -45,12 +50,12 @@ export const CONTENT_PAGE_COPY = {
   sortVotes: "按投票数",
   sortVersions: "按版本数",
   loadingList: "正在加载内容列表...",
-  emptyList: "暂无匹配内容，请先上传并登记第一条内容。",
+  emptyList: "暂无匹配内容，请先发布第一条内容。",
   prevPage: "上一页",
   nextPage: "下一页",
-  uploadTitle: "上传内容",
+  uploadTitle: "发布内容",
   uploadDescription:
-    "首次上传会要求钱包签名完成身份验证，验证成功后才会调用 IPFS 上传接口。",
+    "首次发布会要求钱包签名完成身份验证，验证通过后系统会先上传文件到本地 IPFS，再自动发起链上登记。",
   titlePlaceholder: "内容标题",
   descriptionPlaceholder: "内容描述",
   uploadPolicyDescription:
@@ -59,13 +64,13 @@ export const CONTENT_PAGE_COPY = {
   freeNow: "当前免费",
   loadingFee: "正在读取费用...",
   registerFeeDescription:
-    "链上登记时会把这笔费用转入协议金库，用于形成内容发布的消耗口。",
+    "链上登记时会把这笔费用转入协议金库，用于形成内容发布的消耗门槛。",
   authenticating: "正在验证身份...",
   uploading: "正在上传...",
-  uploadToLocalIpfs: "上传到本地 IPFS",
+  uploadAndRegister: "上传并登记",
   localGatewayUrl: "本地网关 URL",
   registering: "正在登记...",
-  registerOnchain: "链上登记",
+  lastPublishResult: "最近一次发布结果",
   totalCountSummary: "共 {count} 条",
   paginationPageSummary: "第 {page} / {totalPages} 页",
   paginationPageSizeSummary: "每页 {pageSize} 条",
@@ -101,11 +106,11 @@ export function parseContentResults(
 }
 
 /**
- * @notice 根据范围和关键词过滤内容列表。
+ * @notice 根据范围和关键字过滤内容列表。
  * @param contentList 原始内容列表。
  * @param scope 当前查看范围，可选全部或仅我的内容。
  * @param address 当前钱包地址。
- * @param search 搜索关键词。
+ * @param search 搜索关键字。
  * @returns 过滤后的内容列表。
  */
 export function filterContentList(

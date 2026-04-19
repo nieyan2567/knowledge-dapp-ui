@@ -35,6 +35,8 @@ export type ApiRateLimitPolicyName =
   | "admin:validator-requests:reject"
   | "admin:validator-requests:remove"
   | "ipfs:upload"
+  | "ipfs:register-complete"
+  | "ipfs:cleanup-orphan"
   | "client:error"
   | "faucet:nonce"
   | "faucet:claim";
@@ -127,6 +129,10 @@ function getDefaultPolicy(name: ApiRateLimitPolicyName): ApiRateLimitPolicy {
       return { max: 20, windowSeconds: 300 };
     case "ipfs:upload":
       return { max: 10, windowSeconds: 300 };
+    case "ipfs:register-complete":
+      return { max: 20, windowSeconds: 300 };
+    case "ipfs:cleanup-orphan":
+      return { max: 20, windowSeconds: 300 };
     case "client:error":
       return { max: 30, windowSeconds: 60 };
     case "faucet:nonce":

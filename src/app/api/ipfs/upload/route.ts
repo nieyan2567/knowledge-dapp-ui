@@ -14,10 +14,12 @@ import {
   readUploadSession,
 } from "@/lib/auth/session";
 import { getServerEnv } from "@/lib/env";
+import { unpinLocalIpfsCid } from "@/lib/ipfs-kubo";
 import {
   captureServerEvent,
   captureServerException,
 } from "@/lib/observability/server";
+import { createIpfsUploadRecord } from "@/lib/upload-record-store";
 import { validateUploadFileServer } from "@/lib/upload-policy";
 
 /**
@@ -131,15 +133,41 @@ export async function POST(req: NextRequest) {
     }
 
     const { Hash: cid } = kuboResult.value;
+    const expiresAt = new Date(
+      Date.now() + env.UPLOAD_ORPHAN_TTL_SECONDS * 1000
+    );
+    let uploadRecord;
+
+    try {
+      uploadRecord = await createIpfsUploadRecord({
+        address: session.sub,
+        sessionId: session.id,
+        sessionVersion: session.version,
+        cid,
+        fileName: file.name,
+        fileSize: file.size,
+        expiresAt,
+      });
+    } catch (error) {
+      try {
+        await unpinLocalIpfsCid(cid);
+      } catch {
+        // 若回滚 unpin 失败，则保持原始异常继续抛出，由外层统一记录。
+      }
+
+      throw error;
+    }
 
     return NextResponse.json({
       provider: "local",
+      uploadId: uploadRecord.id,
       cid,
       name: file.name,
       size: file.size,
       url: `${gatewayUrl}/${cid}`,
       uploadedBy: session.sub,
       sessionVersion: session.version,
+      orphanExpiresAt: expiresAt.toISOString(),
     });
   } catch (error) {
     await captureServerException("Local IPFS upload failed", {

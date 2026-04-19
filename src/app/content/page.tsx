@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 /**
- * 模块说明：内容广场模块，负责内容列表重建、上传到 IPFS、以及内容注册到合约的前端流程。
+ * @file 内容广场模块。
+ * @description 负责内容列表重建，以及“一键上传到 IPFS 并自动登记到链上”的发布流程。
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -46,6 +47,12 @@ type ContentSortKey =
   | "votes_desc"
   | "versions_desc";
 
+type UploadedPublishAsset = {
+  uploadId: number;
+  cid: string;
+  url: string;
+};
+
 /**
  * 上报内容广场页面中的可恢复错误。
  * @param message 错误摘要信息。
@@ -81,8 +88,8 @@ export default function ContentPage() {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [uploadedCid, setUploadedCid] = useState("");
-  const [uploadedUrl, setUploadedUrl] = useState("");
+  const [lastPublishedCid, setLastPublishedCid] = useState("");
+  const [lastPublishedUrl, setLastPublishedUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [search, setSearch] = useState("");
@@ -246,10 +253,133 @@ export default function ContentPage() {
   }, [page, totalPages]);
 
   /**
-   * 把用户选择的文件上传到 IPFS。
-   * @returns 成功时写入 CID 和网关地址，失败时仅弹出错误提示。
+   * 上传文件到本地 IPFS，并返回这次上传的记录信息。
+   * @returns 成功时返回上传记录 ID、CID 与网关地址；失败时抛出异常。
    */
-  async function handleUploadToIpfs() {
+  const uploadContentAsset = useCallback(async () => {
+    if (!file) {
+      throw new Error(CONTENT_PAGE_COPY.selectFileFirst);
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    return txToast(
+      (async () => {
+        const response = await fetch("/api/ipfs/upload", {
+          method: "POST",
+          body: formData,
+          credentials: "same-origin",
+        });
+
+        const result = (await response.json()) as {
+          uploadId?: number;
+          cid?: string;
+          url?: string;
+          error?: string;
+        };
+
+        if (
+          !response.ok ||
+          typeof result.uploadId !== "number" ||
+          !result.cid ||
+          !result.url
+        ) {
+          throw new Error(result.error || CONTENT_PAGE_COPY.uploadFailed);
+        }
+
+        return {
+          uploadId: result.uploadId,
+          cid: result.cid,
+          url: result.url,
+        } satisfies UploadedPublishAsset;
+      })(),
+      CONTENT_PAGE_COPY.uploadLoading,
+      CONTENT_PAGE_COPY.uploadSuccess,
+      CONTENT_PAGE_COPY.uploadFailed
+    );
+  }, [file]);
+
+  /**
+   * 在链上登记成功后回写上传记录状态。
+   * @param uploadId 上传记录 ID。
+   * @param txHash 对应的链上交易哈希。
+   */
+  const markUploadRegistered = useCallback(
+    async (uploadId: number, txHash: `0x${string}`) => {
+      const response = await fetch("/api/ipfs/register-complete", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          uploadId,
+          txHash,
+        }),
+      });
+
+      const result = (await response.json()) as {
+        ok?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || "Failed to mark upload as registered");
+      }
+    },
+    []
+  );
+
+  /**
+   * 在发布流程失败时请求服务端立即回收刚刚上传的孤儿文件。
+   * @param uploadId 上传记录 ID。
+   * @param reason 清理原因。
+   */
+  const cleanupFailedUpload = useCallback(
+    async (uploadId: number, reason: string) => {
+      try {
+        const response = await fetch("/api/ipfs/cleanup-orphan", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            uploadId,
+            reason,
+          }),
+        });
+
+        const result = (await response.json()) as {
+          ok?: boolean;
+          error?: string;
+        };
+
+        if (!response.ok || result.ok === false) {
+          throw new Error(result.error || "Failed to clean orphan upload");
+        }
+      } catch (error) {
+        reportContentPageError("Failed to clean orphan upload", error, {
+          uploadId,
+          reason,
+        });
+        toast.error(CONTENT_PAGE_COPY.orphanCleanupFailed);
+      }
+    },
+    []
+  );
+
+  /**
+   * 执行一键发布：上传到本地 IPFS 后自动调用 `registerContent`。
+   * @returns 成功时清空表单并刷新列表；失败时尝试清理孤儿文件。
+   */
+  async function handlePublishContent() {
+    if (!address) {
+      toast.error(CONTENT_PAGE_COPY.connectWalletFirst);
+      return;
+    }
+
     if (!file) {
       toast.error(CONTENT_PAGE_COPY.selectFileFirst);
       return;
@@ -258,79 +388,6 @@ export default function ContentPage() {
     const uploadValidation = validateUploadFile(file);
     if (!uploadValidation.ok) {
       toast.error(uploadValidation.error);
-      return;
-    }
-
-    const isAuthorized = await ensureUploadAuth();
-
-    if (!isAuthorized) {
-      return;
-    }
-
-    setUploading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const data = await txToast(
-        (async () => {
-          const response = await fetch("/api/ipfs/upload", {
-            method: "POST",
-            body: formData,
-            credentials: "same-origin",
-          });
-
-          const result = (await response.json()) as {
-            cid?: string;
-            url?: string;
-            error?: string;
-          };
-
-          if (!response.ok || !result.cid || !result.url) {
-            throw new Error(result.error || CONTENT_PAGE_COPY.uploadFailed);
-          }
-
-          return {
-            cid: result.cid,
-            url: result.url,
-          };
-        })(),
-        CONTENT_PAGE_COPY.uploadLoading,
-        CONTENT_PAGE_COPY.uploadSuccess,
-        CONTENT_PAGE_COPY.uploadFailed
-      );
-
-      setUploadedCid(data.cid);
-      setUploadedUrl(data.url);
-    } catch (error) {
-      reportContentPageError("Failed to upload content to IPFS", error, {
-        fileName: file.name,
-      });
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  function handleFileChange(selectedFile: File) {
-    const uploadValidation = validateUploadFile(selectedFile);
-
-    if (!uploadValidation.ok) {
-      toast.error(uploadValidation.error);
-      return;
-    }
-
-    setFile(selectedFile);
-  }
-
-  async function handleRegisterContent() {
-    if (!address) {
-      toast.error(CONTENT_PAGE_COPY.connectWalletFirst);
-      return;
-    }
-
-    if (!uploadedCid) {
-      toast.error(CONTENT_PAGE_COPY.uploadToIpfsFirst);
       return;
     }
 
@@ -344,7 +401,31 @@ export default function ContentPage() {
       return;
     }
 
+    const isAuthorized = await ensureUploadAuth();
+
+    if (!isAuthorized) {
+      return;
+    }
+
+    let uploadedAsset: UploadedPublishAsset | null = null;
+
+    setUploading(true);
+
+    try {
+      uploadedAsset = await uploadContentAsset();
+      setLastPublishedCid(uploadedAsset.cid);
+      setLastPublishedUrl(uploadedAsset.url);
+    } catch (error) {
+      reportContentPageError("Failed to upload content to IPFS", error, {
+        fileName: file.name,
+      });
+      return;
+    } finally {
+      setUploading(false);
+    }
+
     setRegistering(true);
+    let chainRegistered = false;
 
     try {
       const hash = await writeTxToast({
@@ -354,7 +435,7 @@ export default function ContentPage() {
           address: CONTRACTS.KnowledgeContent as `0x${string}`,
           abi: ABIS.KnowledgeContent,
           functionName: "registerContent",
-          args: [uploadedCid, title.trim(), desc.trim()],
+          args: [uploadedAsset.cid, title.trim(), desc.trim()],
           value: typeof registerFee === "bigint" ? registerFee : 0n,
           account: address,
         },
@@ -364,23 +445,63 @@ export default function ContentPage() {
       });
 
       if (!hash) {
+        await cleanupFailedUpload(
+          uploadedAsset.uploadId,
+          "register_submission_failed"
+        );
         return;
       }
 
+      if (publicClient) {
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+        if (receipt.status !== "success") {
+          throw new Error("registerContent transaction reverted");
+        }
+      }
+      chainRegistered = true;
+
+      try {
+        await markUploadRegistered(uploadedAsset.uploadId, hash);
+      } catch (error) {
+        reportContentPageError("Failed to mark upload as registered", error, {
+          uploadId: uploadedAsset.uploadId,
+          cid: uploadedAsset.cid,
+          txHash: hash,
+        });
+        toast.warning(CONTENT_PAGE_COPY.registerTrackingWarning);
+      }
+
       setFile(null);
-      setUploadedCid("");
-      setUploadedUrl("");
       setTitle("");
       setDesc("");
 
       await refreshAfterTx(hash, refreshContentList, ["content", "dashboard"]);
     } catch (error) {
-      reportContentPageError("Failed to register content on-chain", error, {
-        cid: uploadedCid,
+      reportContentPageError("Failed to publish content", error, {
+        uploadId: uploadedAsset.uploadId,
+        cid: uploadedAsset.cid,
       });
+      if (!chainRegistered) {
+        await cleanupFailedUpload(
+          uploadedAsset.uploadId,
+          "register_confirmation_failed"
+        );
+      }
     } finally {
       setRegistering(false);
     }
+  }
+
+  function handleFileChange(selectedFile: File) {
+    const uploadValidation = validateUploadFile(selectedFile);
+
+    if (!uploadValidation.ok) {
+      toast.error(uploadValidation.error);
+      return;
+    }
+
+    setFile(selectedFile);
   }
 
   return (
@@ -414,8 +535,8 @@ export default function ContentPage() {
           title={title}
           desc={desc}
           file={file}
-          uploadedCid={uploadedCid}
-          uploadedUrl={uploadedUrl}
+          lastPublishedCid={lastPublishedCid}
+          lastPublishedUrl={lastPublishedUrl}
           uploading={uploading}
           registering={registering}
           isAuthenticating={isAuthenticating}
@@ -424,8 +545,7 @@ export default function ContentPage() {
           onTitleChange={setTitle}
           onDescriptionChange={setDesc}
           onFileChange={handleFileChange}
-          onUpload={handleUploadToIpfs}
-          onRegister={handleRegisterContent}
+          onPublish={handlePublishContent}
         />
       </div>
     </main>

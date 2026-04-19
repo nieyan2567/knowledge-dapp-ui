@@ -90,6 +90,7 @@ const serverEnvSchema = publicEnvSchema
     UPLOAD_PROVIDER: z.enum(["local"]).default("local"),
     IPFS_API_URL: urlWithDefault("http://127.0.0.1:5001"),
     IPFS_GATEWAY_URL: urlWithDefault("http://127.0.0.1:8080/ipfs"),
+    IPFS_GC_COOLDOWN_SECONDS: positiveIntWithDefault(300),
     UPLOAD_AUTH_SECRET: z.preprocess(
       emptyStringToUndefined,
       z.string().min(1).optional()
@@ -97,6 +98,8 @@ const serverEnvSchema = publicEnvSchema
     UPLOAD_AUTH_NONCE_TTL_SECONDS: positiveIntWithDefault(300),
     UPLOAD_AUTH_SESSION_TTL_SECONDS: positiveIntWithDefault(2 * 60 * 60),
     UPLOAD_MAX_FILE_SIZE_BYTES: positiveIntWithDefault(512 * 1024 * 1024),
+    UPLOAD_ORPHAN_TTL_SECONDS: positiveIntWithDefault(24 * 60 * 60),
+    UPLOAD_CLEANUP_BATCH_SIZE: positiveIntWithDefault(50),
     DATABASE_URL: optionalUrl,
     REDIS_URL: optionalUrl,
     BESU_ADMIN_RPC_URL: optionalUrl,
@@ -282,11 +285,14 @@ function getServerEnvSource() {
     UPLOAD_PROVIDER: process.env.UPLOAD_PROVIDER,
     IPFS_API_URL: process.env.IPFS_API_URL,
     IPFS_GATEWAY_URL: process.env.IPFS_GATEWAY_URL,
+    IPFS_GC_COOLDOWN_SECONDS: process.env.IPFS_GC_COOLDOWN_SECONDS,
     UPLOAD_AUTH_SECRET: process.env.UPLOAD_AUTH_SECRET,
     UPLOAD_AUTH_NONCE_TTL_SECONDS: process.env.UPLOAD_AUTH_NONCE_TTL_SECONDS,
     UPLOAD_AUTH_SESSION_TTL_SECONDS:
       process.env.UPLOAD_AUTH_SESSION_TTL_SECONDS,
     UPLOAD_MAX_FILE_SIZE_BYTES: process.env.UPLOAD_MAX_FILE_SIZE_BYTES,
+    UPLOAD_ORPHAN_TTL_SECONDS: process.env.UPLOAD_ORPHAN_TTL_SECONDS,
+    UPLOAD_CLEANUP_BATCH_SIZE: process.env.UPLOAD_CLEANUP_BATCH_SIZE,
     DATABASE_URL: process.env.DATABASE_URL,
     REDIS_URL: process.env.REDIS_URL,
     BESU_ADMIN_RPC_URL: process.env.BESU_ADMIN_RPC_URL,
